@@ -8,6 +8,7 @@ import {
   GridIcon,
   HorizontaLDots,
   ListIcon,
+  PageIcon,
   PieChartIcon,
   PlugInIcon,
   TableIcon,
@@ -30,7 +31,7 @@ const navItems: NavItem[] = [
     path: "/",
   },
   {
-    icon: <GridIcon />,
+    icon: <PageIcon />,
     name: "Page Description",
     path: "/page-description",
   },
