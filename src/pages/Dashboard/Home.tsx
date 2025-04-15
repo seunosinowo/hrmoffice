@@ -12,8 +12,8 @@ export default function HRDashboard() {
         title="HR Management System"
         description="Comprehensive HR analytics and employee management dashboard with performance metrics, competency analysis, and activity tracking"
       />
-      <div className="grid grid-cols-12 gap-4 md:gap-6">
-        <div className="col-span-12 space-y-6 xl:col-span-8">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 md:gap-6">
+        <div className="col-span-1 space-y-6 lg:col-span-8">
           <HRMetrics />
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -22,8 +22,8 @@ export default function HRDashboard() {
           </div>
         </div>
 
-        <div className="col-span-12 space-y-6 xl:col-span-4">
-          <div className="sticky top-6 space-y-6">
+        <div className="col-span-1 space-y-6 lg:col-span-4">
+          <div className="space-y-6 lg:sticky lg:top-6">
             <PerformanceStatistics />
             <RecentActivities />
           </div>

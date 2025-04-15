@@ -6,30 +6,61 @@ export default function CompetencyGapAnalysis() {
     chart: {
       fontFamily: "Outfit, sans-serif",
       type: "donut",
-      height: 300,
+      height: 320,
+      animations: {
+        enabled: true,
+        speed: 800,
+      },
     },
     colors: ["#10B981", "#F59E0B", "#EF4444"],
     labels: ["Met", "Partially Met", "Not Met"],
     legend: {
       position: "bottom",
-      horizontalAlign: "center",
+      horizontalAlign: "left",
+      fontSize: "13px",
+      markers: {
+        size: 10,
+      },
+      itemMargin: {
+        horizontal: 9,
+        vertical: 12
+      },
+      onItemClick: {
+        toggleDataSeries: false
+      },
+      floating: false,
+      offsetY: 5,
+      offsetX: 0,
+      formatter: function(seriesName) {
+        if (seriesName === "Partially Met") {
+          return "  " + seriesName;
+        }
+        return seriesName;
+      },
+      labels: {
+        colors: ["#6B7280", "#6B7280", "#6B7280"],
+        useSeriesColors: false
+      }
     },
     plotOptions: {
       pie: {
         donut: {
-          size: "65%",
+          size: "70%",
+          background: "transparent",
           labels: {
             show: true,
             name: {
               show: true,
               fontSize: "14px",
               color: "#6B7280",
+              offsetY: -10,
             },
             value: {
               show: true,
-              fontSize: "24px",
+              fontSize: "22px",
               fontWeight: "bold",
               color: "#111827",
+              offsetY: 5,
               formatter: function (val) {
                 return val + "%";
               },
@@ -40,6 +71,9 @@ export default function CompetencyGapAnalysis() {
               formatter: function () {
                 return "22%";
               },
+              color: "#111827",
+              fontSize: "14px",
+              fontWeight: "bold"
             },
           },
         },
@@ -50,13 +84,20 @@ export default function CompetencyGapAnalysis() {
     },
     responsive: [
       {
-        breakpoint: 640,
+        breakpoint: 1024,
         options: {
           chart: {
-            width: 200,
+            width: "100%",
+            height: 320,
           },
           legend: {
             position: "bottom",
+            horizontalAlign: "left",
+            offsetY: 5,
+            itemMargin: {
+              horizontal: 9,
+              vertical: 12
+            }
           },
         },
       },
@@ -74,8 +115,10 @@ export default function CompetencyGapAnalysis() {
         Current vs required competency levels
       </p>
 
-      <div className="mt-6">
-        <Chart options={options} series={series} type="donut" height={300} />
+      <div className="mt-6 flex items-center justify-center">
+        <div className="w-full max-w-[320px]">
+          <Chart options={options} series={series} type="donut" height={320} />
+        </div>
       </div>
     </div>
   );
