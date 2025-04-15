@@ -4,17 +4,24 @@ import {
   PlusIcon, 
   PencilIcon,
   TrashBinIcon,
-  EyeIcon
+  InfoIcon
 } from "../../icons";
+
+interface AssessorAssignment {
+  id: number;
+  employeeName: string;
+  employeeRole: string;
+  assessorName: string;
+  assessorRole: string;
+  assignedDate: string;
+}
 
 function EmployeeAssessorAssign() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
-  
-  // Sample data with assessor assignments
-  const assignments = [
+  const [assignments, setAssignments] = useState<AssessorAssignment[]>([
     { 
       id: 1, 
       employeeName: "Sarah Johnson", 
@@ -47,9 +54,15 @@ function EmployeeAssessorAssign() {
       assessorRole: "Design Lead",
       assignedDate: "2023-01-28"
     },
-  ];
+  ]);
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    employee: "",
+    assessor: ""
+  });
 
-  // Filter based on search term
+  // Filter assignments based on search term
   const filteredAssignments = assignments.filter(assignment => 
     assignment.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     assignment.assessorName.toLowerCase().includes(searchTerm.toLowerCase())
@@ -60,21 +73,91 @@ function EmployeeAssessorAssign() {
     setShowDeleteModal(true);
   };
 
+  const handleDeleteConfirm = () => {
+    if (selectedUser === null) return;
+    
+    // Update local state
+    setAssignments(assignments.filter(a => a.id !== selectedUser));
+    setShowDeleteModal(false);
+    setSelectedUser(null);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Get employee and assessor details from the selected values
+    const employeeId = parseInt(formData.employee);
+    const assessorId = parseInt(formData.assessor);
+    
+    if (isNaN(employeeId) || isNaN(assessorId)) return;
+    
+    // Find the selected employee and assessor
+    const employee = getEmployeeById(employeeId);
+    const assessor = getAssessorById(assessorId);
+    
+    if (!employee || !assessor) return;
+    
+    // Create new assignment with local ID
+    const newAssignment: AssessorAssignment = {
+      id: assignments.length > 0 ? Math.max(...assignments.map(a => a.id)) + 1 : 1,
+      employeeName: employee.name,
+      employeeRole: employee.role,
+      assessorName: assessor.name,
+      assessorRole: assessor.role,
+      assignedDate: new Date().toISOString().split('T')[0]
+    };
+    
+    // Update local state
+    setAssignments([newAssignment, ...assignments]);
+    
+    // Reset form and close modal
+    setFormData({
+      employee: "",
+      assessor: ""
+    });
+    setShowAddModal(false);
+  };
+
+  // Helper functions to get employee and assessor data
+  const getEmployeeById = (id: number) => {
+    const employees = [
+      { id: 1, name: "Sarah Johnson", role: "HR Manager" },
+      { id: 2, name: "Emma Rodriguez", role: "Marketing Specialist" },
+      { id: 3, name: "David Wilson", role: "Sales Representative" },
+      { id: 4, name: "James Taylor", role: "UX Designer" }
+    ];
+    return employees.find(e => e.id === id);
+  };
+
+  const getAssessorById = (id: number) => {
+    const assessors = [
+      { id: 1, name: "Michael Chen", role: "Senior HR Manager" },
+      { id: 2, name: "Lisa Anderson", role: "Marketing Director" },
+      { id: 3, name: "Robert Brown", role: "Sales Manager" },
+      { id: 4, name: "Olivia Martinez", role: "Design Lead" }
+    ];
+    return assessors.find(a => a.id === id);
+  };
+
   return (
     <div className="h-full overflow-auto p-6">
-
       {/* Header Section */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Assessor Assignments</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">Manage employee assessor relationships</p>
         </div>
-        <div className="flex justify-center sm:justify-end">
+        <div className="flex justify-center">
           <button 
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
-            <PlusIcon className="size-0" />
+            <PlusIcon className="size-4" />
             New Assignment
           </button>
         </div>
@@ -83,7 +166,7 @@ function EmployeeAssessorAssign() {
       {/* Search Bar */}
       <div className="mb-6 relative">
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-          <EyeIcon className="size-5 text-gray-400" />
+          <InfoIcon className="size-5 text-gray-400" />
         </div>
         <input
           type="text"
@@ -179,13 +262,13 @@ function EmployeeAssessorAssign() {
             onClick={() => setShowAddModal(true)}
             className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
-            <PlusIcon className="size-0" />
+            <PlusIcon className="size-4" />
             New Assignment
           </button>
         </div>
       )}
 
-      {/* Assignment Modal */}
+      {/* Add Assignment Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
           <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
@@ -194,13 +277,17 @@ function EmployeeAssessorAssign() {
               Assign an assessor to an employee
             </p>
             
-            <form className="mt-6 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
                 <label htmlFor="employee" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Employee
                 </label>
                 <select
                   id="employee"
+                  name="employee"
+                  value={formData.employee}
+                  onChange={handleInputChange}
+                  required
                   className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
                 >
                   <option value="">Select employee</option>
@@ -217,6 +304,10 @@ function EmployeeAssessorAssign() {
                 </label>
                 <select
                   id="assessor"
+                  name="assessor"
+                  value={formData.assessor}
+                  onChange={handleInputChange}
+                  required
                   className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
                 >
                   <option value="">Select assessor</option>
@@ -264,10 +355,7 @@ function EmployeeAssessorAssign() {
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  console.log('Delete assignment:', selectedUser);
-                  setShowDeleteModal(false);
-                }}
+                onClick={handleDeleteConfirm}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
               >
                 Delete

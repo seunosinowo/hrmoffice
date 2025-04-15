@@ -22,8 +22,8 @@ import PageDescription from "./pages/PageDescription/PageDescription";
 
 import User from "./pages/User_and_role_management/User";
 import Employee from "./pages/User_and_role_management/Employee";
-import EmployeeJobAssignment from "././pages/User_and_role_management/EmployeeJobAssignment";
-import EmployeeAssessorAssign from "././pages/User_and_role_management/EmployeeAssessorAssign";
+import EmployeeJobAssignment from "./pages/User_and_role_management/EmployeeJobAssignment";
+import EmployeeAssessorAssign from "./pages/User_and_role_management/EmployeeAssessorAssign";
 
 import OrganizationUnit from "./pages/Organizational_structure/Organization_unit";
 import Discipline from "./pages/Organizational_structure/Discipline";
