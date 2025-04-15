@@ -43,7 +43,7 @@ export default function EmployeeJobAssignment() {
       setLoading(true);
       setError(null);
       
-      // Check if Supabase client is initialized
+      // Checking if Supabase client is initialized
       if (!supabase) {
         throw new Error("Supabase client is not initialized");
       }
@@ -164,8 +164,8 @@ export default function EmployeeJobAssignment() {
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 w-full sm:w-auto"
           >
-            <PlusIcon className="size-4" />
-            <span className="text-center">New Assignment</span>
+            <PlusIcon className="size-0" />
+            <span className="text-center items-center justify-center -ms-1">New Assignment</span>
           </button>
         </div>
       </div>

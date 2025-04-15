@@ -122,7 +122,7 @@ function Employee() {
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 min-w-[140px] whitespace-nowrap"
           >
             <PlusIcon className="size-4" />
-            Add Employee
+             <span className="text-center -ms-6">Add Employee</span>
           </button>
         </div>
       </div>
