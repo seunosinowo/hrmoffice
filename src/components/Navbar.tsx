@@ -11,10 +11,11 @@ export default function Navbar() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 justify-between">
           <div className="flex">
-            <div className="flex flex-shrink-0 items-center">
+            <div className="flex flex-shrink-0 flex-col items-start justify-center">
               <Link to="/" className="text-xl font-bold text-gray-900 dark:text-white">
                 HRM Office
               </Link>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Competency assessments system</span>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link

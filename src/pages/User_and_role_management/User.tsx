@@ -17,23 +17,19 @@ const users = [
     department: "Engineering",
     avatar: "/images/user/owner.jpeg",
   },
-  // Add more users as needed
 ];
 
 export default function UserManagement() {
   const handleViewProfile = (userId: number) => {
     console.log(`View profile ${userId}`);
-    // Navigate to profile page or open modal
   };
 
   const handleEditProfile = (userId: number) => {
     console.log(`Edit profile ${userId}`);
-    // Open edit modal/form
   };
 
   const handleDeleteProfile = (userId: number) => {
     console.log(`Delete profile ${userId}`);
-    // Show confirmation dialog and delete
   };
 
   return (

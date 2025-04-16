@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import NotFound from "./pages/OtherPage/NotFound";
@@ -47,82 +47,89 @@ import OrganizationGap from "./pages/Analytics/OrganizationGap";
 
 import Home from "./pages/Dashboard/Home";
 
+import AboutPage from "./pages/NavPages/AboutPage";
+import Pricing from "./pages/NavPages/Pricing";
+import Resources from "./pages/NavPages/Resources";
+
 export default function App() {
   return (
-    <>
-      <Router>
-        <ScrollToTop />
-        <Routes>
-          {/* Dashboard Layout */}
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<Home />} />
+    <Router>
+      <ScrollToTop />
+      <Routes>
+        {/* Auth Layout */}
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/signup" element={<SignUp />} />
 
-            {/* Others Page */}
-            <Route path="/profile" element={<UserProfiles />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/blank" element={<Blank />} />
+        {/* Main Layout */}
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Home />} />
 
-            {/* Forms */}
-            <Route path="/form-elements" element={<FormElements />} />
+          {/* Others Page */}
+          <Route path="/profile" element={<UserProfiles />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/blank" element={<Blank />} />
 
-            {/* Tables */}
-            <Route path="/basic-tables" element={<BasicTables />} />
+          {/* Forms */}
+          <Route path="/form-elements" element={<FormElements />} />
 
-            {/* Ui Elements */}
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/avatars" element={<Avatars />} />
-            <Route path="/badge" element={<Badges />} />
-            <Route path="/buttons" element={<Buttons />} />
-            <Route path="/images" element={<Images />} />
-            <Route path="/videos" element={<Videos />} />
+          {/* Tables */}
+          <Route path="/basic-tables" element={<BasicTables />} />
 
-            {/* Charts */}
-            <Route path="/line-chart" element={<LineChart />} />
-            <Route path="/bar-chart" element={<BarChart />} />
+          {/* Ui Elements */}
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/avatars" element={<Avatars />} />
+          <Route path="/badge" element={<Badges />} />
+          <Route path="/buttons" element={<Buttons />} />
+          <Route path="/images" element={<Images />} />
+          <Route path="/videos" element={<Videos />} />
 
-            {/* Page Description */}
-            <Route path="/page-description" element={<PageDescription />} />
+          {/* Charts */}
+          <Route path="/line-chart" element={<LineChart />} />
+          <Route path="/bar-chart" element={<BarChart />} />
 
-            {/* User and Role Management */}
-            <Route path="/user" element={<User />} />
-            <Route path="/employee" element={<Employee />} />
-            <Route path="/employee-job-assignment" element={<EmployeeJobAssignment />} />
-            <Route path="/employee-assessor-assign" element={<EmployeeAssessorAssign />} />
+          {/* Page Description */}
+          <Route path="/page-description" element={<PageDescription />} />
 
-            {/* Organizational Structure */}
-            <Route path="/organization-unit" element={<OrganizationUnit />} />
-            <Route path="/discipline" element={<Discipline />} />
-            <Route path="/organization-competency" element={<OrganizationCompetency />} />
+          {/* User and Role Management */}
+          <Route path="/user" element={<User />} />
+          <Route path="/employee" element={<Employee />} />
+          <Route path="/employee-job-assignment" element={<EmployeeJobAssignment />} />
+          <Route path="/employee-assessor-assign" element={<EmployeeAssessorAssign />} />
 
-            {/* Competency Framework */}
-            <Route path="/competency-category" element={<CompetencyCategory />} />
-            <Route path="/competency-domain" element={<CompetencyDomain />} />
-            <Route path="/proficiency-level" element={<ProficiencyLevel />} />
-            <Route path="/competency" element={<Competency />} />
-            <Route path="/competency-proficiency-description" element={<CompetencyProficiencyDescription />} />
+          {/* Organizational Structure */}
+          <Route path="/organization-unit" element={<OrganizationUnit />} />
+          <Route path="/discipline" element={<Discipline />} />
+          <Route path="/organization-competency" element={<OrganizationCompetency />} />
 
-            {/* Job Profiling */}
-            <Route path="/job" element={<Job />} />
-            <Route path="/job-competency-profile" element={<JobCompetencyProfile />} />
+          {/* Competency Framework */}
+          <Route path="/competency-category" element={<CompetencyCategory />} />
+          <Route path="/competency-domain" element={<CompetencyDomain />} />
+          <Route path="/proficiency-level" element={<ProficiencyLevel />} />
+          <Route path="/competency" element={<Competency />} />
+          <Route path="/competency-proficiency-description" element={<CompetencyProficiencyDescription />} />
 
-            {/* Assessment Management */}
-            <Route path="/employee-assessment" element={<EmployeeAssessment />} />
-            <Route path="/assessor-assessment" element={<AssessorAssessment />} />
-            <Route path="/consensus-assessment" element={<ConsensusAssessment />} />
+          {/* Job Profiling */}
+          <Route path="/job" element={<Job />} />
+          <Route path="/job-competency-profile" element={<JobCompetencyProfile />} />
 
-            {/* Analytics */}
-            <Route path="/individual-gap" element={<IndividualGap />} />
-            <Route path="/organization-gap" element={<OrganizationGap />} />
-          </Route>
+          {/* Assessment Management */}
+          <Route path="/employee-assessment" element={<EmployeeAssessment />} />
+          <Route path="/assessor-assessment" element={<AssessorAssessment />} />
+          <Route path="/consensus-assessment" element={<ConsensusAssessment />} />
 
-          {/* Auth Layout */}
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
+          {/* Analytics */}
+          <Route path="/individual-gap" element={<IndividualGap />} />
+          <Route path="/organization-gap" element={<OrganizationGap />} />
 
-          {/* Fallback Route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Router>
-    </>
+          {/* Nav Pages */}
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/resources" element={<Resources />} />
+        </Route>
+
+        {/* Fallback Route */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Router>
   );
 }
