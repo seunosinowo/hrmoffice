@@ -40,24 +40,26 @@ export default function Navbar() {
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
             <ThemeToggleButton />
-            <Link
-              to="/auth/login"
-              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-            >
-              Login
-            </Link>
-            <Link
-              to="/auth/signup"
-              className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              Sign up
-            </Link>
-            <Link
-              to="/demo"
-              className="inline-flex items-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-            >
-              Book a demo
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                to="/auth/login"
+                className="text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-white"
+              >
+                Login
+              </Link>
+              <Link
+                to="/auth/signup"
+                className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md"
+              >
+                Sign up
+              </Link>
+              <Link
+                to="/book-demo"
+                className="text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-white"
+              >
+                Book a demo
+              </Link>
+            </div>
           </div>
           <div className="-mr-2 flex items-center sm:hidden">
             <button
@@ -116,7 +118,7 @@ export default function Navbar() {
                 Sign up
               </Link>
               <Link
-                to="/demo"
+                to="/book-demo"
                 className="block px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
               >
                 Book a demo

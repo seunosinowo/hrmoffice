@@ -59,20 +59,20 @@ export default function PricingPage() {
           {plans.map((plan) => (
             <div 
               key={plan.name} 
-              className={`relative rounded-2xl shadow-lg overflow-hidden ${
+              className={`relative rounded-2xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 ${
                 plan.popular 
-                  ? "ring-2 ring-blue-500 dark:ring-blue-400 transform md:-translate-y-4" 
+                  ? "ring-2 ring-blue-500 dark:ring-blue-400 transform md:-translate-y-4 bg-gradient-to-b from-white to-blue-50 dark:from-gray-800 dark:to-gray-700" 
                   : "bg-white dark:bg-gray-800"
               }`}
             >
               {plan.popular && (
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-medium">
-                  Most Popular
+                <div className="absolute top-5 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-bold tracking-wide shadow-lg animate-pulse z-10">
+                  MOST POPULAR
                 </div>
               )}
-              <div className="p-8">
+              <div className="p-8 pt-12">
                 <div className="flex items-center mb-6">
-                  <div className="mr-4">{plan.icon}</div>
+                  <div className="mr-4 transform hover:scale-110 transition-transform duration-300">{plan.icon}</div>
                   <div>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{plan.name}</h3>
                     <p className="text-gray-600 dark:text-gray-300">{plan.desc}</p>
@@ -84,16 +84,16 @@ export default function PricingPage() {
                 </div>
                 <ul className="space-y-4 mb-8">
                   {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start">
-                      <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-700 dark:text-gray-300">{feature}</span>
+                    <li key={feature} className="flex items-start group">
+                      <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0 transform group-hover:scale-110 transition-transform duration-300" />
+                      <span className="text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors duration-300">{feature}</span>
                     </li>
                   ))}
                 </ul>
                 <button
-                  className={`w-full py-3 px-6 rounded-lg font-medium ${
+                  className={`w-full py-3 px-6 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 ${
                     plan.popular
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
+                      ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl"
                       : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
                   }`}
                 >
@@ -106,24 +106,32 @@ export default function PricingPage() {
 
         <div className="mt-20 bg-white dark:bg-gray-800 rounded-2xl p-10">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">
-            Frequently Asked Questions
+            HR Management FAQs
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <FAQItem 
-              question="Can I change plans later?" 
-              answer="Yes, you can upgrade or downgrade at any time." 
+              question="How does employee onboarding work in your system?" 
+              answer="Our platform provides automated onboarding workflows with document signing, task assignments, and training tracking to streamline new hire processes." 
             />
             <FAQItem 
-              question="Is there a free trial?" 
-              answer="All paid plans come with a 14-day free trial." 
+              question="Can we customize performance review templates?" 
+              answer="Yes, all plans include customizable review templates with advanced options available in Business and Enterprise tiers." 
             />
             <FAQItem 
-              question="What payment methods do you accept?" 
-              answer="We accept all major credit cards and PayPal." 
+              question="Is payroll integration included?" 
+              answer="Payroll integration is available in our Business and Enterprise plans with support for 50+ payroll providers." 
             />
             <FAQItem 
-              question="Do you offer discounts for non-profits?" 
-              answer="Yes! Contact our sales team for special pricing." 
+              question="How secure is our employee data?" 
+              answer="We use enterprise-grade encryption, SOC 2 compliance, and regular security audits to protect all HR data." 
+            />
+            <FAQItem 
+              question="Can managers access team analytics?" 
+              answer="Yes, role-based dashboards give managers real-time insights into their team's metrics and KPIs." 
+            />
+            <FAQItem 
+              question="Do you offer implementation support?" 
+              answer="All plans include onboarding assistance, with dedicated implementation managers for Enterprise customers." 
             />
           </div>
         </div>
@@ -134,8 +142,8 @@ export default function PricingPage() {
 
 function FAQItem({ question, answer }: { question: string, answer: string }) {
   return (
-    <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
-      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">{question}</h3>
+    <div className="border-b border-gray-200 dark:border-gray-700 pb-6 transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700 p-4 rounded-lg">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400">{question}</h3>
       <p className="text-gray-600 dark:text-gray-400">{answer}</p>
     </div>
   );

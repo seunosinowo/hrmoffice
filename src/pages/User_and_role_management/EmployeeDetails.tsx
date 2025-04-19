@@ -9,7 +9,7 @@ import {
   UserCircleIcon
 } from "../../icons";
 
-function Employee() {
+function EmployeeDetails() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -113,7 +113,7 @@ function Employee() {
       {/* Header Section */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Employee</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Employee Details</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">Digital energy employees</p>
         </div>
         <div className="flex justify-center sm:justify-end">
@@ -333,4 +333,4 @@ function Employee() {
   );
 }
 
-export default Employee;
+export default EmployeeDetails;
