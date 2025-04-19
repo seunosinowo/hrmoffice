@@ -74,7 +74,7 @@ export default function AppHeader() {
                 >
                   Book a demo
                 </Link>
-                <button
+          <button
                   onClick={signOut}
                   className="inline-flex items-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 >
@@ -105,7 +105,7 @@ export default function AppHeader() {
             )}
           </div>
           <div className="-mr-2 flex items-center sm:hidden">
-            <button
+          <button
               onClick={() => setIsOpen(!isOpen)}
               className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             >
@@ -115,7 +115,7 @@ export default function AppHeader() {
               ) : (
                 <HorizontaLDots className="block h-6 w-6" />
               )}
-            </button>
+                </button>
           </div>
         </div>
       </div>
@@ -171,7 +171,7 @@ export default function AppHeader() {
           <div className="border-t border-gray-200 pb-3 pt-4 dark:border-gray-700">
             <div className="space-y-1">
               <div className="px-4 py-2">
-                <ThemeToggleButton />
+            <ThemeToggleButton />
               </div>
               {user ? (
                 <>
