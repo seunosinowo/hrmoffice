@@ -146,7 +146,7 @@ export default function ResourcesPage() {
             </div>
             <div className="md:w-1/3 flex justify-center md:justify-end">
               <button className="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition-colors">
-                Visit Knowledge Base
+                Browse All Resources
               </button>
             </div>
           </div>

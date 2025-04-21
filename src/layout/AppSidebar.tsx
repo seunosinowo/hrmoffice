@@ -310,6 +310,7 @@ const AppSidebar: React.FC = () => {
                 width={150}
                 height={40}
               />
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">Competency assessments system</p>
             </>
           ) : (
             <img

@@ -4,38 +4,78 @@ import {
   UserIcon, 
   PlusIcon, 
   TrashBinIcon,
-  InfoIcon
+  InfoIcon,
+  PencilIcon,
+  ChevronDownIcon
 } from "../../icons";
 
 interface JobAssignment {
   id: number;
   employee_name: string;
-  job_title: string;
-  department: string;
+  job_role: string;
   start_date: string;
-  end_date: string;
-  status: string;
+  created_at: string;
 }
+
+interface JobRole {
+  id: number;
+  name: string;
+  description: string;
+  created_at: string;
+}
+
+// Add this function after the interfaces
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
 
 export default function EmployeeJobAssignment() {
   const [assignments, setAssignments] = useState<JobAssignment[]>([]);
+  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<JobAssignment | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [formData, setFormData] = useState<Omit<JobAssignment, 'id'>>({
+  const [formData, setFormData] = useState<Omit<JobAssignment, 'id' | 'created_at'>>({
     employee_name: "",
-    job_title: "",
-    department: "",
-    start_date: "",
-    end_date: "",
-    status: "Active"
+    job_role: "",
+    start_date: ""
   });
+  
+  // Loading states for actions
+  const [isAdding, setIsAdding] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Dropdown state
+  const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
 
   useEffect(() => {
     fetchAssignments();
+    fetchJobRoles();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.actions-dropdown')) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const fetchAssignments = async () => {
@@ -43,27 +83,13 @@ export default function EmployeeJobAssignment() {
       setLoading(true);
       setError(null);
       
-      // Checking if Supabase client is initialized
-      if (!supabase) {
-        throw new Error("Supabase client is not initialized");
-      }
-      
       const { data, error } = await supabase
-        .from('employee_job_assignments') 
-        .select('*');
-      
-      if (error) {
-        console.error("Supabase error:", error);
-        throw error;
-      }
-      
-      // Handle empty data case
-      if (!data || data.length === 0) {
-        setAssignments([]);
-        return;
-      }
-      
-      setAssignments(data);
+        .from('employee_job_assignments')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAssignments(data || []);
     } catch (err) {
       console.error("Error fetching assignments:", err);
       setError('Failed to load job assignments. Please try again later.');
@@ -72,43 +98,93 @@ export default function EmployeeJobAssignment() {
     }
   };
 
+  const fetchJobRoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('job_roles')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setJobRoles(data || []);
+    } catch (err) {
+      console.error("Error fetching job roles:", err);
+    }
+  };
+
   // Filter assignments based on search term
   const filteredAssignments = assignments.filter(assignment => 
     assignment.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    assignment.job_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    assignment.department.toLowerCase().includes(searchTerm.toLowerCase())
+    assignment.job_role.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      // First insert the new assignment
-      const { error: insertError } = await supabase
+      setIsAdding(true);
+      
+      const { data, error } = await supabase
         .from('employee_job_assignments')
-        .insert([formData]);
+        .insert([formData])
+        .select()
+        .single();
+
+      if (error) throw error;
       
-      if (insertError) {
-        console.error("Insert error:", insertError);
-        throw insertError;
-      }
-      
-      // Then fetch the updated list
-      await fetchAssignments();
-      
-      // Reset form and close modal
+      setAssignments([data, ...assignments]);
+      setShowAddModal(false);
       setFormData({
         employee_name: "",
-        job_title: "",
-        department: "",
-        start_date: "",
-        end_date: "",
-        status: "Active"
+        job_role: "",
+        start_date: ""
       });
-      setShowAddModal(false);
     } catch (err) {
       console.error("Error adding assignment:", err);
       setError('Failed to add assignment. Please try again later.');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const handleEdit = (assignment: JobAssignment) => {
+    setSelectedAssignment(assignment);
+    setFormData({
+      employee_name: assignment.employee_name,
+      job_role: assignment.job_role,
+      start_date: assignment.start_date
+    });
+    setShowEditModal(true);
+    setActiveDropdown(null);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedAssignment) return;
+    
+    try {
+      setIsUpdating(true);
+      
+      const { data, error } = await supabase
+        .from('employee_job_assignments')
+        .update(formData)
+        .eq('id', selectedAssignment.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setAssignments(assignments.map(assignment => 
+        assignment.id === selectedAssignment.id ? data : assignment
+      ));
+      setShowEditModal(false);
+      setSelectedAssignment(null);
+    } catch (err) {
+      console.error("Error updating assignment:", err);
+      setError('Failed to update assignment. Please try again later.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -116,38 +192,31 @@ export default function EmployeeJobAssignment() {
     if (!selectedAssignment) return;
     
     try {
+      setIsDeleting(true);
+      
       const { error } = await supabase
         .from('employee_job_assignments')
         .delete()
         .eq('id', selectedAssignment.id);
+
+      if (error) throw error;
       
-      if (error) {
-        console.error("Delete error:", error);
-        throw error;
-      }
-      
-      // Refresh the assignments list
-      await fetchAssignments();
-      
+      setAssignments(assignments.filter(assignment => assignment.id !== selectedAssignment.id));
       setShowDeleteModal(false);
       setSelectedAssignment(null);
     } catch (err) {
       console.error("Error deleting assignment:", err);
       setError('Failed to delete assignment. Please try again later.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  // Get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      case 'Pending':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'On Leave':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+  const toggleDropdown = (id: number) => {
+    if (activeDropdown === id) {
+      setActiveDropdown(null);
+    } else {
+      setActiveDropdown(id);
     }
   };
 
@@ -165,7 +234,7 @@ export default function EmployeeJobAssignment() {
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 w-full sm:w-auto"
           >
             <PlusIcon className="size-0" />
-            <span className="text-center items-center justify-center -ms-1">New Assignment</span>
+            <span className="text-center items-center justify-center">New Assignment</span>
           </button>
         </div>
       </div>
@@ -178,7 +247,7 @@ export default function EmployeeJobAssignment() {
         <input
           type="text"
           className="block w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white dark:placeholder-gray-400"
-          placeholder="Search by employee, job title, or department..."
+          placeholder="Search by employee or job role..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -213,22 +282,13 @@ export default function EmployeeJobAssignment() {
               <thead className="bg-gray-50 dark:bg-gray-800/50">
                 <tr>
                   <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Employee
+                    Employee Details
                   </th>
                   <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Job Title
-                  </th>
-                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Department
+                    Job Role
                   </th>
                   <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Start Date
-                  </th>
-                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    End Date
-                  </th>
-                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Status
                   </th>
                   <th scope="col" className="whitespace-nowrap px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Actions
@@ -249,34 +309,43 @@ export default function EmployeeJobAssignment() {
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
-                      {assignment.job_title}
+                      {assignment.job_role}
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
-                      {assignment.department}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
-                      {assignment.start_date}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
-                      {assignment.end_date}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-4">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(assignment.status)}`}>
-                        {assignment.status}
-                      </span>
+                      {formatDate(assignment.start_date)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-medium">
-                      <div className="flex justify-end gap-2">
+                      <div className="relative actions-dropdown">
                         <button 
-                          onClick={() => {
-                            setSelectedAssignment(assignment);
-                            setShowDeleteModal(true);
-                          }}
-                          className="rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
-                          title="Delete"
+                          onClick={() => toggleDropdown(assignment.id)}
+                          className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
                         >
-                          <TrashBinIcon className="size-4" />
+                          Actions
+                          <ChevronDownIcon className="ml-1 size-4" />
                         </button>
+                        
+                        {activeDropdown === assignment.id && (
+                          <div className="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900" style={{ position: 'fixed' }}>
+                            <button 
+                              onClick={() => handleEdit(assignment)}
+                              className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                            >
+                              <PencilIcon className="mr-2 size-4 text-amber-500" />
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setSelectedAssignment(assignment);
+                                setShowDeleteModal(true);
+                                setActiveDropdown(null);
+                              }}
+                              className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                            >
+                              <TrashBinIcon className="mr-2 size-4 text-red-500" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -299,7 +368,7 @@ export default function EmployeeJobAssignment() {
             onClick={() => setShowAddModal(true)}
             className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
-            <PlusIcon className="size-4" />
+            <PlusIcon className="size-0" />
             New Assignment
           </button>
         </div>
@@ -330,78 +399,35 @@ export default function EmployeeJobAssignment() {
               </div>
               
               <div>
-                <label htmlFor="job_title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Job Title
-                </label>
-                <input
-                  type="text"
-                  id="job_title"
-                  value={formData.job_title}
-                  onChange={(e) => setFormData({...formData, job_title: e.target.value})}
-                  required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Department
-                </label>
-                <input
-                  type="text"
-                  id="department"
-                  value={formData.department}
-                  onChange={(e) => setFormData({...formData, department: e.target.value})}
-                  required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="start_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    id="start_date"
-                    value={formData.start_date}
-                    onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-                    required
-                    className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="end_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    id="end_date"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-                    required
-                    className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Status
+                <label htmlFor="job_role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Job Role
                 </label>
                 <select
-                  id="status"
-                  value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
+                  id="job_role"
+                  value={formData.job_role}
+                  onChange={(e) => setFormData({...formData, job_role: e.target.value})}
                   required
                   className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
                 >
-                  <option value="Active">Active</option>
-                  <option value="Pending">Pending</option>
-                  <option value="On Leave">On Leave</option>
+                  <option value="">Select a job role</option>
+                  {jobRoles.map(role => (
+                    <option key={role.id} value={role.name}>{role.name}</option>
+                  ))}
                 </select>
+              </div>
+              
+              <div>
+                <label htmlFor="start_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  id="start_date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
+                />
               </div>
               
               <div className="flex items-center justify-end gap-3 pt-4">
@@ -409,14 +435,108 @@ export default function EmployeeJobAssignment() {
                   type="button"
                   onClick={() => setShowAddModal(false)}
                   className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                  disabled={isAdding}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                  disabled={isAdding}
                 >
-                  Add Assignment
+                  {isAdding ? (
+                    <>
+                      <div className="mr-2 size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      Adding...
+                    </>
+                  ) : (
+                    'Add Assignment'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Assignment Modal */}
+      {showEditModal && selectedAssignment && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
+            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Edit Job Assignment</h2>
+            <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
+              Update job assignment details
+            </p>
+            
+            <form onSubmit={handleUpdate} className="mt-6 space-y-4 max-h-[70vh] overflow-y-auto pr-2 pl-1">
+              <div>
+                <label htmlFor="edit_employee_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Employee Name
+                </label>
+                <input
+                  type="text"
+                  id="edit_employee_name"
+                  value={formData.employee_name}
+                  onChange={(e) => setFormData({...formData, employee_name: e.target.value})}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="edit_job_role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Job Role
+                </label>
+                <select
+                  id="edit_job_role"
+                  value={formData.job_role}
+                  onChange={(e) => setFormData({...formData, job_role: e.target.value})}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
+                >
+                  <option value="">Select a job role</option>
+                  {jobRoles.map(role => (
+                    <option key={role.id} value={role.name}>{role.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="edit_start_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  id="edit_start_date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
+                />
+              </div>
+              
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                  disabled={isUpdating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? (
+                    <>
+                      <div className="mr-2 size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Assignment'
+                  )}
                 </button>
               </div>
             </form>
@@ -437,14 +557,23 @@ export default function EmployeeJobAssignment() {
               <button
                 onClick={() => setShowDeleteModal(false)}
                 className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                disabled={isDeleting}
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteConfirm}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
+                disabled={isDeleting}
               >
-                Delete
+                {isDeleting ? (
+                  <>
+                    <div className="mr-2 size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
               </button>
             </div>
           </div>

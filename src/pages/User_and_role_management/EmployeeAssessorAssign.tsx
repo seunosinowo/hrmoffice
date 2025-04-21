@@ -1,147 +1,283 @@
-import { useState } from "react";
+import { supabase } from '../../lib/supabase';
+import { useState, useEffect } from 'react';
 import { 
   UserIcon, 
   PlusIcon, 
-  PencilIcon,
   TrashBinIcon,
-  InfoIcon
+  InfoIcon,
+  PencilIcon,
+  ChevronDownIcon
 } from "../../icons";
 
 interface AssessorAssignment {
   id: number;
-  employeeName: string;
-  employeeRole: string;
-  assessorName: string;
-  assessorRole: string;
-  assignedDate: string;
+  employee_name: string;
+  department: string;
+  job_role: string;
+  assessor: string;
+  created_at: string;
 }
 
-function EmployeeAssessorAssign() {
-  const [searchTerm, setSearchTerm] = useState("");
+interface JobRole {
+  id: number;
+  name: string;
+  description: string;
+  created_at: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
+
+export default function EmployeeAssessorAssign() {
+  const [assignments, setAssignments] = useState<AssessorAssignment[]>([]);
+  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<number | null>(null);
-  const [assignments, setAssignments] = useState<AssessorAssignment[]>([
-    { 
-      id: 1, 
-      employeeName: "Sarah Johnson", 
-      employeeRole: "HR Manager",
-      assessorName: "Michael Chen",
-      assessorRole: "Senior HR Manager",
-      assignedDate: "2023-01-15"
-    },
-    { 
-      id: 2, 
-      employeeName: "Emma Rodriguez", 
-      employeeRole: "Marketing Specialist",
-      assessorName: "Lisa Anderson",
-      assessorRole: "Marketing Director",
-      assignedDate: "2023-02-20"
-    },
-    { 
-      id: 3, 
-      employeeName: "David Wilson", 
-      employeeRole: "Sales Representative",
-      assessorName: "Robert Brown",
-      assessorRole: "Sales Manager",
-      assignedDate: "2023-03-10"
-    },
-    { 
-      id: 4, 
-      employeeName: "James Taylor", 
-      employeeRole: "UX Designer",
-      assessorName: "Olivia Martinez",
-      assessorRole: "Design Lead",
-      assignedDate: "2023-01-28"
-    },
-  ]);
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    employee: "",
+  const [selectedAssignment, setSelectedAssignment] = useState<AssessorAssignment | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [formData, setFormData] = useState<Omit<AssessorAssignment, 'id' | 'created_at'>>({
+    employee_name: "",
+    department: "",
+    job_role: "",
     assessor: ""
   });
+  
+  // Loading states for actions
+  const [isAdding, setIsAdding] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Dropdown state
+  const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchAssignments();
+    fetchJobRoles();
+    fetchDepartments();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.actions-dropdown')) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const fetchAssignments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log("Fetching assignments...");
+      
+      // Try using a different approach
+      const { data, error } = await supabase
+        .from('employee_assessor_assignments')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Error fetching assignments:", error);
+        throw error;
+      }
+      
+      console.log("Fetched assignments:", data);
+      setAssignments(data || []);
+    } catch (err) {
+      console.error("Error fetching assignments:", err);
+      setError('Failed to load assessor assignments. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchJobRoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('job_roles')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setJobRoles(data || []);
+    } catch (err) {
+      console.error("Error fetching job roles:", err);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      console.log("Fetching departments...");
+      
+      // Try using a direct query with explicit schema
+      const { data, error, count } = await supabase
+        .from('departments')
+        .select('*', { count: 'exact' })
+        .order('name');
+
+      if (error) {
+        console.error("Error fetching departments:", error);
+        throw error;
+      }
+      
+      console.log("Fetched departments:", data);
+      console.log("Department count:", count);
+      
+      // If no departments found, try to insert some test data
+      if (!data || data.length === 0) {
+        console.log("No departments found. Inserting test data...");
+        
+        // Insert some test departments
+        const { data: insertData, error: insertError } = await supabase
+          .from('departments')
+          .insert([
+            { name: 'Human Resources', description: 'HR department' },
+            { name: 'Finance', description: 'Finance department' },
+            { name: 'Marketing', description: 'Marketing department' }
+          ])
+          .select();
+          
+        if (insertError) {
+          console.error("Error inserting test departments:", insertError);
+        } else {
+          console.log("Inserted test departments:", insertData);
+          setDepartments(insertData || []);
+          return;
+        }
+      }
+      
+      setDepartments(data || []);
+    } catch (err) {
+      console.error("Error fetching departments:", err);
+    }
+  };
 
   // Filter assignments based on search term
   const filteredAssignments = assignments.filter(assignment => 
-    assignment.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    assignment.assessorName.toLowerCase().includes(searchTerm.toLowerCase())
+    assignment.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    assignment.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    assignment.job_role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    assignment.assessor.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDelete = (assignmentId: number) => {
-    setSelectedUser(assignmentId);
-    setShowDeleteModal(true);
-  };
-
-  const handleDeleteConfirm = () => {
-    if (selectedUser === null) return;
-    
-    // Update local state
-    setAssignments(assignments.filter(a => a.id !== selectedUser));
-    setShowDeleteModal(false);
-    setSelectedUser(null);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Get employee and assessor details from the selected values
-    const employeeId = parseInt(formData.employee);
-    const assessorId = parseInt(formData.assessor);
-    
-    if (isNaN(employeeId) || isNaN(assessorId)) return;
-    
-    // Find the selected employee and assessor
-    const employee = getEmployeeById(employeeId);
-    const assessor = getAssessorById(assessorId);
-    
-    if (!employee || !assessor) return;
-    
-    // Create new assignment with local ID
-    const newAssignment: AssessorAssignment = {
-      id: assignments.length > 0 ? Math.max(...assignments.map(a => a.id)) + 1 : 1,
-      employeeName: employee.name,
-      employeeRole: employee.role,
-      assessorName: assessor.name,
-      assessorRole: assessor.role,
-      assignedDate: new Date().toISOString().split('T')[0]
-    };
-    
-    // Update local state
-    setAssignments([newAssignment, ...assignments]);
-    
-    // Reset form and close modal
+    try {
+      setIsAdding(true);
+      
+      const { data, error } = await supabase
+        .from('employee_assessor_assignments')
+        .insert([formData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setAssignments([data, ...assignments]);
+      setShowAddModal(false);
+      setFormData({
+        employee_name: "",
+        department: "",
+        job_role: "",
+        assessor: ""
+      });
+    } catch (err) {
+      console.error("Error adding assignment:", err);
+      setError('Failed to add assignment. Please try again later.');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const handleEdit = (assignment: AssessorAssignment) => {
+    setSelectedAssignment(assignment);
     setFormData({
-      employee: "",
-      assessor: ""
+      employee_name: assignment.employee_name,
+      department: assignment.department,
+      job_role: assignment.job_role,
+      assessor: assignment.assessor
     });
-    setShowAddModal(false);
+    setShowEditModal(true);
+    setActiveDropdown(null);
   };
 
-  // Helper functions to get employee and assessor data
-  const getEmployeeById = (id: number) => {
-    const employees = [
-      { id: 1, name: "Sarah Johnson", role: "HR Manager" },
-      { id: 2, name: "Emma Rodriguez", role: "Marketing Specialist" },
-      { id: 3, name: "David Wilson", role: "Sales Representative" },
-      { id: 4, name: "James Taylor", role: "UX Designer" }
-    ];
-    return employees.find(e => e.id === id);
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedAssignment) return;
+    
+    try {
+      setIsUpdating(true);
+      
+      const { data, error } = await supabase
+        .from('employee_assessor_assignments')
+        .update(formData)
+        .eq('id', selectedAssignment.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setAssignments(assignments.map(assignment => 
+        assignment.id === selectedAssignment.id ? data : assignment
+      ));
+      setShowEditModal(false);
+      setSelectedAssignment(null);
+    } catch (err) {
+      console.error("Error updating assignment:", err);
+      setError('Failed to update assignment. Please try again later.');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
-  const getAssessorById = (id: number) => {
-    const assessors = [
-      { id: 1, name: "Michael Chen", role: "Senior HR Manager" },
-      { id: 2, name: "Lisa Anderson", role: "Marketing Director" },
-      { id: 3, name: "Robert Brown", role: "Sales Manager" },
-      { id: 4, name: "Olivia Martinez", role: "Design Lead" }
-    ];
-    return assessors.find(a => a.id === id);
+  const handleDeleteConfirm = async () => {
+    if (!selectedAssignment) return;
+    
+    try {
+      setIsDeleting(true);
+      
+      const { error } = await supabase
+        .from('employee_assessor_assignments')
+        .delete()
+        .eq('id', selectedAssignment.id);
+
+      if (error) throw error;
+      
+      setAssignments(assignments.filter(assignment => assignment.id !== selectedAssignment.id));
+      setShowDeleteModal(false);
+      setSelectedAssignment(null);
+    } catch (err) {
+      console.error("Error deleting assignment:", err);
+      setError('Failed to delete assignment. Please try again later.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const toggleDropdown = (id: number) => {
+    if (activeDropdown === id) {
+      setActiveDropdown(null);
+    } else {
+      setActiveDropdown(id);
+    }
   };
 
   return (
@@ -149,16 +285,16 @@ function EmployeeAssessorAssign() {
       {/* Header Section */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Assessor Assignments</h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">Manage employee assessor relationships</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Employee Assessor Assignment</h1>
+          <p className="mt-1 text-gray-600 dark:text-gray-400">Manage employee assessor assignments</p>
         </div>
-        <div className="flex justify-center">
+        <div className="flex justify-center sm:justify-end">
           <button 
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 w-full sm:w-auto"
           >
-            <PlusIcon className="size-4" />
-            New Assignment
+            <PlusIcon className="size-0" />
+            <span className="text-center items-center justify-center">New Assignment</span>
           </button>
         </div>
       </div>
@@ -170,88 +306,124 @@ function EmployeeAssessorAssign() {
         </div>
         <input
           type="text"
-          className="block w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white dark:placeholder-gray-400"
-          placeholder="Search by employee or assessor name..."
+          className="block w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white dark:placeholder-gray-400"
+          placeholder="Search by employee, department, job role, or assessor..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
-      {/* Assignments Table */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-gray-800/50">
-              <tr>
-                <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Employee
-                </th>
-                <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Assessor
-                </th>
-                <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Assigned Date
-                </th>
-                <th scope="col" className="whitespace-nowrap px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-white/[0.03]">
-              {filteredAssignments.map((assignment) => (
-                <tr key={assignment.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
-                  <td className="whitespace-nowrap px-4 py-4">
-                    <div className="flex items-center">
-                      <div className="flex size-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-                        <UserIcon className="size-5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="ml-4">
-                        <div className="font-medium text-gray-900 dark:text-white">{assignment.employeeName}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{assignment.employeeRole}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4">
-                    <div className="flex items-center">
-                      <div className="flex size-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                        <UserIcon className="size-5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div className="ml-4">
-                        <div className="font-medium text-gray-900 dark:text-white">{assignment.assessorName}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{assignment.assessorRole}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
-                    {assignment.assignedDate}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-medium">
-                    <div className="flex justify-end gap-2">
-                      <button 
-                        onClick={() => console.log('Edit assignment:', assignment.id)}
-                        className="rounded-lg p-2 text-blue-500 hover:bg-blue-50 hover:text-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/20 dark:hover:text-blue-300"
-                        title="Edit"
-                      >
-                        <PencilIcon className="size-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(assignment.id)}
-                        className="rounded-lg p-2 text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
-                        title="Delete"
-                      >
-                        <TrashBinIcon className="size-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Loading State */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="size-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading assignments...</p>
         </div>
-      </div>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+          <p className="text-red-700 dark:text-red-400">{error}</p>
+          <button 
+            onClick={fetchAssignments}
+            className="mt-2 rounded-lg bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/40"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {/* Assignments Table */}
+      {!loading && !error && (
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+              <thead className="bg-gray-50 dark:bg-gray-800/50">
+                <tr>
+                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Employee Details
+                  </th>
+                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Department
+                  </th>
+                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Job Role
+                  </th>
+                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Assessor
+                  </th>
+                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-white/[0.03]">
+                {filteredAssignments.map((assignment) => (
+                  <tr key={assignment.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
+                    <td className="whitespace-nowrap px-4 py-4">
+                      <div className="flex items-center">
+                        <div className="flex size-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                          <UserIcon className="size-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="ml-4">
+                          <div className="font-medium text-gray-900 dark:text-white">{assignment.employee_name}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
+                      {assignment.department}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
+                      {assignment.job_role}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
+                      {assignment.assessor}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-medium">
+                      <div className="relative actions-dropdown">
+                        <button 
+                          onClick={() => toggleDropdown(assignment.id)}
+                          className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                        >
+                          Actions
+                          <ChevronDownIcon className="ml-1 size-4" />
+                        </button>
+                        
+                        {activeDropdown === assignment.id && (
+                          <div className="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900" style={{ position: 'fixed' }}>
+                            <button 
+                              onClick={() => handleEdit(assignment)}
+                              className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                            >
+                              <PencilIcon className="mr-2 size-4 text-amber-500" />
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setSelectedAssignment(assignment);
+                                setShowDeleteModal(true);
+                                setActiveDropdown(null);
+                              }}
+                              className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                            >
+                              <TrashBinIcon className="mr-2 size-4 text-red-500" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Empty State */}
-      {filteredAssignments.length === 0 && (
+      {!loading && !error && filteredAssignments.length === 0 && (
         <div className="flex flex-col items-center justify-center py-12">
           <UserIcon className="size-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">No assignments found</h3>
@@ -262,7 +434,7 @@ function EmployeeAssessorAssign() {
             onClick={() => setShowAddModal(true)}
             className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
-            <PlusIcon className="size-4" />
+            <PlusIcon className="size-0" />
             New Assignment
           </button>
         </div>
@@ -274,27 +446,57 @@ function EmployeeAssessorAssign() {
           <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
             <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">New Assessor Assignment</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
-              Assign an assessor to an employee
+              Create a new assessor assignment for an employee
             </p>
             
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4 max-h-[70vh] overflow-y-auto pr-2 pl-1">
               <div>
-                <label htmlFor="employee" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Employee
+                <label htmlFor="employee_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Employee Name
+                </label>
+                <input
+                  type="text"
+                  id="employee_name"
+                  value={formData.employee_name}
+                  onChange={(e) => setFormData({...formData, employee_name: e.target.value})}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Department
                 </label>
                 <select
-                  id="employee"
-                  name="employee"
-                  value={formData.employee}
-                  onChange={handleInputChange}
+                  id="department"
+                  value={formData.department}
+                  onChange={(e) => setFormData({...formData, department: e.target.value})}
                   required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
                 >
-                  <option value="">Select employee</option>
-                  <option value="1">Sarah Johnson (HR Manager)</option>
-                  <option value="2">Emma Rodriguez (Marketing Specialist)</option>
-                  <option value="3">David Wilson (Sales Representative)</option>
-                  <option value="4">James Taylor (UX Designer)</option>
+                  <option value="">Select a department</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.name}>{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="job_role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Job Role
+                </label>
+                <select
+                  id="job_role"
+                  value={formData.job_role}
+                  onChange={(e) => setFormData({...formData, job_role: e.target.value})}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
+                >
+                  <option value="">Select a job role</option>
+                  {jobRoles.map(role => (
+                    <option key={role.id} value={role.name}>{role.name}</option>
+                  ))}
                 </select>
               </div>
               
@@ -302,20 +504,14 @@ function EmployeeAssessorAssign() {
                 <label htmlFor="assessor" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Assessor
                 </label>
-                <select
+                <input
+                  type="text"
                   id="assessor"
-                  name="assessor"
                   value={formData.assessor}
-                  onChange={handleInputChange}
+                  onChange={(e) => setFormData({...formData, assessor: e.target.value})}
                   required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
-                >
-                  <option value="">Select assessor</option>
-                  <option value="1">Michael Chen (Senior HR Manager)</option>
-                  <option value="2">Lisa Anderson (Marketing Director)</option>
-                  <option value="3">Robert Brown (Sales Manager)</option>
-                  <option value="4">Olivia Martinez (Design Lead)</option>
-                </select>
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
+                />
               </div>
               
               <div className="flex items-center justify-end gap-3 pt-4">
@@ -323,14 +519,126 @@ function EmployeeAssessorAssign() {
                   type="button"
                   onClick={() => setShowAddModal(false)}
                   className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                  disabled={isAdding}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                  disabled={isAdding}
                 >
-                  Assign Assessor
+                  {isAdding ? (
+                    <>
+                      <div className="mr-2 size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      Adding...
+                    </>
+                  ) : (
+                    'Add Assignment'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Assignment Modal */}
+      {showEditModal && selectedAssignment && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
+            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Edit Assessor Assignment</h2>
+            <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
+              Update assessor assignment details
+            </p>
+            
+            <form onSubmit={handleUpdate} className="mt-6 space-y-4 max-h-[70vh] overflow-y-auto pr-2 pl-1">
+              <div>
+                <label htmlFor="edit_employee_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Employee Name
+                </label>
+                <input
+                  type="text"
+                  id="edit_employee_name"
+                  value={formData.employee_name}
+                  onChange={(e) => setFormData({...formData, employee_name: e.target.value})}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="edit_department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Department
+                </label>
+                <select
+                  id="edit_department"
+                  value={formData.department}
+                  onChange={(e) => setFormData({...formData, department: e.target.value})}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
+                >
+                  <option value="">Select a department</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.name}>{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="edit_job_role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Job Role
+                </label>
+                <select
+                  id="edit_job_role"
+                  value={formData.job_role}
+                  onChange={(e) => setFormData({...formData, job_role: e.target.value})}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
+                >
+                  <option value="">Select a job role</option>
+                  {jobRoles.map(role => (
+                    <option key={role.id} value={role.name}>{role.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="edit_assessor" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Assessor
+                </label>
+                <input
+                  type="text"
+                  id="edit_assessor"
+                  value={formData.assessor}
+                  onChange={(e) => setFormData({...formData, assessor: e.target.value})}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
+                />
+              </div>
+              
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                  disabled={isUpdating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? (
+                    <>
+                      <div className="mr-2 size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Assignment'
+                  )}
                 </button>
               </div>
             </form>
@@ -339,7 +647,7 @@ function EmployeeAssessorAssign() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && selectedUser && (
+      {showDeleteModal && selectedAssignment && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
           <div className="w-full max-w-xs rounded-xl bg-white p-5 dark:bg-gray-900">
             <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Delete Assignment</h2>
@@ -351,14 +659,23 @@ function EmployeeAssessorAssign() {
               <button
                 onClick={() => setShowDeleteModal(false)}
                 className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                disabled={isDeleting}
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteConfirm}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
+                disabled={isDeleting}
               >
-                Delete
+                {isDeleting ? (
+                  <>
+                    <div className="mr-2 size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
               </button>
             </div>
           </div>
@@ -367,5 +684,3 @@ function EmployeeAssessorAssign() {
     </div>
   );
 }
-
-export default EmployeeAssessorAssign;
