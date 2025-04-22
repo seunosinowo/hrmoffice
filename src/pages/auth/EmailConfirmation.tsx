@@ -24,14 +24,29 @@ export default function EmailConfirmation() {
 
   const verifyEmail = async (token_hash: string) => {
     try {
-      const { error } = await supabase.auth.exchangeCodeForSession(token_hash);
+      // First, verify the email
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash,
+        type: "email"
+      });
 
-      if (error) {
-        throw error;
+      if (verifyError) {
+        throw verifyError;
       }
 
-      // Redirect to welcome page after successful verification
-      navigate("/auth/welcome");
+      // Then, get the session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (session) {
+        // Redirect to welcome page after successful verification
+        navigate("/auth/welcome");
+      } else {
+        throw new Error("No session found after verification");
+      }
     } catch (error: any) {
       console.error("Verification error:", error);
       setError(error.message || "Failed to verify email. Please try again.");
