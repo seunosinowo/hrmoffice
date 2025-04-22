@@ -40,7 +40,7 @@ export default function EmailConfirmation() {
         throw verifyError;
       }
 
-      // Then, get the session
+      // Get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
@@ -48,10 +48,32 @@ export default function EmailConfirmation() {
       }
 
       if (session) {
-        // Redirect to welcome page after successful verification
-        navigate("/auth/welcome");
+        // For local development, use navigate
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          navigate("/auth/welcome", { replace: true });
+        } else {
+          // For production, redirect to Vercel
+          window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
+        }
       } else {
-        throw new Error("No session found after verification");
+        // If no session, try to refresh it
+        const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError) {
+          throw refreshError;
+        }
+
+        if (newSession) {
+          // For local development, use navigate
+          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            navigate("/auth/welcome", { replace: true });
+          } else {
+            // For production, redirect to Vercel
+            window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
+          }
+        } else {
+          throw new Error("No session found after verification");
+        }
       }
     } catch (error: any) {
       console.error("Verification error:", error);

@@ -48,8 +48,12 @@ export default function SignUp() {
       }
       
       if (data?.user) {
-        // Show success message and redirect to email confirmation page
-        navigate("/auth/email-confirmation");
+        // For local development, navigate to email confirmation page
+        navigate("/auth/email-confirmation", { 
+          state: { 
+            message: "Please check your email for the confirmation link." 
+          } 
+        });
       }
     } catch (error: any) {
       setError(error.message);

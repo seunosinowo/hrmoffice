@@ -12,9 +12,31 @@ export default function WelcomePage() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        // First try to get the current session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (error) throw error;
+        if (sessionError) throw sessionError;
+        
+        if (!session) {
+          // If no session, try to refresh it
+          const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) throw refreshError;
+          
+          if (!newSession) {
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+              navigate('/auth/login', { replace: true });
+            } else {
+              window.location.href = 'https://hrmoffice.vercel.app/auth/login';
+            }
+            return;
+          }
+        }
+
+        // Get user data
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) throw userError;
         
         if (user) {
           // Extract name from email or use email as fallback
@@ -24,17 +46,29 @@ export default function WelcomePage() {
           
           // Automatically redirect to dashboard after 5 seconds
           const redirectTimer = setTimeout(() => {
-            navigate('/page-description');
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+              navigate('/page-description', { replace: true });
+            } else {
+              window.location.href = 'https://hrmoffice.vercel.app/page-description';
+            }
           }, 5000);
 
           return () => clearTimeout(redirectTimer);
         } else {
-          // If no user is found, redirect to login
-          navigate('/auth/login');
+          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            navigate('/auth/login', { replace: true });
+          } else {
+            window.location.href = 'https://hrmoffice.vercel.app/auth/login';
+          }
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
         setError("Failed to load user data. Please try again.");
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          navigate('/auth/login', { replace: true });
+        } else {
+          window.location.href = 'https://hrmoffice.vercel.app/auth/login';
+        }
       } finally {
         setLoading(false);
       }
