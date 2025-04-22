@@ -30,8 +30,8 @@ export default function EmailConfirmation() {
         throw error;
       }
 
-      // Redirect to dashboard after successful verification
-      navigate("/dashboard");
+      // Redirect to welcome page after successful verification
+      navigate("/auth/welcome");
     } catch (error: any) {
       setError(error.message);
       setVerifying(false);
@@ -52,6 +52,9 @@ export default function EmailConfirmation() {
             <div className="mt-4 flex justify-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
             </div>
+            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+              Please wait while we verify your email address.
+            </p>
           </div>
         </div>
       </div>

@@ -6,12 +6,15 @@ import { supabase } from "../../lib/supabase";
 export default function WelcomePage() {
   const [userName, setUserName] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error) throw error;
         
         if (user) {
           // Extract name from email or use email as fallback
@@ -20,16 +23,18 @@ export default function WelcomePage() {
           setUserName(displayName);
           
           // Automatically redirect to dashboard after 5 seconds
-          setTimeout(() => {
-            navigate('/dashboard');
+          const redirectTimer = setTimeout(() => {
+            navigate('/page-description');
           }, 5000);
+
+          return () => clearTimeout(redirectTimer);
         } else {
           // If no user is found, redirect to login
           navigate('/auth/login');
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
-        navigate('/auth/login');
+        setError("Failed to load user data. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -44,6 +49,34 @@ export default function WelcomePage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-600 dark:text-gray-400">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+          <div className="absolute top-4 right-4">
+            <ThemeToggleButton />
+          </div>
+          <div className="text-center">
+            <h2 className="mt-6 text-3xl font-extrabold text-gray-900 dark:text-white">
+              Error
+            </h2>
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+              {error}
+            </p>
+            <div className="mt-4">
+              <Link
+                to="/auth/login"
+                className="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+              >
+                Return to login
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -112,7 +145,7 @@ export default function WelcomePage() {
             
             <div className="mt-8">
               <button
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/page-description')}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
               >
                 Go to Dashboard

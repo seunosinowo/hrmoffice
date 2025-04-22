@@ -28,14 +28,14 @@ export default function SignUp() {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             signUpType
           },
-          emailRedirectTo: `${window.location.origin}/auth/email-confirmation`
+          emailRedirectTo: 'https://hrmoffice.vercel.app/auth/email-confirmation'
         }
       });
 
@@ -47,8 +47,10 @@ export default function SignUp() {
         throw error;
       }
       
-      // Show success message and redirect to email confirmation page
-      navigate("/auth/email-confirmation");
+      if (data?.user) {
+        // Show success message and redirect to email confirmation page
+        navigate("/auth/email-confirmation");
+      }
     } catch (error: any) {
       setError(error.message);
     } finally {
