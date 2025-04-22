@@ -16,6 +16,9 @@ export default function EmailConfirmation() {
     if (token_hash && type === "email") {
       setVerifying(true);
       verifyEmail(token_hash);
+    } else {
+      // If no token or type, show the initial state
+      setVerifying(false);
     }
   }, [searchParams]);
 
@@ -33,7 +36,8 @@ export default function EmailConfirmation() {
       // Redirect to welcome page after successful verification
       navigate("/auth/welcome");
     } catch (error: any) {
-      setError(error.message);
+      console.error("Verification error:", error);
+      setError(error.message || "Failed to verify email. Please try again.");
       setVerifying(false);
     }
   };
