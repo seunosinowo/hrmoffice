@@ -12,36 +12,32 @@ export default function EmailConfirmation() {
   useEffect(() => {
     const token_hash = searchParams.get("token_hash");
     const type = searchParams.get("type");
+    const error = searchParams.get("error");
+    const error_description = searchParams.get("error_description");
+    
+    if (error) {
+      setError(error_description || "Verification failed. The link may have expired.");
+      return;
+    }
     
     if (token_hash && type === "email") {
       setVerifying(true);
       verifyEmail(token_hash);
     } else {
-      // If no token or type, show the initial state
       setVerifying(false);
     }
   }, [searchParams]);
 
   const verifyEmail = async (token_hash: string) => {
     try {
-      // First, verify the email
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        token_hash,
-        type: "email"
-      });
-
-      if (verifyError) {
-        throw verifyError;
-      }
-
-      // Then, get the session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Exchange the code for a session
+      const { data, error } = await supabase.auth.exchangeCodeForSession(token_hash);
       
-      if (sessionError) {
-        throw sessionError;
+      if (error) {
+        throw error;
       }
 
-      if (session) {
+      if (data?.session) {
         // Redirect to welcome page after successful verification
         navigate("/auth/welcome");
       } else {
@@ -91,13 +87,16 @@ export default function EmailConfirmation() {
             <p className="mt-2 text-sm text-red-600 dark:text-red-400">
               {error}
             </p>
-            <div className="mt-4">
+            <div className="mt-4 space-y-4">
               <Link
                 to="/auth/login"
                 className="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
               >
                 Return to login
               </Link>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                If you need a new verification link, please try signing up again.
+              </p>
             </div>
           </div>
         </div>
