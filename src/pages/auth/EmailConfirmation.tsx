@@ -10,10 +10,16 @@ export default function EmailConfirmation() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token_hash = searchParams.get("token_hash");
-    const type = searchParams.get("type");
-    const error = searchParams.get("error");
-    const error_description = searchParams.get("error_description");
+    // Get the hash part of the URL
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    
+    const token_hash = params.get("token_hash") || searchParams.get("token_hash");
+    const type = params.get("type") || searchParams.get("type");
+    const error = params.get("error") || searchParams.get("error");
+    const error_description = params.get("error_description") || searchParams.get("error_description");
+    
+    console.log("Verification params:", { token_hash, type, error, error_description });
     
     if (error) {
       setError(error_description || "Verification failed. The link may have expired.");
@@ -24,12 +30,15 @@ export default function EmailConfirmation() {
       setVerifying(true);
       verifyEmail(token_hash);
     } else {
+      setError("Invalid verification link. Please try signing up again.");
       setVerifying(false);
     }
   }, [searchParams]);
 
   const verifyEmail = async (token_hash: string) => {
     try {
+      console.log("Verifying email with token:", token_hash);
+      
       // First, verify the email
       const { error: verifyError } = await supabase.auth.verifyOtp({
         token_hash,
@@ -37,6 +46,7 @@ export default function EmailConfirmation() {
       });
 
       if (verifyError) {
+        console.error("Verification error:", verifyError);
         throw verifyError;
       }
 
@@ -44,10 +54,12 @@ export default function EmailConfirmation() {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
+        console.error("Session error:", sessionError);
         throw sessionError;
       }
 
       if (session) {
+        console.log("Session found, redirecting to welcome page");
         // For local development, use navigate
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
           navigate("/auth/welcome", { replace: true });
@@ -56,14 +68,17 @@ export default function EmailConfirmation() {
           window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
         }
       } else {
+        console.log("No session found, trying to refresh");
         // If no session, try to refresh it
         const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
         
         if (refreshError) {
+          console.error("Refresh error:", refreshError);
           throw refreshError;
         }
 
         if (newSession) {
+          console.log("New session created, redirecting to welcome page");
           // For local development, use navigate
           if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             navigate("/auth/welcome", { replace: true });
