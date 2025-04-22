@@ -29,9 +29,6 @@ export default function EmailConfirmation() {
     if (token_hash && type === "email") {
       setVerifying(true);
       verifyEmail(token_hash);
-    } else {
-      setError("Invalid verification link. Please try signing up again.");
-      setVerifying(false);
     }
   }, [searchParams]);
 

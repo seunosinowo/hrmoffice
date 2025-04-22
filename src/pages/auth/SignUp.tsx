@@ -35,7 +35,9 @@ export default function SignUp() {
           data: {
             signUpType
           },
-          emailRedirectTo: 'https://hrmoffice.vercel.app/auth/email-confirmation'
+          emailRedirectTo: window.location.hostname === 'localhost' 
+            ? 'http://localhost:5173/auth/welcome'
+            : 'https://hrmoffice.vercel.app/auth/welcome'
         }
       });
 
