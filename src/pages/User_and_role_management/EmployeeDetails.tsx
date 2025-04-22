@@ -354,61 +354,67 @@ const EmployeeDetails: React.FC = () => {
             <div key={employee.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
               <div className="p-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-6">
                     <div className="relative">
                       <img
                         src={employee.profile_picture_url || getDefaultAvatarUrl()}
                         alt={`${employee.first_name} ${employee.last_name}`}
-                        className="h-16 w-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                        className="h-24 w-24 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.src = getDefaultAvatarUrl();
                         }}
                       />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {employee.first_name} {employee.last_name}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {employee.employee_number}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-6">
-                    <div className="text-center min-w-[200px]">
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        {employee.email}
-                      </p>
-                    </div>
-                    <div className="text-center min-w-[150px]">
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Departments</p>
-                      <div className="flex flex-wrap justify-center gap-1 mt-1">
-                        {employee.departments.map((dept) => (
-                          <span
-                            key={dept.id}
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                          >
-                            {dept.name}
-                          </span>
-                        ))}
+                    <div className="flex items-center space-x-8">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {employee.first_name} {employee.last_name}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {employee.employee_number}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Email</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          {employee.email}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Phone</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          {employee.phone_number}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Departments</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {employee.departments.map((dept) => (
+                            <span
+                              key={dept.id}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                            >
+                              {dept.name}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex space-x-4 ml-4">
-                      <button
-                        onClick={() => handleViewEmployee(employee.id)}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => handleEditEmployee(employee.id)}
-                        className="text-sm font-medium text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
-                      >
-                        Edit
-                      </button>
-                    </div>
+                  </div>
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={() => handleViewEmployee(employee.id)}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleEditEmployee(employee.id)}
+                      className="text-sm font-medium text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+                    >
+                      Edit
+                    </button>
                   </div>
                 </div>
               </div>
