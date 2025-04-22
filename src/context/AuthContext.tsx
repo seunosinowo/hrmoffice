@@ -65,6 +65,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: window.location.hostname === 'localhost' 
+          ? 'http://localhost:5173/auth/welcome'
+          : 'https://hrmoffice.vercel.app/auth/welcome'
+      }
     });
 
     if (error) {
@@ -84,7 +89,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`
+        redirectTo: window.location.hostname === 'localhost' 
+          ? 'http://localhost:5173/auth/callback'
+          : 'https://hrmoffice.vercel.app/auth/callback'
       }
     });
 

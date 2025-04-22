@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ThemeToggleButton } from "../../components/common/ThemeToggleButton";
-import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../context/AuthContext";
 
 type SignUpType = 'individual' | 'organization' | 'contractor';
 
@@ -14,7 +14,7 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false);
   const [signUpType, setSignUpType] = useState<SignUpType | null>(null);
   const navigate = useNavigate();
-  const { signInWithGoogle } = useAuth();
+  const { signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,36 +28,17 @@ export default function SignUp() {
     }
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            signUpType
-          },
-          emailRedirectTo: window.location.hostname === 'localhost' 
-            ? 'http://localhost:5173/auth/welcome'
-            : 'https://hrmoffice.vercel.app/auth/welcome'
-        }
+      await signUp(email, password);
+      navigate("/auth/email-confirmation", { 
+        state: { 
+          message: "Please check your email for the confirmation link." 
+        } 
       });
-
-      if (error) {
-        if (error.message.includes('already registered')) {
-          setError("This email is already registered. Please try logging in instead.");
-          return;
-        }
-        throw error;
-      }
-      
-      if (data?.user) {
-        // For local development, navigate to email confirmation page
-        navigate("/auth/email-confirmation", { 
-          state: { 
-            message: "Please check your email for the confirmation link." 
-          } 
-        });
-      }
     } catch (error: any) {
+      if (error.message.includes('already registered')) {
+        setError("This email is already registered. Please try logging in instead.");
+        return;
+      }
       setError(error.message);
     } finally {
       setLoading(false);
@@ -67,9 +48,18 @@ export default function SignUp() {
   const handleGoogleSignIn = async () => {
     try {
       setLoading(true);
-      await signInWithGoogle();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred during Google sign-in');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.hostname === 'localhost' 
+            ? 'http://localhost:5173/auth/callback'
+            : 'https://hrmoffice.vercel.app/auth/callback'
+        }
+      });
+      
+      if (error) throw error;
+    } catch (error: any) {
+      setError(error.message);
     } finally {
       setLoading(false);
     }

@@ -10,7 +10,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { signInWithGoogle } = useAuth();
+  const { signIn } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,12 +18,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
+      await signIn(email, password);
       navigate("/page-description");
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An error occurred during login');
@@ -35,9 +30,18 @@ export default function Login() {
   const handleGoogleSignIn = async () => {
     try {
       setLoading(true);
-      await signInWithGoogle();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred during Google sign-in');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.hostname === 'localhost' 
+            ? 'http://localhost:5173/auth/callback'
+            : 'https://hrmoffice.vercel.app/auth/callback'
+        }
+      });
+      
+      if (error) throw error;
+    } catch (error: any) {
+      setError(error.message);
     } finally {
       setLoading(false);
     }

@@ -8,16 +8,41 @@ export default function Callback() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        // Get the session from the URL hash
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) throw error;
         
         if (session) {
-          navigate('/dashboard'); // or wherever you want to redirect after login
+          // Redirect to welcome page
+          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            navigate('/auth/welcome', { replace: true });
+          } else {
+            window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
+          }
+        } else {
+          // If no session, try to refresh it
+          const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) throw refreshError;
+          
+          if (newSession) {
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+              navigate('/auth/welcome', { replace: true });
+            } else {
+              window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
+            }
+          } else {
+            throw new Error('No session found after OAuth callback');
+          }
         }
       } catch (error) {
-        console.error('Error handling callback:', error);
-        navigate('/auth/login');
+        console.error('Error handling OAuth callback:', error);
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          navigate('/auth/login', { replace: true });
+        } else {
+          window.location.href = 'https://hrmoffice.vercel.app/auth/login';
+        }
       }
     };
 
