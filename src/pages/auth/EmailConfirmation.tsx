@@ -30,14 +30,24 @@ export default function EmailConfirmation() {
 
   const verifyEmail = async (token_hash: string) => {
     try {
-      // Exchange the code for a session
-      const { data, error } = await supabase.auth.exchangeCodeForSession(token_hash);
-      
-      if (error) {
-        throw error;
+      // First, verify the email
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash,
+        type: "email"
+      });
+
+      if (verifyError) {
+        throw verifyError;
       }
 
-      if (data?.session) {
+      // Then, get the session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (session) {
         // Redirect to welcome page after successful verification
         navigate("/auth/welcome");
       } else {
