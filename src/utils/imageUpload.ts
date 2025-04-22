@@ -257,4 +257,72 @@ export const checkAndFixBucketPermissions = async (bucketName: string): Promise<
     console.error('Error checking bucket permissions:', error);
     return false;
   }
+};
+
+export const uploadProfilePicture = async (file: File, employeeId: string): Promise<string | null> => {
+  try {
+    const bucketName = 'employee_pictures';
+    
+    // Check if bucket exists
+    const bucketExists = await checkBucketExists(bucketName);
+    if (!bucketExists) {
+      console.error(`Bucket ${bucketName} does not exist. Please create it in the Supabase dashboard.`);
+      return null;
+    }
+
+    // Check bucket permissions
+    const permissionsOk = await checkAndFixBucketPermissions(bucketName);
+    if (!permissionsOk) {
+      console.error(`Bucket ${bucketName} permissions are not correctly configured.`);
+      console.warn('Please check the Supabase dashboard for storage permissions.');
+      return null;
+    }
+    
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      console.error('File size must be less than 2MB');
+      return null;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      console.error('File type must be JPEG, JPG, or PNG');
+      return null;
+    }
+
+    // Generate a unique file name
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `${employeeId}_${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    // Upload the file
+    const { error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: file.type
+      });
+
+    if (uploadError) {
+      console.error('Error uploading profile picture:', uploadError);
+      return null;
+    }
+
+    // Get the public URL
+    const { data } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(filePath);
+
+    // Add cache-busting parameter
+    return `${data.publicUrl}?t=${Date.now()}`;
+  } catch (error) {
+    console.error('Error in uploadProfilePicture:', error);
+    return null;
+  }
+};
+
+export const getDefaultAvatarUrl = (): string => {
+  return 'https://ui-avatars.com/api/?background=random';
 }; 

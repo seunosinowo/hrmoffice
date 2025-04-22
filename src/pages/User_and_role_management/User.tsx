@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserIcon, EyeIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../../lib/supabase';
-import { uploadImage, checkBucketExists, getFileUrl } from '../../utils/imageUpload';
+import { uploadImage, checkBucketExists } from '../../utils/imageUpload';
 
 // Add a type for our user
 interface Department {
@@ -74,33 +74,26 @@ const UserManagement: React.FC = () => {
     try {
       console.log('Verifying image URL:', url);
       
-      // Extract the filename from the URL
-      const urlParts = url.split('/');
-      const fileName = urlParts[urlParts.length - 1];
+      // If the URL is from ui-avatars.com, return it as is
+      if (url.includes('ui-avatars.com')) {
+        return url;
+      }
       
-      // Check if the file exists in the bucket
-      const verifiedUrl = await getFileUrl('profile_pictures', fileName);
-      if (verifiedUrl) {
-        console.log(`Verified URL for ${fileName}: ${verifiedUrl}`);
-        
-        // Additional verification by trying to fetch the image
-        try {
-          const response = await fetch(verifiedUrl, { method: 'HEAD' });
-          if (response.ok) {
-            console.log(`URL is accessible: ${verifiedUrl}`);
-            // Add cache-busting parameter to the URL
-            const cacheBustUrl = `${verifiedUrl}?t=${Date.now()}`;
-            return cacheBustUrl;
-          } else {
-            console.warn(`URL is not accessible: ${verifiedUrl}, status: ${response.status}`);
-            return null;
-          }
-        } catch (fetchError) {
-          console.error('Error fetching image for verification:', fetchError);
+      // For Supabase URLs, we don't need to extract the filename
+      // Just verify the URL is accessible
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+        if (response.ok) {
+          console.log(`URL is accessible: ${url}`);
+          // Add cache-busting parameter to the URL
+          const cacheBustUrl = `${url}?t=${Date.now()}`;
+          return cacheBustUrl;
+        } else {
+          console.warn(`URL is not accessible: ${url}, status: ${response.status}`);
           return null;
         }
-      } else {
-        console.warn(`Could not verify URL for ${fileName}`);
+      } catch (fetchError) {
+        console.error('Error fetching image for verification:', fetchError);
         return null;
       }
     } catch (error) {
@@ -206,182 +199,67 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // Handle file change for profile picture
+  // Handle file change
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    try {
-      console.log('File selected:', file.name, file.size, file.type);
-      
-      // Validate file size (max 2MB)
-      if (file.size > 2 * 1024 * 1024) {
-        console.error('File size must be less than 2MB');
-        return;
-      }
-
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-      if (!allowedTypes.includes(file.type)) {
-        console.error('File type must be JPEG, JPG, or PNG');
-        return;
-      }
-
-      // Create a new file with a standardized name
-      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const newFileName = `${Date.now()}.${fileExt}`;
-      const newFile = new File([file], newFileName, { type: file.type });
-
-      // Upload the file
-      const imageUrl = await uploadImage(newFile, 'profile_pictures');
-      if (!imageUrl) {
-        console.error('Failed to upload image');
-        return;
-      }
-
-      // Verify the image URL is accessible
-      try {
-        const response = await fetch(imageUrl, { method: 'HEAD' });
-        if (!response.ok) {
-          console.error(`Image URL verification failed: ${response.status} ${response.statusText}`);
-          return;
-        }
-        console.log('Image URL verified:', imageUrl);
-      } catch (error) {
-        console.error('Error verifying image URL:', error);
-        return;
-      }
-
-      setNewUser(prev => ({ ...prev, profilePicture: imageUrl }));
-    } catch (error) {
-      console.error('Error handling file:', error);
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setError('File size must be less than 2MB');
+      return;
     }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('File type must be JPEG, JPG, or PNG');
+      return;
+    }
+
+    setAvatarFile(file);
   };
 
-  // Add user function with Supabase integration
+  // Add user
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
 
-    if (!newUser.username || !newUser.first_name || !newUser.last_name || !newUser.email || !newUser.phone_number || !newUser.department_id) {
-      alert('Please fill in all required fields');
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
-      let avatarUrl = null;
-      
-      // Handle profile picture upload if a file was selected
-      if (avatarFile) {
-        try {
-          // Check if the bucket exists before trying to upload
-          const bucketExists = await checkBucketExists('profile_pictures');
-          if (!bucketExists) {
-            console.warn('Cannot upload profile picture: The profile_pictures bucket does not exist.');
-          } else {
-            console.log('Uploading file:', avatarFile.name, 'Size:', avatarFile.size, 'Type:', avatarFile.type);
-            avatarUrl = await uploadImage(avatarFile, 'profile_pictures');
-            console.log('Uploaded image URL:', avatarUrl);
-            if (!avatarUrl) {
-              console.warn('Failed to upload profile picture. Continuing without it.');
-            }
-          }
-        } catch (uploadError) {
-          console.error('Error uploading profile picture:', uploadError);
-          // Continue without the profile picture
-        }
-      }
-      
-      // Create user in Supabase
-      const { data, error } = await supabase
+      // First, create the user with default avatar
+      const { data: userData, error: userError } = await supabase
         .from('users')
-        .insert([
-          {
-            username: newUser.username,
-            first_name: newUser.first_name,
-            last_name: newUser.last_name,
-            email: newUser.email,
-            phone_number: newUser.phone_number,
-            department_id: newUser.department_id,
-            profile_picture_url: avatarUrl
-          }
-        ])
-        .select(`
-          id,
-          username,
-          first_name,
-          last_name,
-          email,
-          phone_number,
-          department_id,
-          profile_picture_url,
-          departments (
-            id,
-            name
-          )
-        `)
+        .insert([{
+          username: newUser.username,
+          first_name: newUser.first_name,
+          last_name: newUser.last_name,
+          email: newUser.email,
+          phone_number: newUser.phone_number,
+          department_id: newUser.department_id,
+          profile_picture_url: 'https://ui-avatars.com/api/?background=random'
+        }])
+        .select()
         .single();
 
-      if (error) {
-        if (error.code === '23505') {
-          setError('Username already exists. Please choose a different username.');
-        } else {
-          console.error('Error adding user:', error);
-          setError('Error adding user. Please try again.');
-        }
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Transform the data to match our User interface
-      const userData = data as any;
-      
-      // Extract department data safely
-      let departmentData = { id: '', name: 'No Department' };
-      
-      if (userData.departments) {
-        if (Array.isArray(userData.departments) && userData.departments.length > 0) {
-          departmentData = {
-            id: userData.departments[0].id || '',
-            name: userData.departments[0].name || 'No Department'
-          };
-        } else if (typeof userData.departments === 'object') {
-          departmentData = {
-            id: userData.departments.id || '',
-            name: userData.departments.name || 'No Department'
-          };
+      if (userError) throw userError;
+
+      // Upload profile picture if provided
+      if (avatarFile && userData) {
+        const uploadedUrl = await uploadImage(avatarFile, 'profile_pictures');
+        if (uploadedUrl) {
+          // Update user with new profile picture URL
+          const { error: updateError } = await supabase
+            .from('users')
+            .update({ profile_picture_url: uploadedUrl })
+            .eq('id', userData.id);
+
+          if (updateError) throw updateError;
         }
       }
-      
-      // Verify the profile picture URL if it exists
-      let verifiedProfilePictureUrl = userData.profile_picture_url;
-      if (verifiedProfilePictureUrl) {
-        const verifiedUrl = await verifyImageUrl(verifiedProfilePictureUrl);
-        if (verifiedUrl) {
-          verifiedProfilePictureUrl = verifiedUrl;
-        } else {
-          console.warn('Profile picture URL verification failed, setting to null');
-          verifiedProfilePictureUrl = null;
-        }
-      }
-      
-      const newUserData: User = {
-        id: userData.id || '',
-        username: userData.username || '',
-        first_name: userData.first_name || '',
-        last_name: userData.last_name || '',
-        email: userData.email || '',
-        phone_number: userData.phone_number || '',
-        department_id: userData.department_id || '',
-        profile_picture_url: verifiedProfilePictureUrl,
-        department: departmentData
-      };
-      
-      console.log('New user data with profile picture:', newUserData);
-      
-      setUsers([newUserData, ...users]);
+
+      // Refresh the user list
+      await fetchUsers();
       setShowAddModal(false);
       setNewUser({
         username: '',
@@ -394,7 +272,7 @@ const UserManagement: React.FC = () => {
       setAvatarFile(null);
     } catch (error) {
       console.error('Error adding user:', error);
-      setError('Error adding user. Please try again.');
+      setError('Failed to add user');
     } finally {
       setIsSubmitting(false);
     }
@@ -418,44 +296,16 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // Update user function with Supabase integration
+  // Update user
   const handleUpdateUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
     if (!selectedUser) return;
-    
     setIsSubmitting(true);
     setError(null);
-    
-    if (!selectedUser.username || !selectedUser.first_name || !selectedUser.last_name || !selectedUser.email || !selectedUser.phone_number || !selectedUser.department_id) {
-      alert('Please fill in all required fields');
-      setIsSubmitting(false);
-      return;
-    }
 
     try {
-      let avatarUrl = selectedUser.profile_picture_url;
-      
-      // Handle profile picture upload if a new file was selected
-      if (avatarFile) {
-        // Check if the bucket exists before trying to upload
-        const bucketExists = await checkBucketExists('profile_pictures');
-        if (!bucketExists) {
-          console.warn('Cannot upload profile picture: The profile_pictures bucket does not exist.');
-        } else {
-          console.log('Uploading file for update:', avatarFile.name, 'Size:', avatarFile.size, 'Type:', avatarFile.type);
-          const uploadedUrl = await uploadImage(avatarFile, 'profile_pictures');
-          if (uploadedUrl) {
-            avatarUrl = uploadedUrl;
-            console.log('Updated image URL:', avatarUrl);
-          } else {
-            console.warn('Failed to upload new profile picture. Keeping existing one.');
-          }
-        }
-      }
-      
-      // Update user in Supabase
-      const { data, error } = await supabase
+      // Update user details
+      const { error: updateError } = await supabase
         .from('users')
         .update({
           username: selectedUser.username,
@@ -463,74 +313,29 @@ const UserManagement: React.FC = () => {
           last_name: selectedUser.last_name,
           email: selectedUser.email,
           phone_number: selectedUser.phone_number,
-          department_id: selectedUser.department_id,
-          profile_picture_url: avatarUrl
+          department_id: selectedUser.department_id
         })
-        .eq('id', selectedUser.id)
-        .select(`
-          id,
-          username,
-          first_name,
-          last_name,
-          email,
-          phone_number,
-          department_id,
-          profile_picture_url,
-          departments (
-            id,
-            name
-          )
-        `)
-        .single();
+        .eq('id', selectedUser.id);
 
-      if (error) throw error;
-      
-      // Transform the data to match our User interface
-      const userData = data as any;
-      
-      // Extract department data safely
-      let departmentData = { id: '', name: 'No Department' };
-      
-      if (userData.departments) {
-        if (Array.isArray(userData.departments) && userData.departments.length > 0) {
-          departmentData = {
-            id: userData.departments[0].id || '',
-            name: userData.departments[0].name || 'No Department'
-          };
-        } else if (typeof userData.departments === 'object') {
-          departmentData = {
-            id: userData.departments.id || '',
-            name: userData.departments.name || 'No Department'
-          };
+      if (updateError) throw updateError;
+
+      // Handle profile picture update
+      if (avatarFile) {
+        const uploadedUrl = await uploadImage(avatarFile, 'profile_pictures');
+        if (uploadedUrl) {
+          await supabase
+            .from('users')
+            .update({ profile_picture_url: uploadedUrl })
+            .eq('id', selectedUser.id);
         }
       }
-      
-      const updatedUser: User = {
-        id: userData.id || '',
-        username: userData.username || '',
-        first_name: userData.first_name || '',
-        last_name: userData.last_name || '',
-        email: userData.email || '',
-        phone_number: userData.phone_number || '',
-        department_id: userData.department_id || '',
-        profile_picture_url: userData.profile_picture_url,
-        department: departmentData
-      };
-      
-      // Update the user in the local state
-      const updatedUsers = users.map(user => {
-        if (user.id === selectedUser.id) {
-          return updatedUser;
-        }
-        return user;
-      });
 
-      setUsers(updatedUsers);
+      await fetchUsers();
       setShowEditModal(false);
       setAvatarFile(null);
     } catch (error) {
       console.error('Error updating user:', error);
-      setError('Error updating user. Please try again later.');
+      setError('Failed to update user');
     } finally {
       setIsSubmitting(false);
     }
@@ -612,23 +417,12 @@ const UserManagement: React.FC = () => {
                       crossOrigin="anonymous"
                       onError={(e) => {
                         console.error('Error loading image:', user.profile_picture_url);
-                        // Try to reload the image with a cache-busting parameter
                         const target = e.target as HTMLImageElement;
-                        const originalSrc = target.src;
-                        if (!originalSrc.includes('?t=')) {
-                          target.src = `${originalSrc}?t=${Date.now()}`;
-                          console.log('Retrying with cache-busting URL:', target.src);
-                        } else {
-                          // If we've already tried cache-busting, show the fallback
-                          target.style.display = 'none';
-                          const fallback = target.parentElement?.querySelector('.fallback-avatar') as HTMLElement;
-                          if (fallback) {
-                            fallback.style.display = 'flex';
-                          }
+                        target.style.display = 'none';
+                        const fallback = target.parentElement?.querySelector('.fallback-avatar') as HTMLElement;
+                        if (fallback) {
+                          fallback.style.display = 'flex';
                         }
-                      }}
-                      onLoad={() => {
-                        console.log('Image loaded successfully:', user.profile_picture_url);
                       }}
                     />
                   ) : (
@@ -685,8 +479,8 @@ const UserManagement: React.FC = () => {
 
       {/* Add User Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 shadow-xl border border-gray-200 dark:border-gray-700">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 my-8 shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Add New User
             </h3>
@@ -859,8 +653,8 @@ const UserManagement: React.FC = () => {
 
       {/* View User Modal */}
       {showViewModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 my-8 shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 User Details
@@ -945,8 +739,8 @@ const UserManagement: React.FC = () => {
 
       {/* Edit User Modal */}
       {showEditModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 my-8 shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Edit User
