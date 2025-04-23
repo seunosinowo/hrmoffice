@@ -182,7 +182,7 @@ export default function WelcomePage() {
                 onClick={() => navigate('/page-description')}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
               >
-                Continue to Platform
+                Continue to HR Management System
               </button>
               <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
                 You will be automatically redirected in a few seconds...
