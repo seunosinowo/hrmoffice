@@ -91,7 +91,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: {
         redirectTo: window.location.hostname === 'localhost' 
           ? 'http://localhost:5173/auth/callback'
-          : 'https://hrmoffice.vercel.app/auth/callback'
+          : 'https://hrmoffice.vercel.app/auth/callback',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
       }
     });
 
