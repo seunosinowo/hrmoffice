@@ -9,45 +9,35 @@ import {
   ChevronDownIcon
 } from "../../icons";
 
-interface AssessorAssignment {
+interface CompetencyProficiency {
   id: number;
-  employee_name: string;
-  department: string;
-  job_role: string;
-  assessor: string;
+  competency_name: string;
+  proficiency_level: string;
+  description: string;
   created_at: string;
 }
 
-interface JobRole {
+interface ProficiencyLevel {
   id: number;
   name: string;
   description: string;
   created_at: string;
 }
 
-interface Department {
-  id: string;
-  name: string;
-  description: string | null;
-  created_at: string;
-}
-
-export default function EmployeeAssessorAssign() {
-  const [assignments, setAssignments] = useState<AssessorAssignment[]>([]);
-  const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+export default function CompetencyProficiency() {
+  const [proficiencies, setProficiencies] = useState<CompetencyProficiency[]>([]);
+  const [proficiencyLevels, setProficiencyLevels] = useState<ProficiencyLevel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState<AssessorAssignment | null>(null);
+  const [selectedProficiency, setSelectedProficiency] = useState<CompetencyProficiency | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [formData, setFormData] = useState<Omit<AssessorAssignment, 'id' | 'created_at'>>({
-    employee_name: "",
-    department: "",
-    job_role: "",
-    assessor: ""
+  const [formData, setFormData] = useState<Omit<CompetencyProficiency, 'id' | 'created_at'>>({
+    competency_name: "",
+    proficiency_level: "",
+    description: ""
   });
   
   // Loading states for actions
@@ -59,9 +49,8 @@ export default function EmployeeAssessorAssign() {
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchAssignments();
-    fetchJobRoles();
-    fetchDepartments();
+    fetchProficiencies();
+    fetchProficiencyLevels();
   }, []);
 
   // Close dropdown when clicking outside
@@ -79,101 +68,44 @@ export default function EmployeeAssessorAssign() {
     };
   }, []);
 
-  const fetchAssignments = async () => {
+  const fetchProficiencies = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      console.log("Fetching assignments...");
-      
-      // Try using a different approach
       const { data, error } = await supabase
-        .from('employee_assessor_assignments')
+        .from('competency_proficiencies')
         .select('*')
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error("Error fetching assignments:", error);
-        throw error;
-      }
-      
-      console.log("Fetched assignments:", data);
-      setAssignments(data || []);
+      if (error) throw error;
+      setProficiencies(data || []);
     } catch (err) {
-      console.error("Error fetching assignments:", err);
-      setError('Failed to load assessor assignments. Please try again later.');
+      console.error("Error fetching proficiencies:", err);
+      setError('Failed to load competency proficiencies. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchJobRoles = async () => {
+  const fetchProficiencyLevels = async () => {
     try {
       const { data, error } = await supabase
-        .from('job_roles')
+        .from('proficiency_levels')
         .select('*')
         .order('name');
 
       if (error) throw error;
-      setJobRoles(data || []);
+      setProficiencyLevels(data || []);
     } catch (err) {
-      console.error("Error fetching job roles:", err);
+      console.error("Error fetching proficiency levels:", err);
     }
   };
 
-  const fetchDepartments = async () => {
-    try {
-      console.log("Fetching departments...");
-      
-      // Try using a direct query with explicit schema
-      const { data, error, count } = await supabase
-        .from('departments')
-        .select('*', { count: 'exact' })
-        .order('name');
-
-      if (error) {
-        console.error("Error fetching departments:", error);
-        throw error;
-      }
-      
-      console.log("Fetched departments:", data);
-      console.log("Department count:", count);
-      
-      // If no departments found, try to insert some test data
-      if (!data || data.length === 0) {
-        console.log("No departments found. Inserting test data...");
-        
-        // Insert some test departments
-        const { data: insertData, error: insertError } = await supabase
-          .from('departments')
-          .insert([
-            { name: 'Human Resources', description: 'HR department' },
-            { name: 'Finance', description: 'Finance department' },
-            { name: 'Marketing', description: 'Marketing department' }
-          ])
-          .select();
-          
-        if (insertError) {
-          console.error("Error inserting test departments:", insertError);
-        } else {
-          console.log("Inserted test departments:", insertData);
-          setDepartments(insertData || []);
-          return;
-        }
-      }
-      
-      setDepartments(data || []);
-    } catch (err) {
-      console.error("Error fetching departments:", err);
-    }
-  };
-
-  // Filter assignments based on search term
-  const filteredAssignments = assignments.filter(assignment => 
-    assignment.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    assignment.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    assignment.job_role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    assignment.assessor.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filter proficiencies based on search term
+  const filteredProficiencies = proficiencies.filter(proficiency => 
+    proficiency.competency_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    proficiency.proficiency_level.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -183,36 +115,34 @@ export default function EmployeeAssessorAssign() {
       setIsAdding(true);
       
       const { data, error } = await supabase
-        .from('employee_assessor_assignments')
+        .from('competency_proficiencies')
         .insert([formData])
         .select()
         .single();
 
       if (error) throw error;
       
-      setAssignments([...assignments, data]);
+      setProficiencies([...proficiencies, data]);
       setShowAddModal(false);
       setFormData({
-        employee_name: "",
-        department: "",
-        job_role: "",
-        assessor: ""
+        competency_name: "",
+        proficiency_level: "",
+        description: ""
       });
     } catch (err) {
-      console.error("Error adding assignment:", err);
-      setError('Failed to add assignment. Please try again later.');
+      console.error("Error adding proficiency:", err);
+      setError('Failed to add proficiency. Please try again later.');
     } finally {
       setIsAdding(false);
     }
   };
 
-  const handleEdit = (assignment: AssessorAssignment) => {
-    setSelectedAssignment(assignment);
+  const handleEdit = (proficiency: CompetencyProficiency) => {
+    setSelectedProficiency(proficiency);
     setFormData({
-      employee_name: assignment.employee_name,
-      department: assignment.department,
-      job_role: assignment.job_role,
-      assessor: assignment.assessor
+      competency_name: proficiency.competency_name,
+      proficiency_level: proficiency.proficiency_level,
+      description: proficiency.description
     });
     setShowEditModal(true);
     setActiveDropdown(null);
@@ -221,52 +151,52 @@ export default function EmployeeAssessorAssign() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedAssignment) return;
+    if (!selectedProficiency) return;
     
     try {
       setIsUpdating(true);
       
       const { data, error } = await supabase
-        .from('employee_assessor_assignments')
+        .from('competency_proficiencies')
         .update(formData)
-        .eq('id', selectedAssignment.id)
+        .eq('id', selectedProficiency.id)
         .select()
         .single();
 
       if (error) throw error;
       
-      setAssignments(assignments.map(assignment => 
-        assignment.id === selectedAssignment.id ? data : assignment
+      setProficiencies(proficiencies.map(proficiency => 
+        proficiency.id === selectedProficiency.id ? data : proficiency
       ));
       setShowEditModal(false);
-      setSelectedAssignment(null);
+      setSelectedProficiency(null);
     } catch (err) {
-      console.error("Error updating assignment:", err);
-      setError('Failed to update assignment. Please try again later.');
+      console.error("Error updating proficiency:", err);
+      setError('Failed to update proficiency. Please try again later.');
     } finally {
       setIsUpdating(false);
     }
   };
 
   const handleDeleteConfirm = async () => {
-    if (!selectedAssignment) return;
+    if (!selectedProficiency) return;
     
     try {
       setIsDeleting(true);
       
       const { error } = await supabase
-        .from('employee_assessor_assignments')
+        .from('competency_proficiencies')
         .delete()
-        .eq('id', selectedAssignment.id);
+        .eq('id', selectedProficiency.id);
 
       if (error) throw error;
       
-      setAssignments(assignments.filter(assignment => assignment.id !== selectedAssignment.id));
+      setProficiencies(proficiencies.filter(proficiency => proficiency.id !== selectedProficiency.id));
       setShowDeleteModal(false);
-      setSelectedAssignment(null);
+      setSelectedProficiency(null);
     } catch (err) {
-      console.error("Error deleting assignment:", err);
-      setError('Failed to delete assignment. Please try again later.');
+      console.error("Error deleting proficiency:", err);
+      setError('Failed to delete proficiency. Please try again later.');
     } finally {
       setIsDeleting(false);
     }
@@ -285,8 +215,8 @@ export default function EmployeeAssessorAssign() {
       {/* Header Section */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Employee Assessor Assignment</h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">Manage employee assessor assignments</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Competency Proficiency</h1>
+          <p className="mt-1 text-gray-600 dark:text-gray-400">Manage competency proficiency levels and descriptions</p>
         </div>
         <div className="flex justify-center sm:justify-end">
           <button 
@@ -294,7 +224,7 @@ export default function EmployeeAssessorAssign() {
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 w-full sm:w-auto"
           >
             <PlusIcon className="size-0" />
-            <span className="text-center items-center justify-center">Employee Assignsor</span>
+            <span className="text-center items-center justify-center">Add Proficiency</span>
           </button>
         </div>
       </div>
@@ -307,7 +237,7 @@ export default function EmployeeAssessorAssign() {
         <input
           type="text"
           className="block w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white dark:placeholder-gray-400"
-          placeholder="Search by employee, department, job role, or assessor..."
+          placeholder="Search by competency or proficiency level..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -317,7 +247,7 @@ export default function EmployeeAssessorAssign() {
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
           <div className="size-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
-          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading assignments...</p>
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading proficiencies...</p>
         </div>
       )}
 
@@ -326,7 +256,7 @@ export default function EmployeeAssessorAssign() {
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
           <p className="text-red-700 dark:text-red-400">{error}</p>
           <button 
-            onClick={fetchAssignments}
+            onClick={fetchProficiencies}
             className="mt-2 rounded-lg bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/40"
           >
             Try Again
@@ -334,7 +264,7 @@ export default function EmployeeAssessorAssign() {
         </div>
       )}
 
-      {/* Assignments Table */}
+      {/* Proficiencies Table */}
       {!loading && !error && (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="overflow-x-auto">
@@ -342,16 +272,13 @@ export default function EmployeeAssessorAssign() {
               <thead className="bg-gray-50 dark:bg-gray-800/50">
                 <tr>
                   <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Employee Details
+                    Competency Name
                   </th>
                   <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Department
+                    Proficiency Level
                   </th>
                   <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Job Role
-                  </th>
-                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Assessor
+                    Description
                   </th>
                   <th scope="col" className="whitespace-nowrap px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Actions
@@ -359,57 +286,60 @@ export default function EmployeeAssessorAssign() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-white/[0.03]">
-                {filteredAssignments.map((assignment) => (
-                  <tr key={assignment.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
+                {filteredProficiencies.map((proficiency) => (
+                  <tr key={proficiency.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
                     <td className="whitespace-nowrap px-4 py-4">
                       <div className="flex items-center">
                         <div className="flex size-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
                           <UserIcon className="size-5 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="ml-4">
-                          <div className="font-medium text-gray-900 dark:text-white">{assignment.employee_name}</div>
+                          <div className="font-medium text-gray-900 dark:text-white">{proficiency.competency_name}</div>
                         </div>
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
-                      {assignment.department}
+                      {proficiency.proficiency_level}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
-                      {assignment.job_role}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
-                      {assignment.assessor}
+                    <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      {proficiency.description}
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-medium">
                       <div className="relative actions-dropdown">
                         <button 
-                          onClick={() => toggleDropdown(assignment.id)}
+                          onClick={() => toggleDropdown(proficiency.id)}
                           className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
                         >
                           Actions
                           <ChevronDownIcon className="ml-1 size-4" />
                         </button>
                         
-                        {activeDropdown === assignment.id && (
-                          <div className="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900" style={{ position: 'fixed' }}>
-                            <button 
-                              onClick={() => handleEdit(assignment)}
-                              className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                            >
-                              <PencilIcon className="mr-2 size-4 text-amber-500" />
-                              Edit
-                            </button>
-                            <button 
-                              onClick={() => {
-                                setSelectedAssignment(assignment);
-                                setShowDeleteModal(true);
-                                setActiveDropdown(null);
-                              }}
-                              className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-                            >
-                              <TrashBinIcon className="mr-2 size-4 text-red-500" />
-                              Delete
-                            </button>
+                        {activeDropdown === proficiency.id && (
+                          <div className={`actions-dropdown absolute right-0 z-[9999] w-36 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 dark:bg-gray-800 ${
+                            proficiency.id === proficiencies[proficiencies.length - 1].id ? 'bottom-full mb-1' : 'top-full mt-1'
+                          }`}>
+                            <div className="py-1">
+                              <button
+                                onClick={() => handleEdit(proficiency)}
+                                disabled={isAdding || isUpdating || isDeleting}
+                                className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-700"
+                              >
+                                <PencilIcon className="mr-3 h-4 w-4 text-amber-500" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedProficiency(proficiency);
+                                  setShowDeleteModal(true);
+                                  setActiveDropdown(null);
+                                }}
+                                disabled={isAdding || isUpdating || isDeleting}
+                                className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 disabled:opacity-50 dark:text-red-400 dark:hover:bg-gray-700"
+                              >
+                                <TrashBinIcon className="mr-3 h-4 w-4" />
+                                Delete
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -423,94 +353,76 @@ export default function EmployeeAssessorAssign() {
       )}
 
       {/* Empty State */}
-      {!loading && !error && filteredAssignments.length === 0 && (
+      {!loading && !error && filteredProficiencies.length === 0 && (
         <div className="flex flex-col items-center justify-center py-12">
           <UserIcon className="size-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">No assignments found</h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">No proficiencies found</h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {searchTerm ? 'Try adjusting your search' : 'Create your first assessor assignment'}
+            {searchTerm ? 'Try adjusting your search' : 'Create your first competency proficiency'}
           </p>
           <button 
             onClick={() => setShowAddModal(true)}
             className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
-            <PlusIcon className="size-4" />
-            Employee Assignsor
+            <PlusIcon className="size-0" />
+            Add Proficiency
           </button>
         </div>
       )}
 
-      {/* Add Assignment Modal */}
+      {/* Add Proficiency Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
           <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
-            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">New Assessor Assignment</h2>
+            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">New Competency Proficiency</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
-              Create a new assessor assignment for an employee
+              Create a new competency proficiency
             </p>
             
             <form onSubmit={handleSubmit} className="mt-6 space-y-4 max-h-[70vh] overflow-y-auto pr-2 pl-1">
               <div>
-                <label htmlFor="employee_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Employee Name
+                <label htmlFor="competency_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Competency Name
                 </label>
                 <input
                   type="text"
-                  id="employee_name"
-                  value={formData.employee_name}
-                  onChange={(e) => setFormData({...formData, employee_name: e.target.value})}
+                  id="competency_name"
+                  value={formData.competency_name}
+                  onChange={(e) => setFormData({...formData, competency_name: e.target.value})}
                   required
                   className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
                 />
               </div>
               
               <div>
-                <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Department
+                <label htmlFor="proficiency_level" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Proficiency Level
                 </label>
                 <select
-                  id="department"
-                  value={formData.department}
-                  onChange={(e) => setFormData({...formData, department: e.target.value})}
+                  id="proficiency_level"
+                  value={formData.proficiency_level}
+                  onChange={(e) => setFormData({...formData, proficiency_level: e.target.value})}
                   required
                   className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
                 >
-                  <option value="">Select a department</option>
-                  {departments.map(dept => (
-                    <option key={dept.id} value={dept.name}>{dept.name}</option>
+                  <option value="">Select a proficiency level</option>
+                  {proficiencyLevels.map(level => (
+                    <option key={level.id} value={level.name}>{level.name}</option>
                   ))}
                 </select>
               </div>
               
               <div>
-                <label htmlFor="job_role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Job Role
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Description
                 </label>
-                <select
-                  id="job_role"
-                  value={formData.job_role}
-                  onChange={(e) => setFormData({...formData, job_role: e.target.value})}
-                  required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
-                >
-                  <option value="">Select a job role</option>
-                  {jobRoles.map(role => (
-                    <option key={role.id} value={role.name}>{role.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="assessor" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Assessor
-                </label>
-                <input
-                  type="text"
-                  id="assessor"
-                  value={formData.assessor}
-                  onChange={(e) => setFormData({...formData, assessor: e.target.value})}
+                <textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
                   required
                   className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
+                  rows={4}
                 />
               </div>
               
@@ -534,7 +446,7 @@ export default function EmployeeAssessorAssign() {
                       Adding...
                     </>
                   ) : (
-                    'Add Assignment'
+                    'Add Proficiency'
                   )}
                 </button>
               </div>
@@ -543,77 +455,59 @@ export default function EmployeeAssessorAssign() {
         </div>
       )}
 
-      {/* Edit Assignment Modal */}
-      {showEditModal && selectedAssignment && (
+      {/* Edit Proficiency Modal */}
+      {showEditModal && selectedProficiency && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
           <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
-            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Edit Assessor Assignment</h2>
+            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Edit Competency Proficiency</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
-              Update assessor assignment details
+              Update competency proficiency details
             </p>
             
             <form onSubmit={handleUpdate} className="mt-6 space-y-4 max-h-[70vh] overflow-y-auto pr-2 pl-1">
               <div>
-                <label htmlFor="edit_employee_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Employee Name
+                <label htmlFor="edit_competency_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Competency Name
                 </label>
                 <input
                   type="text"
-                  id="edit_employee_name"
-                  value={formData.employee_name}
-                  onChange={(e) => setFormData({...formData, employee_name: e.target.value})}
+                  id="edit_competency_name"
+                  value={formData.competency_name}
+                  onChange={(e) => setFormData({...formData, competency_name: e.target.value})}
                   required
                   className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
                 />
               </div>
               
               <div>
-                <label htmlFor="edit_department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Department
+                <label htmlFor="edit_proficiency_level" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Proficiency Level
                 </label>
                 <select
-                  id="edit_department"
-                  value={formData.department}
-                  onChange={(e) => setFormData({...formData, department: e.target.value})}
+                  id="edit_proficiency_level"
+                  value={formData.proficiency_level}
+                  onChange={(e) => setFormData({...formData, proficiency_level: e.target.value})}
                   required
                   className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
                 >
-                  <option value="">Select a department</option>
-                  {departments.map(dept => (
-                    <option key={dept.id} value={dept.name}>{dept.name}</option>
+                  <option value="">Select a proficiency level</option>
+                  {proficiencyLevels.map(level => (
+                    <option key={level.id} value={level.name}>{level.name}</option>
                   ))}
                 </select>
               </div>
               
               <div>
-                <label htmlFor="edit_job_role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Job Role
+                <label htmlFor="edit_description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Description
                 </label>
-                <select
-                  id="edit_job_role"
-                  value={formData.job_role}
-                  onChange={(e) => setFormData({...formData, job_role: e.target.value})}
-                  required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
-                >
-                  <option value="">Select a job role</option>
-                  {jobRoles.map(role => (
-                    <option key={role.id} value={role.name}>{role.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="edit_assessor" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Assessor
-                </label>
-                <input
-                  type="text"
-                  id="edit_assessor"
-                  value={formData.assessor}
-                  onChange={(e) => setFormData({...formData, assessor: e.target.value})}
+                <textarea
+                  id="edit_description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
                   required
                   className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
+                  rows={4}
                 />
               </div>
               
@@ -637,7 +531,7 @@ export default function EmployeeAssessorAssign() {
                       Updating...
                     </>
                   ) : (
-                    'Update Assignment'
+                    'Update Proficiency'
                   )}
                 </button>
               </div>
@@ -647,12 +541,12 @@ export default function EmployeeAssessorAssign() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && selectedAssignment && (
+      {showDeleteModal && selectedProficiency && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
           <div className="w-full max-w-xs rounded-xl bg-white p-5 dark:bg-gray-900">
-            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Delete Assignment</h2>
+            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Delete Proficiency</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
-              Are you sure you want to delete this assessor assignment?
+              Are you sure you want to delete this competency proficiency?
             </p>
             
             <div className="mt-6 flex items-center justify-end gap-3">

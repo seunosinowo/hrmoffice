@@ -66,7 +66,8 @@ const EmployeeDetails: React.FC = () => {
               name
             )
           )
-        `);
+        `)
+        .order('employee_number', { ascending: true });
 
       if (employeesError) throw employeesError;
 

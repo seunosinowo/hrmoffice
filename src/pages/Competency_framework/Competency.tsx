@@ -139,18 +139,22 @@ function Competency() {
                 if (error) throw error;
             } else {
                 setIsAdding(true);
-                const { error } = await supabase
+                const { data: newItem, error } = await supabase
                     .from('competencies')
                     .insert([{
                         name: formData.name,
                         domain_id: domainId,
                         definition: formData.definition
-                    }]);
+                    }])
+                    .select()
+                    .single();
 
                 if (error) throw error;
+                
+                // Add new item at the end of the array
+                setData([...data, newItem]);
             }
 
-            await fetchData();
             await fetchDomains();
             setShowAddModal(false);
             setFormData({ name: "", domain_id: "", definition: "" });

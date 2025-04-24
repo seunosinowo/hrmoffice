@@ -123,7 +123,8 @@ const UserManagement: React.FC = () => {
             id,
             name
           )
-        `);
+        `)
+        .order('created_at', { ascending: true });
       
       if (error) {
         throw error;

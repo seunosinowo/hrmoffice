@@ -7,13 +7,6 @@ import {
   ChevronDownIcon
 } from "../../icons";
 
-const proficiencyLevels = {
-  1: "Basic",
-  2: "Intermediate",
-  3: "Advanced",
-  4: "Expert"
-};
-
 interface CompetencyCategory {
   id: number;
   category: string;
@@ -22,6 +15,18 @@ interface CompetencyCategory {
   created_at: string;
   updated_at: string;
 }
+
+// Add proficiency level mapping with proper typing
+interface ProficiencyLevelMap {
+  [key: number]: string;
+}
+
+const proficiencyLevelMap: ProficiencyLevelMap = {
+  1: 'Basic',
+  2: 'Intermediate',
+  3: 'Advanced',
+  4: 'Expert'
+};
 
 export default function CompetencyCategory() {
   const [data, setData] = useState<CompetencyCategory[]>([]);
@@ -35,7 +40,7 @@ export default function CompetencyCategory() {
   const [formData, setFormData] = useState({
     category: "",
     proficiency_level: 1,
-    description: "Basic"
+    description: ""
   });
   const [isAdding, setIsAdding] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -104,7 +109,7 @@ export default function CompetencyCategory() {
         .from('competency_categories')
         .update({ 
           proficiency_level: newLevel,
-          description: proficiencyLevels[newLevel as keyof typeof proficiencyLevels]
+          description: proficiencyLevelMap[newLevel]
         })
         .eq('id', id);
 
@@ -114,8 +119,8 @@ export default function CompetencyCategory() {
         item.id === id 
           ? { 
               ...item, 
-              proficiency_level: newLevel, 
-              description: proficiencyLevels[newLevel as keyof typeof proficiencyLevels] 
+              proficiency_level: newLevel,
+              description: proficiencyLevelMap[newLevel]
             }
           : item
       ));
@@ -174,7 +179,7 @@ export default function CompetencyCategory() {
         .update({
           category: formData.category,
           proficiency_level: formData.proficiency_level,
-          description: formData.description
+          description: `Level ${formData.proficiency_level}`
         })
         .eq('id', selectedItem.id);
 
@@ -182,7 +187,7 @@ export default function CompetencyCategory() {
       
       setData(data.map(item => 
         item.id === selectedItem.id 
-          ? { ...item, ...formData }
+          ? { ...item, ...formData, description: `Level ${formData.proficiency_level}` }
           : item
       ));
       setShowAddModal(false);
@@ -190,7 +195,7 @@ export default function CompetencyCategory() {
       setFormData({
         category: "",
         proficiency_level: 1,
-        description: "Basic"
+        description: ""
       });
     } catch (err) {
       console.error("Error updating item:", err);
@@ -206,18 +211,23 @@ export default function CompetencyCategory() {
     
     try {
       setIsAdding(true);
-      const { error } = await supabase
+      const { data: newItem, error } = await supabase
         .from('competency_categories')
-        .insert([formData]);
+        .insert([{
+          ...formData,
+          description: proficiencyLevelMap[formData.proficiency_level]
+        }])
+        .select()
+        .single();
 
       if (error) throw error;
       
-      await fetchData();
+      setData([...data, newItem]);
       setShowAddModal(false);
       setFormData({
         category: "",
         proficiency_level: 1,
-        description: "Basic"
+        description: ""
       });
     } catch (err) {
       console.error("Error adding item:", err);
@@ -335,15 +345,10 @@ export default function CompetencyCategory() {
                           onChange={(e) => handleProficiencyChange(item.id, parseInt(e.target.value))}
                           className="block w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-2 pr-8 text-center text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                         >
-                          {Object.entries(proficiencyLevels).map(([level, _]) => (
-                            <option 
-                              key={level} 
-                              value={level}
-                              className="text-center"
-                            >
-                              {level}
-                            </option>
-                          ))}
+                          <option value="1">1</option>
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                          <option value="4">4</option>
                         </select>
                         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
                           <ChevronDownIcon className="h-4 w-4" />
@@ -430,17 +435,15 @@ export default function CompetencyCategory() {
                     setFormData({
                       ...formData,
                       proficiency_level: level,
-                      description: proficiencyLevels[level as keyof typeof proficiencyLevels]
+                      description: proficiencyLevelMap[level]
                     });
                   }}
-                  required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
                 >
-                  {Object.entries(proficiencyLevels).map(([level, description]) => (
-                    <option key={level} value={level}>
-                      Level {level} - {description}
-                    </option>
-                  ))}
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
                 </select>
               </div>
               
@@ -453,7 +456,7 @@ export default function CompetencyCategory() {
                     setFormData({
                       category: "",
                       proficiency_level: 1,
-                      description: "Basic"
+                      description: ""
                     });
                   }}
                   className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"

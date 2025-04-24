@@ -86,7 +86,7 @@ export default function EmployeeJobAssignment() {
       const { data, error } = await supabase
         .from('employee_job_assignments')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       setAssignments(data || []);
@@ -132,7 +132,7 @@ export default function EmployeeJobAssignment() {
 
       if (error) throw error;
       
-      setAssignments([data, ...assignments]);
+      setAssignments([...assignments, data]);
       setShowAddModal(false);
       setFormData({
         employee_name: "",

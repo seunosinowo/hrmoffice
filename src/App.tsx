@@ -31,7 +31,7 @@ import EmployeeAssessorAssign from "./pages/User_and_role_management/EmployeeAss
 
 import CompetencyDescription from "./pages/Competency_framework/CompetencyDescription";
 import CompetencyCategory from "./pages/Competency_framework/CompetencyCategory";
-import ProficiencyLevel from "./pages/Competency_framework/ProficiencyLevel";
+import CompetencyProficiency from "./pages/Competency_framework/CompetencyProficiency.tsx";
 import Competency from "./pages/Competency_framework/Competency";
 import CompetencyDomain from "./pages/Competency_framework/CompetencyDomain";
 
@@ -144,7 +144,7 @@ export default function App() {
             {/* Competency Framework */}
             <Route path="/competency-description" element={<CompetencyDescription />} />
             <Route path="/competency-category" element={<CompetencyCategory />} />
-            <Route path="/proficiency-level" element={<ProficiencyLevel />} />
+            <Route path="/proficiency-description" element={<CompetencyProficiency />} />
             <Route path="/competency" element={<Competency />} />
             <Route path="/competency-domain" element={<CompetencyDomain />} />
 
