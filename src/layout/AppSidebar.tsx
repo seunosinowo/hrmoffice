@@ -6,7 +6,6 @@ import {
   BoxCubeIcon,
   ChevronDownIcon,
   HorizontaLDots,
-  ListIcon,
   PageIcon,
   PieChartIcon,
   PlugInIcon,
@@ -47,8 +46,7 @@ const navItems: NavItem[] = [
       { name: "Competency Category", path: "/competency-category" },
       { name: "Competency", path: "/competency" },
       { name: "Competency Domain", path: "/competency-domain" },
-      { name: "Proficiency Level", path: "/proficiency-level" },
-      
+      { name: "Competency Proficiency", path: "/proficiency-description" },
       
     ],
   },
