@@ -40,23 +40,16 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    icon: <ListIcon />,
-    name: "Organizational Structure",
-    subItems: [
-      { name: "Organization Unit", path: "/organization-unit" },
-      { name: "Discipline", path: "/discipline" },
-      { name: "Organization Competency", path: "/organization-competency" },
-    ],
-  },
-  {
     icon: <PieChartIcon />,
     name: "Competency Framework",
     subItems: [
+      { name: "Competency Description", path: "/competency-description" },
       { name: "Competency Category", path: "/competency-category" },
+      { name: "Competency", path: "/competency" },
       { name: "Competency Domain", path: "/competency-domain" },
       { name: "Proficiency Level", path: "/proficiency-level" },
-      { name: "Competency", path: "/competency" },
-      { name: "Competency Proficiency Description", path: "/competency-proficiency-description" },
+      
+      
     ],
   },
   {

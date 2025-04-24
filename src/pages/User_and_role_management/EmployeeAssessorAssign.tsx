@@ -294,7 +294,7 @@ export default function EmployeeAssessorAssign() {
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 w-full sm:w-auto"
           >
             <PlusIcon className="size-0" />
-            <span className="text-center items-center justify-center">New Assignment</span>
+            <span className="text-center items-center justify-center">Employee Assignsor</span>
           </button>
         </div>
       </div>
@@ -434,8 +434,8 @@ export default function EmployeeAssessorAssign() {
             onClick={() => setShowAddModal(true)}
             className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
-            <PlusIcon className="size-0" />
-            New Assignment
+            <PlusIcon className="size-4" />
+            Employee Assignsor
           </button>
         </div>
       )}

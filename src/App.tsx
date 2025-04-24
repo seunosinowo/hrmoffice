@@ -28,15 +28,12 @@ import EmployeeDetails from "./pages/User_and_role_management/EmployeeDetails";
 import EmployeeJobAssignment from "./pages/User_and_role_management/EmployeeJobAssignment";
 import EmployeeAssessorAssign from "./pages/User_and_role_management/EmployeeAssessorAssign";
 
-import OrganizationUnit from "./pages/Organizational_structure/Organization_unit";
-import Discipline from "./pages/Organizational_structure/Discipline";
-import OrganizationCompetency from "./pages/Organizational_structure/Organisation_competency";
 
+import CompetencyDescription from "./pages/Competency_framework/CompetencyDescription";
 import CompetencyCategory from "./pages/Competency_framework/CompetencyCategory";
-import CompetencyDomain from "./pages/Competency_framework/CompetencyDomain";
 import ProficiencyLevel from "./pages/Competency_framework/ProficiencyLevel";
 import Competency from "./pages/Competency_framework/Competency";
-import CompetencyProficiencyDescription from "./pages/Competency_framework/CompetencyProficiencyDescription";
+import CompetencyDomain from "./pages/Competency_framework/CompetencyDomain";
 
 import Job from "./pages/Job_profiling/Job";
 import JobCompetencyProfile from "./pages/Job_profiling/JobCompetencyProfile";
@@ -143,17 +140,13 @@ export default function App() {
             <Route path="/employee-job-assignment" element={<EmployeeJobAssignment />} />
             <Route path="/employee-assessor-assign" element={<EmployeeAssessorAssign />} />
 
-            {/* Organizational Structure */}
-            <Route path="/organization-unit" element={<OrganizationUnit />} />
-            <Route path="/discipline" element={<Discipline />} />
-            <Route path="/organization-competency" element={<OrganizationCompetency />} />
 
             {/* Competency Framework */}
+            <Route path="/competency-description" element={<CompetencyDescription />} />
             <Route path="/competency-category" element={<CompetencyCategory />} />
-            <Route path="/competency-domain" element={<CompetencyDomain />} />
             <Route path="/proficiency-level" element={<ProficiencyLevel />} />
             <Route path="/competency" element={<Competency />} />
-            <Route path="/competency-proficiency-description" element={<CompetencyProficiencyDescription />} />
+            <Route path="/competency-domain" element={<CompetencyDomain />} />
 
             {/* Job Profiling */}
             <Route path="/job" element={<Job />} />
