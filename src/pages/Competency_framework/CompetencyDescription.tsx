@@ -2,7 +2,7 @@ function CompetencyDescription() {
     return (
       <div className="p-6 bg-gray-100 dark:bg-gray-900">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Competency Description Layout</h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">"These are our building blocks of organizational excellence"</p>
+        <p className="text-gray-600 dark:text-gray-400 mb-6">These are our building blocks of organizational excellence</p>
         
         <div className="space-y-8">
 

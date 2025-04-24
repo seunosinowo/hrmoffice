@@ -6,7 +6,6 @@ import {
   BoxCubeIcon,
   ChevronDownIcon,
   HorizontaLDots,
-  ListIcon,
   PageIcon,
   PieChartIcon,
   PlugInIcon,

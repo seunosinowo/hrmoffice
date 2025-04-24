@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { 
-  PlusIcon, 
   TrashBinIcon,
   InfoIcon,
   PencilIcon,
@@ -268,7 +267,7 @@ export default function CompetencyCategory() {
       {/* Header Section */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Competency Category</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Competency Category Layout</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">Building a foundation of excellence through defined competencies</p>
         </div>
         <div className="flex justify-center sm:justify-end">
@@ -276,7 +275,7 @@ export default function CompetencyCategory() {
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 w-full sm:w-auto"
           >
-            <PlusIcon className="size-0" />
+            
             <span>Add Category</span>
           </button>
         </div>
@@ -393,8 +392,9 @@ export default function CompetencyCategory() {
 
       {/* Add/Edit Category Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
-          <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm dark:bg-gray-900/80" />
+          <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
             <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">
               {selectedItem ? 'Edit Category' : 'Add New Category'}
             </h2>
@@ -483,8 +483,9 @@ export default function CompetencyCategory() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
-          <div className="w-full max-w-xs rounded-xl bg-white p-5 dark:bg-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm dark:bg-gray-900/80" />
+          <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
             <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Delete Category</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
               Are you sure you want to delete the category "{selectedItem.category}"?
