@@ -239,7 +239,7 @@ function Competency() {
                   </td>
                 </tr>
               ) : data.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                <tr key={`competency-${item.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                   <td className="whitespace-nowrap px-8 py-4 text-sm text-gray-900 dark:text-gray-100">
                     {item.name}
                   </td>

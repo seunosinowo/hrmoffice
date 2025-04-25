@@ -287,7 +287,7 @@ export default function CompetencyProficiency() {
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-white/[0.03]">
                 {filteredProficiencies.map((proficiency) => (
-                  <tr key={proficiency.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
+                  <tr key={`proficiency-${proficiency.id}-${proficiency.competency_name}`} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
                     <td className="whitespace-nowrap px-4 py-4">
                       <div className="flex items-center">
                         <div className="flex size-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
@@ -372,8 +372,9 @@ export default function CompetencyProficiency() {
 
       {/* Add Proficiency Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
-          <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm dark:bg-gray-900/80" />
+          <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
             <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">New Competency Proficiency</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
               Create a new competency proficiency
@@ -457,8 +458,9 @@ export default function CompetencyProficiency() {
 
       {/* Edit Proficiency Modal */}
       {showEditModal && selectedProficiency && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
-          <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm dark:bg-gray-900/80" />
+          <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
             <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Edit Competency Proficiency</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
               Update competency proficiency details
@@ -542,8 +544,9 @@ export default function CompetencyProficiency() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedProficiency && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
-          <div className="w-full max-w-xs rounded-xl bg-white p-5 dark:bg-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm dark:bg-gray-900/80" />
+          <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
             <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Delete Proficiency</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
               Are you sure you want to delete this competency proficiency?

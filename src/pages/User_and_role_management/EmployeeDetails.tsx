@@ -352,7 +352,7 @@ const EmployeeDetails: React.FC = () => {
         /* Employee Grid - Horizontal Cards */
         <div className="grid grid-cols-1 gap-6">
           {employees.map((employee) => (
-            <div key={employee.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+            <div key={`employee-${employee.id}-${employee.employee_number}`} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
               <div className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-6">
@@ -393,7 +393,7 @@ const EmployeeDetails: React.FC = () => {
                         <div className="flex flex-wrap gap-1 mt-1">
                           {employee.departments.map((dept) => (
                             <span
-                              key={dept.id}
+                              key={`employee-dept-${dept.id}-${employee.id}`}
                               className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
                             >
                               {dept.name}
@@ -516,7 +516,7 @@ const EmployeeDetails: React.FC = () => {
                   </label>
                   <div className="mt-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md p-2 max-h-40 overflow-y-auto">
                     {departments.map((dept) => (
-                      <div key={dept.id} className="flex items-center py-1">
+                      <div key={`dept-checkbox-${dept.id}`} className="flex items-center py-1">
                         <input
                           type="checkbox"
                           id={`dept-${dept.id}`}
@@ -805,7 +805,7 @@ const EmployeeDetails: React.FC = () => {
                   </label>
                   <div className="mt-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md p-2 max-h-40 overflow-y-auto">
                     {departments.map((dept) => (
-                      <div key={dept.id} className="flex items-center py-1">
+                      <div key={`edit-dept-checkbox-${dept.id}`} className="flex items-center py-1">
                         <input
                           type="checkbox"
                           id={`edit-dept-${dept.id}`}
