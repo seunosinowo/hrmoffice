@@ -360,7 +360,7 @@ export default function EmployeeAssessorAssign() {
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-white/[0.03]">
                 {filteredAssignments.map((assignment) => (
-                  <tr key={assignment.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
+                  <tr key={`assignment-${assignment.id}-${assignment.employee_name}`} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
                     <td className="whitespace-nowrap px-4 py-4">
                       <div className="flex items-center">
                         <div className="flex size-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
@@ -477,7 +477,7 @@ export default function EmployeeAssessorAssign() {
                 >
                   <option value="">Select a department</option>
                   {departments.map(dept => (
-                    <option key={dept.id} value={dept.name}>{dept.name}</option>
+                    <option key={`dept-${dept.id}-${dept.name}`} value={dept.name}>{dept.name}</option>
                   ))}
                 </select>
               </div>
@@ -495,7 +495,7 @@ export default function EmployeeAssessorAssign() {
                 >
                   <option value="">Select a job role</option>
                   {jobRoles.map(role => (
-                    <option key={role.id} value={role.name}>{role.name}</option>
+                    <option key={`role-${role.id}-${role.name}`} value={role.name}>{role.name}</option>
                   ))}
                 </select>
               </div>
@@ -580,7 +580,7 @@ export default function EmployeeAssessorAssign() {
                 >
                   <option value="">Select a department</option>
                   {departments.map(dept => (
-                    <option key={dept.id} value={dept.name}>{dept.name}</option>
+                    <option key={`dept-${dept.id}-${dept.name}`} value={dept.name}>{dept.name}</option>
                   ))}
                 </select>
               </div>
@@ -598,7 +598,7 @@ export default function EmployeeAssessorAssign() {
                 >
                   <option value="">Select a job role</option>
                   {jobRoles.map(role => (
-                    <option key={role.id} value={role.name}>{role.name}</option>
+                    <option key={`role-${role.id}-${role.name}`} value={role.name}>{role.name}</option>
                   ))}
                 </select>
               </div>
