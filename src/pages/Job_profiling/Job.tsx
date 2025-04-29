@@ -370,7 +370,7 @@ export default function Job() {
 
       {/* Add Job Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm pt-24 pb-8">
           <div className="w-full max-w-2xl rounded-xl bg-white p-5 dark:bg-gray-900">
             <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Add New Job</h2>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -451,7 +451,7 @@ export default function Job() {
 
       {/* Edit Job Modal */}
       {showEditModal && selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm pt-24 pb-8">
           <div className="w-full max-w-2xl rounded-xl bg-white p-5 dark:bg-gray-900">
             <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Edit Job</h2>
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -532,7 +532,7 @@ export default function Job() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm pt-24 pb-8">
           <div className="w-full max-w-xs rounded-xl bg-white p-5 dark:bg-gray-900">
             <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Delete Job</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
