@@ -43,6 +43,16 @@ interface Assessment {
   competencies: AssessmentCompetency[];
 }
 
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  };
+  return date.toLocaleDateString('en-US', options);
+};
+
 export default function EmployeeAssessment() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -279,7 +289,7 @@ export default function EmployeeAssessment() {
       setFormData({
         employee_name: '',
         assessor_name: '',
-        assessment_date: new Date().toISOString().split('T')[0],
+        assessment_date: new Date().toISOString().slice(0, 16),
         status: 'In Progress',
         overall_rating: 0,
         department_id: '',
@@ -295,10 +305,12 @@ export default function EmployeeAssessment() {
 
   const handleNewAssessmentClick = () => {
     setSelectedAssessment(null);
+    const now = new Date();
+    const formattedDate = now.toISOString().slice(0, 16); // This will give us YYYY-MM-DDTHH:mm
     setFormData({
       employee_name: '',
       assessor_name: '',
-      assessment_date: new Date().toISOString().split('T')[0],
+      assessment_date: formattedDate,
       status: 'In Progress',
       overall_rating: 0,
       department_id: '',
@@ -479,7 +491,7 @@ export default function EmployeeAssessment() {
     doc.text(`Employee: ${assessment.employee.name}`, 14, 30);
     doc.text(`Department: ${assessment.employee.department[0]?.name || 'N/A'}`, 14, 40);
     doc.text(`Assessor: ${assessment.assessor_name}`, 14, 50);
-    doc.text(`Date: ${new Date(assessment.assessment_date).toLocaleDateString()}`, 14, 60);
+    doc.text(`Date: ${formatDate(assessment.assessment_date)}`, 14, 60);
     doc.text(`Overall Rating: ${assessment.overall_rating}`, 14, 70);
 
     // Add competencies table
@@ -633,6 +645,11 @@ export default function EmployeeAssessment() {
                   </div>
                 </div>
 
+                <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                  <p>Assessment Date: {formatDate(assessment.assessment_date)}</p>
+                  <p>Assessor: {assessment.assessor_name}</p>
+                </div>
+
                 <div className="mt-6 flex justify-end gap-2">
                   <button
                     onClick={() => {
@@ -673,7 +690,7 @@ export default function EmployeeAssessment() {
                       Assessment Details
                     </h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      {selectedAssessment.employee.name} - {selectedAssessment.assessment_date}
+                      {selectedAssessment.employee.name} - {formatDate(selectedAssessment.assessment_date)}
                     </p>
                   </div>
                   <button
@@ -845,8 +862,10 @@ export default function EmployeeAssessment() {
                       Assessment Date
                     </label>
                     <input
-                      type="date"
+                      type="datetime-local"
                       id="date"
+                      value={formData.assessment_date}
+                      onChange={(e) => setFormData({ ...formData, assessment_date: e.target.value })}
                       className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
                     />
                   </div>
