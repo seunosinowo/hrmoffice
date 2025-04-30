@@ -4,7 +4,7 @@ import {
   DocumentTextIcon, 
   AcademicCapIcon,
   ChartBarIcon,
-  UserGroupIcon,
+  // UserGroupIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 
@@ -18,40 +18,45 @@ export default function ResourcesPage() {
       action: "Read Guide",
       link: "https://gavsispanel.gelisim.edu.tr/Document/hocal/20180827153114515_42cde2f6-988f-4fe9-ae06-1fc8ad0efd42.pdf"
     },
+    // {
+    //   title: "Employee Onboarding Kit",
+    //   desc: "Templates and checklists for seamless onboarding",
+    //   icon: <UserGroupIcon className="h-8 w-8 text-blue-600" />,
+    //   category: "Templates",
+    //   action: "Get Templates"
+    // },
     {
-      title: "Employee Onboarding Kit",
-      desc: "Templates and checklists for seamless onboarding",
-      icon: <UserGroupIcon className="h-8 w-8 text-blue-600" />,
-      category: "Templates",
-      action: "Get Templates"
-    },
-    {
-      title: "Compliance Masterclass",
-      desc: "Video series on latest labor regulations",
+      title: "Professional in Human Resources (PHR)",
+      desc: "Video series on Human Resources",
       icon: <ShieldCheckIcon className="h-8 w-8 text-emerald-600" />,
       category: "Training",
-      action: "Watch Videos"
+      action: "Watch Videos",
+      link: "https://www.linkedin.com/learning/topics/professional-in-human-resources-phr"
     },
     {
-      title: "People Analytics Handbook",
-      desc: "Turn HR data into actionable insights",
-      icon: <ChartBarIcon className="h-8 w-8 text-purple-600" />,
-      category: "Analytics",
-      action: "Download"
-    },
-    {
-      title: "Leadership Development",
+      title: "Leadership and Management",
       desc: "Curriculum for building management skills",
       icon: <AcademicCapIcon className="h-8 w-8 text-amber-600" />,
       category: "Courses",
-      action: "Start Course"
+      action: "Start Course",
+      link: "https://www.linkedin.com/learning/topics/leadership-and-management"
     },
     {
-      title: "Policy Builder Tool",
+      title: "HR Data Analytics Guidebook",
+      desc: "Turn HR data into actionable insights",
+      icon: <ChartBarIcon className="h-8 w-8 text-purple-600" />,
+      category: "Analytics",
+      action: "Download",
+      link: "https://tq.filegood.club/1586445898"
+    },
+    
+    {
+      title: "Step-by-Step Recruitment Guide",
       desc: "Create custom HR policies in minutes",
       icon: <DocumentTextIcon className="h-8 w-8 text-red-600" />,
-      category: "Tools",
-      action: "Try Tool"
+      category: "Training",
+      action: "Watch Videos",
+      link: "https://www.youtube.com/watch?v=Qk38hHZyX6E"
     },
     {
       title: "Platform Tutorials",
