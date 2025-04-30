@@ -6,7 +6,6 @@ import {
   ChartBarIcon,
   UserGroupIcon,
   ShieldCheckIcon,
-  CogIcon
 } from "@heroicons/react/24/outline";
 
 export default function ResourcesPage() {
@@ -16,7 +15,8 @@ export default function ResourcesPage() {
       desc: "Master core HR processes from hiring to offboarding",
       icon: <BookOpenIcon className="h-8 w-8 text-indigo-600" />,
       category: "Essentials",
-      action: "Read Guide"
+      action: "Read Guide",
+      link: "https://gavsispanel.gelisim.edu.tr/Document/hocal/20180827153114515_42cde2f6-988f-4fe9-ae06-1fc8ad0efd42.pdf"
     },
     {
       title: "Employee Onboarding Kit",
@@ -60,13 +60,6 @@ export default function ResourcesPage() {
       category: "How-To",
       action: "View Tutorials"
     },
-    {
-      title: "System Configuration Guide",
-      desc: "Advanced setup for your organization",
-      icon: <CogIcon className="h-8 w-8 text-gray-600" />,
-      category: "Admin",
-      action: "Read Docs"
-    }
   ];
 
   const categories = [...new Set(resources.map(r => r.category))];
@@ -120,12 +113,17 @@ export default function ResourcesPage() {
                   <span className="text-xs font-semibold px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-700 dark:text-gray-300">
                     {resource.category}
                   </span>
-                  <button className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center">
+                  <a 
+                    href={resource.link || "#"} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center"
+                  >
                     {resource.action}
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
-                  </button>
+                  </a>
                 </div>
               </div>
             </div>
