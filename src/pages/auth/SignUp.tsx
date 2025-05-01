@@ -31,15 +31,17 @@ export default function SignUp() {
       await signUp(email, password);
       navigate("/auth/email-confirmation", { 
         state: { 
-          message: "Please check your email for the confirmation link." 
+          message: "Please check your email for the confirmation link. If you don't see it, check your spam folder." 
         } 
       });
     } catch (error: any) {
       if (error.message.includes('already registered')) {
         setError("This email is already registered. Please try logging in instead.");
-        return;
+      } else if (error.message.includes('email')) {
+        setError("There was an issue sending the verification email. Please try again or use a different email provider.");
+      } else {
+        setError(error.message);
       }
-      setError(error.message);
     } finally {
       setLoading(false);
     }

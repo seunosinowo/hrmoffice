@@ -59,11 +59,12 @@ export default function ResourcesPage() {
       link: "https://www.youtube.com/watch?v=Qk38hHZyX6E"
     },
     {
-      title: "Platform Tutorials",
+      title: "Performance Management System",
       desc: "Step-by-step system walkthroughs",
       icon: <PlayCircleIcon className="h-8 w-8 text-sky-600" />,
       category: "How-To",
-      action: "View Tutorials"
+      action: "View Tutorials",
+      link: "https://www.youtube.com/watch?v=JmpVaBA2m30&pp=ygUVaHIgUGxhdGZvcm0gVHV0b3JpYWxz"
     },
   ];
 

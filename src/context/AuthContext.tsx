@@ -62,17 +62,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.hostname === 'localhost' 
-          ? 'http://localhost:5173/auth/welcome'
-          : 'https://hrmoffice.vercel.app/auth/welcome'
-      }
-    });
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: window.location.hostname === 'localhost' 
+            ? 'http://localhost:5173/auth/welcome'
+            : 'https://hrmoffice.vercel.app/auth/welcome',
+          data: {
+            redirectTo: window.location.hostname === 'localhost' 
+              ? 'http://localhost:5173/auth/welcome'
+              : 'https://hrmoffice.vercel.app/auth/welcome'
+          }
+        }
+      });
 
-    if (error) {
+      if (error) throw error;
+    } catch (error) {
       throw error;
     }
   };
