@@ -127,7 +127,7 @@ export default function AssessorAssessment() {
         {/* Header */}
         <div className="mb-8 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Assessor Performance</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Assessor Assesments Review</h1>
             <p className="mt-2 text-gray-600 dark:text-gray-400">
               Monitor and evaluate the effectiveness of assessment managers
             </p>

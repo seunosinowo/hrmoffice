@@ -78,7 +78,8 @@ export default function JobCompetencyProfile() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.actions-dropdown')) {
         setActiveDropdown(null);
       }
     };
