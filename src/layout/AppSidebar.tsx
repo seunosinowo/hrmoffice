@@ -60,7 +60,7 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PlugInIcon />,
-    name: "Assessment Magt",
+    name: "Assessment Mgt",
     subItems: [
       { name: "Employee Assessment", path: "/employee-assessment" },
       { name: "Assessor Assessment", path: "/assessor-assessment" },

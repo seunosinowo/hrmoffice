@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 type User = {
   id: string;
   email: string;
+  roles: string[];
 };
 
 type AuthContextType = {
@@ -19,14 +20,29 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
+  const fetchUserRoles = async (userId: string) => {
+    try {
+      const { data: roles, error } = await supabase
+        .rpc('get_user_role_names', { user_id: userId });
+      
+      if (error) throw error;
+      return roles || [];
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
+      return [];
+    }
+  };
+
   useEffect(() => {
-    // Check for existing session
+    
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        const roles = await fetchUserRoles(session.user.id);
         setUser({
           id: session.user.id,
-          email: session.user.email!
+          email: session.user.email!,
+          roles
         });
       }
     };
@@ -34,11 +50,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session) {
+        const roles = await fetchUserRoles(session.user.id);
         setUser({
           id: session.user.id,
-          email: session.user.email!
+          email: session.user.email!,
+          roles
         });
       } else {
         setUser(null);
@@ -51,13 +69,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: { session }, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
       throw error;
+    }
+
+    if (session) {
+      const roles = await fetchUserRoles(session.user.id);
+      setUser({
+        id: session.user.id,
+        email: session.user.email!,
+        roles
+      });
     }
   };
 
