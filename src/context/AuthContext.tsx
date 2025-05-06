@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 type User = {
   id: string;
   email: string;
+  roles: string[];
 };
 
 type AuthContextType = {
@@ -26,7 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session) {
         setUser({
           id: session.user.id,
-          email: session.user.email!
+          email: session.user.email!,
+          roles: session.user.user_metadata.roles || []
         });
       }
     };
@@ -38,7 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session) {
         setUser({
           id: session.user.id,
-          email: session.user.email!
+          email: session.user.email!,
+          roles: session.user.user_metadata.roles || []
         });
       } else {
         setUser(null);

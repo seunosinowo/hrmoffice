@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
+import { useAuth } from "../context/AuthContext";
 
 // icon library
 import {
@@ -22,63 +23,183 @@ type NavItem = {
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean; subItems?: { name: string; path: string }[] }[];
 };
 
-const navItems: NavItem[] = [
+const getRolePrefix = (role: string) => {
+  switch (role) {
+    case 'hr':
+      return '/hr';
+    case 'assessor':
+      return '/assessor';
+    default:
+      return '';
+  }
+};
+
+// EmployeeNavItems
+const employeeNavItems: NavItem[] = [
   {
     icon: <PageIcon />,
     name: "Page Description",
-    path: "/page-description",
+    path: "/employee/page-description",
   },
   {
     icon: <UserCircleIcon />,
     name: "User & Role Management",
     subItems: [
-      { name: "User", path: "/user" },
-      { name: "Employee Details", path: "/employee-details" },
-      { name: "Employee Job Assignment", path: "/employee-job-assignment" },
-      { name: "Employee Assessor Assign", path: "/employee-assessor-assign" },
+      { name: "User", path: "/employee/user" },
+      { name: "Employee Details", path: "/employee/employee-details" },
+      { name: "Employee Job Assignment", path: "/employee/employee-job-assignment" },
+      { name: "Employee Assessor Assign", path: "/employee/employee-assessor-assign" },
     ],
   },
   {
     icon: <PieChartIcon />,
     name: "Competency Framework",
     subItems: [
-      { name: "Competency Description", path: "/competency-description" },
-      { name: "Competency Category", path: "/competency-category" },
-      { name: "Competency", path: "/competency" },
-      { name: "Competency Domain", path: "/competency-domain" },
-      { name: "Competency Proficiency", path: "/proficiency-description" },
-      
+      { name: "Competency Description", path: "/employee/competency-description" },
+      { name: "Competency Category", path: "/employee/competency-category" },
+      { name: "Competency", path: "/employee/competency" },
+      { name: "Competency Domain", path: "/employee/competency-domain" },
+      { name: "Competency Proficiency", path: "/employee/proficiency-description" },
     ],
   },
   {
     icon: <TableIcon />,
     name: "Job Profiling",
     subItems: [
-      { name: "Job", path: "/job" },
-      { name: "Job Competency Profile", path: "/job-competency-profile" },
+      { name: "Job", path: "/employee/job" },
+      { name: "Job Competency Profile", path: "/employee/job-competency-profile" },
     ],
   },
   {
     icon: <PlugInIcon />,
-    name: "Assessment Magt",
+    name: "Assessment Mgt",
     subItems: [
-      { name: "Employee Assessment", path: "/employee-assessment" },
-      { name: "Assessor Assessment", path: "/assessor-assessment" },
-      { name: "Consensus Assessment", path: "/consensus-assessment" },
+      { name: "Employee Assessment", path: "/employee/employee-assessment" },
     ],
   },
   {
     icon: <BoxCubeIcon />,
     name: "Analytics",
     subItems: [
-      { name: "Individual Gap", path: "/individual-gap" },
-      { name: "Organization Gap", path: "/organization-gap" },
+      { name: "Individual Gap", path: "/employee/individual-gap" },
+      { name: "Organization Gap", path: "/employee/organization-gap" },
+    ],
+  },
+];
+
+// assessorNavItems
+const assessorNavItems: NavItem[] = [
+  {
+    icon: <PageIcon />,
+    name: "Page Description",
+    path: "/assessor/page-description",
+  },
+  {
+    icon: <UserCircleIcon />,
+    name: "User & Role Management",
+    subItems: [
+      { name: "User", path: "/assessor/user" },
+      { name: "Employee Details", path: "/assessor/employee-details" },
+      { name: "Employee Job Assignment", path: "/assessor/employee-job-assignment" },
+      { name: "Employee Assessor Assign", path: "/assessor/employee-assessor-assign" },
+    ],
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "Competency Framework",
+    subItems: [
+      { name: "Competency Description", path: "/assessor/competency-description" },
+      { name: "Competency Category", path: "/assessor/competency-category" },
+      { name: "Competency", path: "/assessor/competency" },
+      { name: "Competency Domain", path: "/assessor/competency-domain" },
+      { name: "Competency Proficiency", path: "/assessor/proficiency-description" },
+    ],
+  },
+  {
+    icon: <TableIcon />,
+    name: "Job Profiling",
+    subItems: [
+      { name: "Job", path: "/assessor/job" },
+      { name: "Job Competency Profile", path: "/assessor/job-competency-profile" },
+    ],
+  },
+  {
+    icon: <PlugInIcon />,
+    name: "Assessment Mgt",
+    subItems: [
+      { name: "Assessor Assessment", path: "/assessor/assessment" },
+      { name: "Consensus Assessment", path: "/assessor/consensus-assessment" },
+    ],
+  },
+  {
+    icon: <BoxCubeIcon />,
+    name: "Analytics",
+    subItems: [
+      { name: "Individual Gap", path: "/assessor/individual-gap" },
+      { name: "Organization Gap", path: "/assessor/organization-gap" },
+    ],
+  },
+];
+
+// hrNavItems
+const hrNavItems: NavItem[] = [
+  {
+    icon: <PageIcon />,
+    name: "Page Description",
+    path: "/hr/page-description",
+  },
+  {
+    icon: <UserCircleIcon />,
+    name: "User & Role Management",
+    subItems: [
+      { name: "User", path: "/hr/user" },
+      { name: "Employee Details", path: "/hr/employee-details" },
+      { name: "Employee Job Assignment", path: "/hr/employee-job-assignment" },
+      { name: "Employee Assessor Assign", path: "/hr/employee-assessor-assign" },
+      { name: "Role Management", path: "/hr/role-management" },
+    ],
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "Competency Framework",
+    subItems: [
+      { name: "Competency Description", path: "/hr/competency-description" },
+      { name: "Competency Category", path: "/hr/competency-category" },
+      { name: "Competency", path: "/hr/competency" },
+      { name: "Competency Domain", path: "/hr/competency-domain" },
+      { name: "Competency Proficiency", path: "/hr/proficiency-description" },
+    ],
+  },
+  {
+    icon: <TableIcon />,
+    name: "Job Profiling",
+    subItems: [
+      { name: "Job", path: "/hr/job" },
+      { name: "Job Competency Profile", path: "/hr/job-competency-profile" },
+    ],
+  },
+  {
+    icon: <PlugInIcon />,
+    name: "Assessment Mgt",
+    subItems: [
+      { name: "Employee Assessment", path: "/hr/employee-assessment" },
+      { name: "Assessor Assessment", path: "/hr/assessor-assessment" },
+      { name: "Consensus Assessment", path: "/hr/consensus-assessment" },
+    ],
+  },
+  {
+    icon: <BoxCubeIcon />,
+    name: "Analytics",
+    subItems: [
+      { name: "Individual Gap", path: "/hr/individual-gap" },
+      { name: "Organization Gap", path: "/hr/organization-gap" },
     ],
   },
 ];
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { user } = useAuth();
   const location = useLocation();
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main";
@@ -87,9 +208,32 @@ const AppSidebar: React.FC = () => {
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+  // Determine which navigation items to show based on user roles
+  const getNavItems = () => {
+    if (!user) return [];
+    
+    if (user.roles.includes('hr')) {
+      return hrNavItems;
+    } else if (user.roles.includes('assessor')) {
+      return assessorNavItems;
+    } else {
+      return employeeNavItems;
+    }
+  };
+
+  const navItems = getNavItems();
+
   const isActive = useCallback(
-    (path: string) => location.pathname === path,
-    [location.pathname]
+    (path: string) => {
+      // Get the current role prefix
+      const currentRole = user?.roles[0] || '';
+      const prefix = getRolePrefix(currentRole);
+      
+      // If the path doesn't start with the prefix, add it
+      const fullPath = path.startsWith(prefix) ? path : `${prefix}${path}`;
+      return location.pathname === fullPath;
+    },
+    [location.pathname, user?.roles]
   );
 
   useEffect(() => {
