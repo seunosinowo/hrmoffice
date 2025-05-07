@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -20,6 +21,7 @@ interface UserData {
 export default function RoleManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const { refreshUserRole } = useAuth();
 
   useEffect(() => {
     fetchUsers();
@@ -71,9 +73,12 @@ export default function RoleManagement() {
       const { error } = await supabase.rpc('upgrade_to_hr', {
         user_id: userId
       });
-      
+
       if (error) throw error;
-      
+
+      // Refresh user role in AuthContext
+      await refreshUserRole();
+
       // Refresh user list
       fetchUsers();
     } catch (error) {
@@ -127,4 +132,4 @@ export default function RoleManagement() {
       </div>
     </div>
   );
-} 
+}

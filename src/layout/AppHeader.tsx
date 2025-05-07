@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { HorizontaLDots, CloseLineIcon } from "../icons";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
@@ -7,6 +7,16 @@ import { useAuth } from "../context/AuthContext";
 export default function AppHeader() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/'); // Redirect to home page after sign out
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   return (
     <nav className="bg-white shadow-sm dark:bg-gray-900">
@@ -75,7 +85,7 @@ export default function AppHeader() {
                   Book a demo
                 </Link>
           <button
-                  onClick={signOut}
+                  onClick={handleSignOut}
                   className="inline-flex items-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 >
                   Sign out
@@ -182,7 +192,7 @@ export default function AppHeader() {
                     Book a demo
                   </Link>
                   <button
-                    onClick={signOut}
+                    onClick={handleSignOut}
                     className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                   >
                     Sign out
@@ -216,4 +226,4 @@ export default function AppHeader() {
       )}
     </nav>
   );
-} 
+}

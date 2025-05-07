@@ -19,7 +19,47 @@ export default function Login() {
 
     try {
       await signIn(email, password);
-      navigate("/page-description");
+
+      // Get the current user and redirect based on role
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        // Fetch user roles
+        const { data: roleAssignments, error: roleError } = await supabase
+          .from('user_role_assignments')
+          .select('role_id')
+          .eq('user_id', user.id);
+
+        if (roleError) {
+          console.error('Error fetching roles:', roleError);
+          navigate("/page-description"); // Default fallback
+          return;
+        }
+
+        if (roleAssignments && roleAssignments.length > 0) {
+          // Get role names
+          const roleIds = roleAssignments.map(ra => ra.role_id);
+          const { data: roles } = await supabase
+            .from('roles')
+            .select('role_name')
+            .in('id', roleIds);
+
+          const roleNames = roles?.map(r => r.role_name) || [];
+
+          // Redirect based on highest role
+          if (roleNames.includes('hr')) {
+            navigate("/hr/page-description");
+          } else if (roleNames.includes('assessor')) {
+            navigate("/assessor/page-description");
+          } else {
+            navigate("/page-description");
+          }
+        } else {
+          navigate("/page-description"); // Default for users with no roles
+        }
+      } else {
+        navigate("/page-description"); // Default fallback
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An error occurred during login');
     } finally {
@@ -33,12 +73,12 @@ export default function Login() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.hostname === 'localhost' 
+          redirectTo: window.location.hostname === 'localhost'
             ? 'http://localhost:5173/auth/callback'
             : 'https://hrmoffice.vercel.app/auth/callback'
         }
       });
-      
+
       if (error) throw error;
     } catch (error: any) {
       setError(error.message);
@@ -168,4 +208,4 @@ export default function Login() {
       </div>
     </div>
   );
-} 
+}

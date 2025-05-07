@@ -20,15 +20,108 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
+  // Function to assign a role to a user directly if RPC function is not available
+  const assignRoleDirectly = async (userId: string, roleName: string = 'employee') => {
+    try {
+      // First check if the role exists
+      const { data: roleData, error: roleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('role_name', roleName)
+        .single();
+
+      if (roleError) {
+        console.error('Error finding role:', roleError);
+        return;
+      }
+
+      // Then assign the role to the user
+      const { error: assignError } = await supabase
+        .from('user_role_assignments')
+        .insert([{ user_id: userId, role_id: roleData.id }]);
+
+      if (assignError) {
+        console.error('Error assigning role:', assignError);
+      }
+    } catch (error) {
+      console.error('Error in assignRoleDirectly:', error);
+    }
+  };
+
+  const fetchUserRoles = async (userId: string) => {
+    console.log('Fetching roles for user:', userId);
+    let userRoleAssignments;
+
+    const { data: initialRoleAssignments, error } = await supabase
+      .from('user_role_assignments')
+      .select('role_id')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error fetching user roles:', error);
+      return [];
+    }
+
+    userRoleAssignments = initialRoleAssignments;
+
+    // If user has no roles assigned, assign the default 'employee' role
+    if (!userRoleAssignments || userRoleAssignments.length === 0) {
+      console.log('No roles found for user, assigning default employee role');
+      await assignRoleDirectly(userId, 'employee');
+
+      // Fetch the roles again after assignment
+      const { data: updatedRoleAssignments, error: updateError } = await supabase
+        .from('user_role_assignments')
+        .select('role_id')
+        .eq('user_id', userId);
+
+      if (updateError) {
+        console.error('Error fetching updated user roles:', updateError);
+        return ['employee']; // Return default role even if fetch fails
+      }
+
+      if (updatedRoleAssignments && updatedRoleAssignments.length > 0) {
+        userRoleAssignments = updatedRoleAssignments;
+      } else {
+        return ['employee']; // Return default role if assignment didn't work
+      }
+    }
+
+    // Get role names for the role_ids
+    const roleIds = userRoleAssignments.map(ra => ra.role_id);
+
+    if (roleIds.length === 0) {
+      return ['employee']; // Return default role if no role IDs found
+    }
+
+    const { data: roles, error: rolesError } = await supabase
+      .from('roles')
+      .select('role_name')
+      .in('id', roleIds);
+
+    if (rolesError) {
+      console.error('Error fetching role names:', rolesError);
+      return ['employee']; // Return default role if fetch fails
+    }
+
+    if (!roles || roles.length === 0) {
+      return ['employee']; // Return default role if no roles found
+    }
+
+    console.log('Fetched roles:', roles);
+    return roles.map(role => role.role_name);
+  };
+
   useEffect(() => {
     // Check for existing session
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        const roles = await fetchUserRoles(session.user.id);
         setUser({
           id: session.user.id,
           email: session.user.email!,
-          roles: session.user.user_metadata.roles || []
+          roles
         });
       }
     };
@@ -36,12 +129,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session) {
+        const roles = await fetchUserRoles(session.user.id);
         setUser({
           id: session.user.id,
           email: session.user.email!,
-          roles: session.user.user_metadata.roles || []
+          roles
         });
       } else {
         setUser(null);
@@ -66,15 +160,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      // Sign up the user
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: window.location.hostname === 'localhost' 
+          emailRedirectTo: window.location.hostname === 'localhost'
             ? 'http://localhost:5173/auth/welcome'
             : 'https://hrmoffice.vercel.app/auth/welcome',
           data: {
-            redirectTo: window.location.hostname === 'localhost' 
+            redirectTo: window.location.hostname === 'localhost'
               ? 'http://localhost:5173/auth/welcome'
               : 'https://hrmoffice.vercel.app/auth/welcome'
           }
@@ -82,6 +177,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) throw error;
+
+      // If sign up was successful and we have a user, assign the default 'employee' role
+      if (data && data.user) {
+        try {
+          // First try to assign default employee role using RPC function
+          const { error: roleError } = await supabase.rpc('assign_default_role', {
+            user_id: data.user.id
+          });
+
+          if (roleError) {
+            console.error('Error assigning default role via RPC:', roleError);
+            // If RPC fails, try direct assignment as fallback
+            await assignRoleDirectly(data.user.id, 'employee');
+          }
+        } catch (roleError) {
+          console.error('Error assigning default role:', roleError);
+          // Try direct assignment as fallback
+          await assignRoleDirectly(data.user.id, 'employee');
+        }
+      }
     } catch (error) {
       throw error;
     }
@@ -99,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.hostname === 'localhost' 
+        redirectTo: window.location.hostname === 'localhost'
           ? 'http://localhost:5173/auth/callback'
           : 'https://hrmoffice.vercel.app/auth/callback',
         queryParams: {
@@ -127,4 +242,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-} 
+}

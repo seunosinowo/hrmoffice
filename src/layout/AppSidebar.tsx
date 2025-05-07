@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 // icon library
@@ -39,50 +39,50 @@ const employeeNavItems: NavItem[] = [
   {
     icon: <PageIcon />,
     name: "Page Description",
-    path: "/employee/page-description",
+    path: "/page-description",
   },
   {
     icon: <UserCircleIcon />,
     name: "User & Role Management",
     subItems: [
-      { name: "User", path: "/employee/user" },
-      { name: "Employee Details", path: "/employee/employee-details" },
-      { name: "Employee Job Assignment", path: "/employee/employee-job-assignment" },
-      { name: "Employee Assessor Assign", path: "/employee/employee-assessor-assign" },
+      { name: "User", path: "/user" },
+      { name: "Employee Details", path: "/employee-details" },
+      { name: "Employee Job Assignment", path: "/employee-job-assignment" },
+      { name: "Employee Assessor Assign", path: "/employee-assessor-assign" },
     ],
   },
   {
     icon: <PieChartIcon />,
     name: "Competency Framework",
     subItems: [
-      { name: "Competency Description", path: "/employee/competency-description" },
-      { name: "Competency Category", path: "/employee/competency-category" },
-      { name: "Competency", path: "/employee/competency" },
-      { name: "Competency Domain", path: "/employee/competency-domain" },
-      { name: "Competency Proficiency", path: "/employee/proficiency-description" },
+      { name: "Competency Description", path: "/competency-description" },
+      { name: "Competency Category", path: "/competency-category" },
+      { name: "Competency", path: "/competency" },
+      { name: "Competency Domain", path: "/competency-domain" },
+      { name: "Competency Proficiency", path: "/proficiency-description" },
     ],
   },
   {
     icon: <TableIcon />,
     name: "Job Profiling",
     subItems: [
-      { name: "Job", path: "/employee/job" },
-      { name: "Job Competency Profile", path: "/employee/job-competency-profile" },
+      { name: "Job", path: "/job" },
+      { name: "Job Competency Profile", path: "/job-competency-profile" },
     ],
   },
   {
     icon: <PlugInIcon />,
     name: "Assessment Mgt",
     subItems: [
-      { name: "Employee Assessment", path: "/employee/employee-assessment" },
+      { name: "Employee Assessment", path: "/employee-assessment" },
     ],
   },
   {
     icon: <BoxCubeIcon />,
     name: "Analytics",
     subItems: [
-      { name: "Individual Gap", path: "/employee/individual-gap" },
-      { name: "Organization Gap", path: "/employee/organization-gap" },
+      { name: "Individual Gap", path: "/individual-gap" },
+      { name: "Organization Gap", path: "/organization-gap" },
     ],
   },
 ];
@@ -167,7 +167,7 @@ const hrNavItems: NavItem[] = [
       { name: "Competency Category", path: "/hr/competency-category" },
       { name: "Competency", path: "/hr/competency" },
       { name: "Competency Domain", path: "/hr/competency-domain" },
-      { name: "Competency Proficiency", path: "/hr/proficiency-description" },
+      { name: "Competency Proficiency", path: "/hr/competency-proficiency" },
     ],
   },
   {
@@ -208,10 +208,42 @@ const AppSidebar: React.FC = () => {
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Determine which navigation items to show based on user roles
+  const isActive = (path: string) => {
+    if (!user) return false;
+
+    // Define role hierarchy for path matching
+    const roleHierarchy: { [key: string]: string[] } = {
+      'hr': ['hr', 'assessor', 'employee'],
+      'assessor': ['assessor', 'employee'],
+      'employee': ['employee']
+    };
+
+    // Get the user's highest role
+    let highestRole = 'employee';
+    if (user.roles.includes('hr')) {
+      highestRole = 'hr';
+    } else if (user.roles.includes('assessor')) {
+      highestRole = 'assessor';
+    }
+
+    // Get all prefixes this user can access
+    const accessiblePrefixes = roleHierarchy[highestRole].map(role => getRolePrefix(role));
+
+    // Check if the current path matches any of the accessible paths
+    for (const prefix of accessiblePrefixes) {
+      const fullPath = path.startsWith(prefix) ? path : `${prefix}${path}`;
+      if (location.pathname.startsWith(fullPath)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   const getNavItems = () => {
     if (!user) return [];
-    
+
+    // Return the nav items based on the user's highest role
     if (user.roles.includes('hr')) {
       return hrNavItems;
     } else if (user.roles.includes('assessor')) {
@@ -222,19 +254,6 @@ const AppSidebar: React.FC = () => {
   };
 
   const navItems = getNavItems();
-
-  const isActive = useCallback(
-    (path: string) => {
-      // Get the current role prefix
-      const currentRole = user?.roles[0] || '';
-      const prefix = getRolePrefix(currentRole);
-      
-      // If the path doesn't start with the prefix, add it
-      const fullPath = path.startsWith(prefix) ? path : `${prefix}${path}`;
-      return location.pathname === fullPath;
-    },
-    [location.pathname, user?.roles]
-  );
 
   useEffect(() => {
     let submenuMatched = false;
@@ -258,7 +277,7 @@ const AppSidebar: React.FC = () => {
     if (!submenuMatched) {
       setOpenSubmenu(null);
     }
-  }, [location, isActive]);
+  }, [location, navItems]);
 
   useEffect(() => {
     if (openSubmenu !== null) {
@@ -410,7 +429,7 @@ const AppSidebar: React.FC = () => {
 
   return (
     <aside
-      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
+      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200
         ${
           isExpanded || isMobileOpen
             ? "w-[290px]"

@@ -1,4 +1,13 @@
-import { supabase } from './supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+const supabaseKey = process.env.REACT_APP_SUPABASE_KEY || '';
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Supabase URL or Key is not defined in environment variables.');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Profile operations
 export const getProfile = async (userId: string) => {
@@ -172,4 +181,30 @@ export const clearAllData = async () => {
     console.error('Error clearing data:', error);
     throw error;
   }
-}; 
+};
+
+// Function to assign default role to new users
+export const assignDefaultRole = async (userId: string) => {
+  const { error } = await supabase
+    .from('profiles') // Assuming 'profiles' table stores user roles
+    .update({ role: 'employee' })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('Error assigning default role:', error);
+    throw error;
+  }
+};
+
+// Function to update user role
+export const updateUserRole = async (userId: string, newRole: string) => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ role: newRole })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('Error updating user role:', error);
+    throw error;
+  }
+};
