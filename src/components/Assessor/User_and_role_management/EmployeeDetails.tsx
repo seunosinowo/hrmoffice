@@ -724,7 +724,7 @@ const EmployeeDetails: React.FC = () => {
                     type="text"
                     value={selectedEmployee.employee_number}
                     disabled
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800"
                   />
                 </div>
                 

@@ -1,10 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from '../../../lib/supabase';
 
 interface User {
   id: string;
@@ -12,15 +7,9 @@ interface User {
   roles: string[];
 }
 
-interface UserData {
-  id: string;
-  email: string;
-}
-
-export default function RoleManagement() {
+export default function HRUser() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  
 
   useEffect(() => {
     fetchUsers();
@@ -28,16 +17,16 @@ export default function RoleManagement() {
 
   const fetchUsers = async () => {
     try {
-      // Fetch all users
+      // Get all users
       const { data: usersData, error: usersError } = await supabase
-        .from('auth.users')
+        .from('users')
         .select('id, email');
 
       if (usersError) throw usersError;
 
-      // Fetch roles for each user
+      // Get roles for each user
       const usersWithRoles = await Promise.all(
-        (usersData as UserData[]).map(async (user) => {
+        (usersData || []).map(async (user) => {
           const { data: roles } = await supabase
             .rpc('get_user_roles', { user_id: user.id });
           return { ...user, roles: roles || [] };
@@ -75,9 +64,6 @@ export default function RoleManagement() {
 
       if (error) throw error;
 
-      // No need to refresh user role in AuthContext for now
-      // The user will see updated roles on next login
-
       // Refresh user list
       fetchUsers();
     } catch (error) {
@@ -89,28 +75,28 @@ export default function RoleManagement() {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">User Role Management</h1>
+      <h1 className="text-2xl font-bold mb-4">User Management</h1>
       <div className="overflow-x-auto">
-        <table className="min-w-full bg-white">
-          <thead>
+        <table className="min-w-full bg-white dark:bg-gray-800 shadow-md rounded-lg">
+          <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
-              <th className="px-6 py-3 border-b">Email</th>
-              <th className="px-6 py-3 border-b">Current Roles</th>
-              <th className="px-6 py-3 border-b">Actions</th>
+              <th className="px-6 py-3 border-b dark:border-gray-600 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
+              <th className="px-6 py-3 border-b dark:border-gray-600 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Current Roles</th>
+              <th className="px-6 py-3 border-b dark:border-gray-600 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {users.map((user) => (
-              <tr key={user.id}>
-                <td className="px-6 py-4 border-b">{user.email}</td>
-                <td className="px-6 py-4 border-b">
+              <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{user.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                   {user.roles.join(', ') || 'No roles'}
                 </td>
-                <td className="px-6 py-4 border-b">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   {!user.roles.includes('assessor') && (
                     <button
                       onClick={() => upgradeToAssessor(user.id)}
-                      className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded mr-2 transition-colors duration-200"
                     >
                       Make Assessor
                     </button>
@@ -118,7 +104,7 @@ export default function RoleManagement() {
                   {!user.roles.includes('hr') && (
                     <button
                       onClick={() => upgradeToHR(user.id)}
-                      className="bg-green-500 text-white px-4 py-2 rounded"
+                      className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition-colors duration-200"
                     >
                       Make HR
                     </button>

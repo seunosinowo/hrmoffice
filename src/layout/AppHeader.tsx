@@ -11,8 +11,11 @@ export default function AppHeader() {
 
   const handleSignOut = async () => {
     try {
+      // Sign out first
       await signOut();
-      navigate('/'); // Redirect to home page after sign out
+
+      // Then navigate to the home page
+      window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
     }

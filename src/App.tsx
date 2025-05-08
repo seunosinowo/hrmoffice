@@ -8,6 +8,7 @@ import { RoleBasedRoute } from "./components/RoleBasedRoute";
 
 // Lazy load components
 const NotFound = lazy(() => import("./pages/OtherPage/NotFound"));
+const Unauthorized = lazy(() => import("./pages/OtherPage/Unauthorized"));
 const Login = lazy(() => import("./pages/auth/Login"));
 const SignUp = lazy(() => import("./pages/auth/SignUp"));
 const EmailConfirmation = lazy(() => import("./pages/auth/EmailConfirmation"));
@@ -191,6 +192,9 @@ export default function App() {
               </Route>
             </Route>
           )}
+
+          {/* Unauthorized Route */}
+          <Route path="/unauthorized" element={<Unauthorized />} />
 
           {/* 404 Route */}
           <Route path="*" element={<NotFound />} />
