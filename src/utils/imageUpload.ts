@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 export const uploadImage = async (file: File, bucketName: string): Promise<string | null> => {
   try {
     console.log(`Starting image upload process for file: ${file.name}, size: ${file.size}, type: ${file.type}`);
-    
+
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       console.error('File size must be less than 2MB');
@@ -33,7 +33,7 @@ export const uploadImage = async (file: File, bucketName: string): Promise<strin
         return null;
       }
     }
-    
+
     // Check and fix bucket permissions
     const permissionsOk = await checkAndFixBucketPermissions(bucketName);
     if (!permissionsOk) {
@@ -44,12 +44,12 @@ export const uploadImage = async (file: File, bucketName: string): Promise<strin
 
     // Generate a unique file name with proper extension
     const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const fileName = `${Date.now()}.${fileExt}`;
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
     const filePath = `${fileName}`;
 
     // Upload the file to Supabase storage
     console.log(`Uploading file to Supabase storage: ${fileName}, Type: ${file.type}, Size: ${file.size} bytes`);
-    
+
     const { error } = await supabase.storage
       .from(bucketName)
       .upload(filePath, file, {
@@ -67,26 +67,52 @@ export const uploadImage = async (file: File, bucketName: string): Promise<strin
     const { data } = supabase.storage
       .from(bucketName)
       .getPublicUrl(filePath);
-    
+
     console.log('Generated public URL:', data.publicUrl);
-    
+
     // Add cache-busting parameter to the URL
     const cacheBustUrl = `${data.publicUrl}?t=${Date.now()}`;
-    
-    // Verify the URL is accessible
+
+    // Verify the URL is accessible - but don't fail if verification fails
     try {
-      const response = await fetch(cacheBustUrl, { method: 'HEAD' });
+      console.log(`Attempting to verify URL accessibility: ${cacheBustUrl}`);
+
+      // Make a HEAD request with no-cache headers
+      const response = await fetch(cacheBustUrl, {
+        method: 'HEAD',
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+
+      console.log(`URL verification response: ${response.status} ${response.statusText}`);
+
       if (!response.ok) {
         console.warn(`URL verification failed after upload: ${response.status} ${response.statusText}`);
+        // IMPORTANT: Even if verification fails, we'll still return the URL
+        console.log(`Returning URL despite verification failure: ${data.publicUrl}`);
+      } else {
+        console.log(`URL verified successfully after upload: ${cacheBustUrl}`);
+      }
+
+      // Double-check that the URL doesn't contain 'default-avatar'
+      if (data.publicUrl.includes('default-avatar')) {
+        console.error('Error: URL contains default-avatar string, which indicates it\'s not a real uploaded image');
         return null;
       }
-      console.log(`URL verified after upload: ${cacheBustUrl}`);
+
+      // ALWAYS return the original URL without cache-busting parameter
+      return data.publicUrl;
     } catch (fetchError) {
       console.error('Error verifying URL after upload:', fetchError);
-      // Continue anyway, as the upload might have succeeded
+      console.log('Error details:', fetchError);
+
+      // IMPORTANT: Continue anyway, as the upload might have succeeded
+      console.log(`Returning URL despite verification error: ${data.publicUrl}`);
+      return data.publicUrl;
     }
-    
-    return cacheBustUrl;
   } catch (error) {
     console.error('Error in upload process:', error);
     return null;
@@ -106,7 +132,7 @@ export const checkBucketExists = async (bucketName: string): Promise<boolean> =>
     const { error } = await supabase.storage
       .from(bucketName)
       .list();
-    
+
     // If there's no error, the bucket exists
     return !error;
   } catch (error) {
@@ -147,32 +173,32 @@ export const getFileUrl = async (bucketName: string, fileName: string): Promise<
       console.warn(`Bucket ${bucketName} does not exist`);
       return null;
     }
-    
+
     // Check if the file exists
     const { data, error } = await supabase.storage
       .from(bucketName)
       .list('', {
         search: fileName
       });
-    
+
     if (error) {
       console.error('Error checking file existence:', error);
       return null;
     }
-    
+
     if (!data || data.length === 0) {
       console.warn(`File ${fileName} not found in bucket ${bucketName}`);
       return null;
     }
-    
+
     // Get the public URL
     const { data: urlData } = supabase.storage
       .from(bucketName)
       .getPublicUrl(fileName);
-    
+
     // Add cache-busting parameter to the URL
     const cacheBustUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-    
+
     // Verify the URL is valid by making a HEAD request
     try {
       const response = await fetch(cacheBustUrl, { method: 'HEAD' });
@@ -200,35 +226,35 @@ export const getFileUrl = async (bucketName: string, fileName: string): Promise<
 export const checkAndFixBucketPermissions = async (bucketName: string): Promise<boolean> => {
   try {
     console.log(`Checking permissions for bucket: ${bucketName}`);
-    
+
     // First check if the bucket exists
     const bucketExists = await checkBucketExists(bucketName);
     if (!bucketExists) {
       console.warn(`Bucket ${bucketName} does not exist. Please create it in the Supabase dashboard.`);
       return false;
     }
-    
+
     // Try to upload a small test file to verify permissions
     const testBlob = new Blob(['test'], { type: 'text/plain' });
     const testFile = new File([testBlob], 'test.txt', { type: 'text/plain' });
-    
+
     const { error: uploadError } = await supabase.storage
       .from(bucketName)
       .upload('test.txt', testFile, {
         upsert: true
       });
-    
+
     if (uploadError) {
       console.error(`Error uploading test file to bucket ${bucketName}:`, uploadError);
       console.warn('Bucket permissions may be incorrect. Please check the Supabase dashboard.');
       return false;
     }
-    
+
     // Try to get the public URL of the test file
     const { data: urlData } = supabase.storage
       .from(bucketName)
       .getPublicUrl('test.txt');
-    
+
     // Try to fetch the test file
     try {
       const response = await fetch(urlData.publicUrl);
@@ -241,12 +267,12 @@ export const checkAndFixBucketPermissions = async (bucketName: string): Promise<
         console.warn('4. Add a policy for public access');
         return false;
       }
-      
+
       // Clean up the test file
       await supabase.storage
         .from(bucketName)
         .remove(['test.txt']);
-      
+
       console.log(`Bucket ${bucketName} permissions are correctly configured.`);
       return true;
     } catch (fetchError) {
@@ -261,68 +287,31 @@ export const checkAndFixBucketPermissions = async (bucketName: string): Promise<
 
 export const uploadProfilePicture = async (file: File, employeeId: string): Promise<string | null> => {
   try {
-    const bucketName = 'employee_pictures';
-    
-    // Check if bucket exists
-    const bucketExists = await checkBucketExists(bucketName);
-    if (!bucketExists) {
-      console.error(`Bucket ${bucketName} does not exist. Please create it in the Supabase dashboard.`);
+    console.log(`Starting profile picture upload for employee ${employeeId}`);
+    console.log(`File details: name=${file.name}, size=${file.size}bytes, type=${file.type}`);
+
+    // Use the uploadImage function that's working in User.tsx
+    // This will try to use the 'profile_pictures' bucket which seems to be working
+    const uploadedUrl = await uploadImage(file, 'profile_pictures');
+
+    if (uploadedUrl) {
+      console.log(`Profile picture uploaded successfully. URL: ${uploadedUrl}`);
+      return uploadedUrl;
+    } else {
+      console.error('Failed to upload profile picture');
       return null;
     }
-
-    // Check bucket permissions
-    const permissionsOk = await checkAndFixBucketPermissions(bucketName);
-    if (!permissionsOk) {
-      console.error(`Bucket ${bucketName} permissions are not correctly configured.`);
-      console.warn('Please check the Supabase dashboard for storage permissions.');
-      return null;
-    }
-    
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      console.error('File size must be less than 2MB');
-      return null;
-    }
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    if (!allowedTypes.includes(file.type)) {
-      console.error('File type must be JPEG, JPG, or PNG');
-      return null;
-    }
-
-    // Generate a unique file name
-    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const fileName = `${employeeId}_${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    // Upload the file
-    const { error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: file.type
-      });
-
-    if (uploadError) {
-      console.error('Error uploading profile picture:', uploadError);
-      return null;
-    }
-
-    // Get the public URL
-    const { data } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(filePath);
-
-    // Add cache-busting parameter
-    return `${data.publicUrl}?t=${Date.now()}`;
   } catch (error) {
     console.error('Error in uploadProfilePicture:', error);
+    alert(`An unexpected error occurred during image upload: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 };
 
-export const getDefaultAvatarUrl = (): string => {
-  return 'https://ui-avatars.com/api/?background=random';
-}; 
+export const getDefaultAvatarUrl = (firstName?: string, lastName?: string): string => {
+  // Return a default avatar image from the public folder
+  // We're not using firstName and lastName here, but they're kept for compatibility
+  // with code that might be calling this function with those parameters
+  console.log(`Getting default avatar for ${firstName || ''} ${lastName || ''}`);
+  return '/default-avatar.png';
+};
