@@ -3,8 +3,8 @@ import {
   UserIcon,
   FileIcon,
   ChatIcon
-} from "../../../icons";
-import { supabase } from "../../../lib/supabase";
+} from "../../../../../../Downloads/hrmoffice/src/icons";
+import { supabase } from "../../../../../../Downloads/hrmoffice/src/lib/supabase";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable'; // Ensure proper import of the plugin
 

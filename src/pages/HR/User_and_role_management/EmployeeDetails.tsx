@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { supabase } from '../../../lib/supabase';
-import { uploadProfilePicture, getDefaultAvatarUrl } from '../../../utils/imageUpload';
+import { supabase } from '../../../../../../Downloads/hrmoffice/src/lib/supabase';
+import { uploadProfilePicture, getDefaultAvatarUrl } from '../../../../../../Downloads/hrmoffice/src/utils/imageUpload';
 
 // interfaces
 interface Department {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../../../lib/supabase';
 import { uploadProfilePicture, getDefaultAvatarUrl } from '../../../utils/imageUpload';
+import { withErrorHandling } from '../../../utils/supabaseHelpers';
 
 // interfaces
 interface Department {
@@ -56,32 +57,39 @@ const EmployeeDetails: React.FC = () => {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const { data: employeesData, error: employeesError } = await supabase
-        .from('employees')
-        .select(`
-          *,
-          employee_departments (
-            department:departments (
-              id,
-              name
+      setError(null);
+
+      const result = await withErrorHandling(async () => {
+        const { data: employeesData, error: employeesError } = await supabase
+          .from('employees')
+          .select(`
+            *,
+            employee_departments (
+              department:departments (
+                id,
+                name
+              )
             )
-          )
-        `)
-        .order('employee_number', { ascending: true });
+          `)
+          .order('employee_number', { ascending: true });
 
-      if (employeesError) throw employeesError;
+        if (employeesError) throw employeesError;
+        return employeesData;
+      });
 
-      const formattedEmployees = employeesData.map(emp => ({
-        ...emp,
-        departments: emp.employee_departments.map((ed: any) => ed.department),
-        department_ids: emp.employee_departments.map((ed: any) => ed.department.id),
-        profile_picture_url: emp.profile_picture_url || getDefaultAvatarUrl()
-      }));
+      if (result) {
+        const formattedEmployees = result.map(emp => ({
+          ...emp,
+          departments: emp.employee_departments.map((ed: any) => ed.department),
+          department_ids: emp.employee_departments.map((ed: any) => ed.department.id),
+          profile_picture_url: emp.profile_picture_url || getDefaultAvatarUrl()
+        }));
 
-      setEmployees(formattedEmployees);
+        setEmployees(formattedEmployees);
+      }
     } catch (error) {
       console.error('Error fetching employees:', error);
-      setError('Failed to load employees');
+      setError('Failed to load employees. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
@@ -90,16 +98,24 @@ const EmployeeDetails: React.FC = () => {
   // Fetch departments
   const fetchDepartments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('departments')
-        .select('*')
-        .order('name');
+      setError(null);
 
-      if (error) throw error;
-      setDepartments(data);
+      const result = await withErrorHandling(async () => {
+        const { data, error } = await supabase
+          .from('departments')
+          .select('*')
+          .order('name');
+
+        if (error) throw error;
+        return data;
+      });
+
+      if (result) {
+        setDepartments(result);
+      }
     } catch (error) {
       console.error('Error fetching departments:', error);
-      setError('Failed to load departments');
+      setError('Failed to load departments. Please try refreshing the page.');
     }
   };
 
@@ -135,35 +151,45 @@ const EmployeeDetails: React.FC = () => {
 
     try {
       const employeeNumber = generateEmployeeNumber();
-      
-      // First, create the employee with default avatar
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .insert([{
-          employee_number: employeeNumber,
-          username: newEmployee.username,
-          first_name: newEmployee.first_name,
-          last_name: newEmployee.last_name,
-          email: newEmployee.email,
-          phone_number: newEmployee.phone_number,
-          profile_picture_url: getDefaultAvatarUrl()
-        }])
-        .select()
-        .single();
 
-      if (employeeError) throw employeeError;
+      // Use withErrorHandling to handle auth errors
+      const employeeData = await withErrorHandling(async () => {
+        // First, create the employee with default avatar
+        const { data: employeeData, error: employeeError } = await supabase
+          .from('employees')
+          .insert([{
+            employee_number: employeeNumber,
+            username: newEmployee.username,
+            first_name: newEmployee.first_name,
+            last_name: newEmployee.last_name,
+            email: newEmployee.email,
+            phone_number: newEmployee.phone_number,
+            profile_picture_url: getDefaultAvatarUrl()
+          }])
+          .select()
+          .single();
+
+        if (employeeError) throw employeeError;
+        return employeeData;
+      });
+
+      if (!employeeData) {
+        throw new Error('Failed to create employee');
+      }
 
       // Upload profile picture if provided
       if (avatarFile && employeeData) {
         const uploadedUrl = await uploadProfilePicture(avatarFile, employeeData.id);
         if (uploadedUrl) {
           // Update employee with new profile picture URL
-          const { error: updateError } = await supabase
-            .from('employees')
-            .update({ profile_picture_url: uploadedUrl })
-            .eq('id', employeeData.id);
+          await withErrorHandling(async () => {
+            const { error: updateError } = await supabase
+              .from('employees')
+              .update({ profile_picture_url: uploadedUrl })
+              .eq('id', employeeData.id);
 
-          if (updateError) throw updateError;
+            if (updateError) throw updateError;
+          });
         }
       }
 
@@ -174,11 +200,13 @@ const EmployeeDetails: React.FC = () => {
           department_id: deptId
         }));
 
-        const { error: deptError } = await supabase
-          .from('employee_departments')
-          .insert(departmentAssociations);
+        await withErrorHandling(async () => {
+          const { error: deptError } = await supabase
+            .from('employee_departments')
+            .insert(departmentAssociations);
 
-        if (deptError) throw deptError;
+          if (deptError) throw deptError;
+        });
       }
 
       // Refresh the employee list
@@ -195,7 +223,7 @@ const EmployeeDetails: React.FC = () => {
       setAvatarFile(null);
     } catch (error) {
       console.error('Error adding employee:', error);
-      setError('Failed to add employee');
+      setError('Failed to add employee. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -227,36 +255,46 @@ const EmployeeDetails: React.FC = () => {
     setError(null);
 
     try {
-      // Update employee details
-      const { error: updateError } = await supabase
-        .from('employees')
-        .update({
-          username: selectedEmployee.username,
-          first_name: selectedEmployee.first_name,
-          last_name: selectedEmployee.last_name,
-          email: selectedEmployee.email,
-          phone_number: selectedEmployee.phone_number
-        })
-        .eq('id', selectedEmployee.id);
+      // Update employee details using withErrorHandling
+      await withErrorHandling(async () => {
+        const { error: updateError } = await supabase
+          .from('employees')
+          .update({
+            username: selectedEmployee.username,
+            first_name: selectedEmployee.first_name,
+            last_name: selectedEmployee.last_name,
+            email: selectedEmployee.email,
+            phone_number: selectedEmployee.phone_number
+          })
+          .eq('id', selectedEmployee.id);
 
-      if (updateError) throw updateError;
+        if (updateError) throw updateError;
+      });
 
       // Handle profile picture update
       if (avatarFile) {
         const uploadedUrl = await uploadProfilePicture(avatarFile, selectedEmployee.id);
         if (uploadedUrl) {
-          await supabase
-            .from('employees')
-            .update({ profile_picture_url: uploadedUrl })
-            .eq('id', selectedEmployee.id);
+          await withErrorHandling(async () => {
+            const { error } = await supabase
+              .from('employees')
+              .update({ profile_picture_url: uploadedUrl })
+              .eq('id', selectedEmployee.id);
+
+            if (error) throw error;
+          });
         }
       }
 
       // Update department associations
-      await supabase
-        .from('employee_departments')
-        .delete()
-        .eq('employee_id', selectedEmployee.id);
+      await withErrorHandling(async () => {
+        const { error } = await supabase
+          .from('employee_departments')
+          .delete()
+          .eq('employee_id', selectedEmployee.id);
+
+        if (error) throw error;
+      });
 
       if (selectedEmployee.department_ids.length > 0) {
         const departmentAssociations = selectedEmployee.department_ids.map(deptId => ({
@@ -264,11 +302,13 @@ const EmployeeDetails: React.FC = () => {
           department_id: deptId
         }));
 
-        const { error: deptError } = await supabase
-          .from('employee_departments')
-          .insert(departmentAssociations);
+        await withErrorHandling(async () => {
+          const { error: deptError } = await supabase
+            .from('employee_departments')
+            .insert(departmentAssociations);
 
-        if (deptError) throw deptError;
+          if (deptError) throw deptError;
+        });
       }
 
       await fetchEmployees();
@@ -276,7 +316,7 @@ const EmployeeDetails: React.FC = () => {
       setAvatarFile(null);
     } catch (error) {
       console.error('Error updating employee:', error);
-      setError('Failed to update employee');
+      setError('Failed to update employee. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -300,7 +340,7 @@ const EmployeeDetails: React.FC = () => {
   // Toggle department selection for edit
   const toggleDepartmentEdit = (departmentId: string, isSelected: boolean) => {
     if (!selectedEmployee) return;
-    
+
     if (isSelected) {
       setSelectedEmployee({
         ...selectedEmployee,
@@ -325,15 +365,8 @@ const EmployeeDetails: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-          Employee Details
+          My Employee Profile
         </h2>
-        <button 
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-        >
-          <UserIcon className="w-4 h-4" />
-          Add Employee
-        </button>
       </div>
 
       {/* Error message */}
@@ -452,7 +485,7 @@ const EmployeeDetails: React.FC = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -541,9 +574,9 @@ const EmployeeDetails: React.FC = () => {
                       <div className="flex flex-col items-center space-y-2">
                         {avatarFile ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={URL.createObjectURL(avatarFile)} 
-                              alt="Preview" 
+                            <img
+                              src={URL.createObjectURL(avatarFile)}
+                              alt="Preview"
                               className="w-full h-full rounded-full object-cover"
                             />
                             <button
@@ -569,9 +602,9 @@ const EmployeeDetails: React.FC = () => {
                           JPG, JPEG, PNG (max. 2MB)
                         </span>
                       </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        className="hidden"
                         accept="image/jpeg,image/jpg,image/png"
                         onChange={handleFileChange}
                       />
@@ -714,7 +747,7 @@ const EmployeeDetails: React.FC = () => {
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
-              
+
               <form onSubmit={handleUpdateEmployee} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -724,10 +757,10 @@ const EmployeeDetails: React.FC = () => {
                     type="text"
                     value={selectedEmployee.employee_number}
                     disabled
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Username
@@ -741,7 +774,7 @@ const EmployeeDetails: React.FC = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -830,9 +863,9 @@ const EmployeeDetails: React.FC = () => {
                       <div className="flex flex-col items-center space-y-2">
                         {avatarFile ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={URL.createObjectURL(avatarFile)} 
-                              alt="Preview" 
+                            <img
+                              src={URL.createObjectURL(avatarFile)}
+                              alt="Preview"
                               className="w-full h-full rounded-full object-cover"
                             />
                             <button
@@ -848,9 +881,9 @@ const EmployeeDetails: React.FC = () => {
                           </div>
                         ) : selectedEmployee.profile_picture_url ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={selectedEmployee.profile_picture_url} 
-                              alt="Current" 
+                            <img
+                              src={selectedEmployee.profile_picture_url}
+                              alt="Current"
                               className="w-full h-full rounded-full object-cover"
                             />
                           </div>
@@ -866,9 +899,9 @@ const EmployeeDetails: React.FC = () => {
                           JPG, JPEG, PNG (max. 2MB)
                         </span>
                       </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        className="hidden"
                         accept="image/jpeg,image/jpg,image/png"
                         onChange={handleFileChange}
                       />

@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "../../../../../../Downloads/hrmoffice/src/lib/supabase";
 import { 
   TrashBinIcon,
   InfoIcon,
   PencilIcon,
   ChevronDownIcon
-} from "../../../icons";
+} from "../../../../../../Downloads/hrmoffice/src/icons";
 
 interface CompetencyCategory {
   id: number;

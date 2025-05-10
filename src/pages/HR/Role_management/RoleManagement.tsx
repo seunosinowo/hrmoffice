@@ -20,6 +20,7 @@ interface UserData {
 export default function RoleManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  
 
   useEffect(() => {
     fetchUsers();
@@ -56,9 +57,9 @@ export default function RoleManagement() {
       const { error } = await supabase.rpc('upgrade_to_assessor', {
         user_id: userId
       });
-      
+
       if (error) throw error;
-      
+
       // Refresh user list
       fetchUsers();
     } catch (error) {
@@ -71,9 +72,12 @@ export default function RoleManagement() {
       const { error } = await supabase.rpc('upgrade_to_hr', {
         user_id: userId
       });
-      
+
       if (error) throw error;
-      
+
+      // No need to refresh user role in AuthContext for now
+      // The user will see updated roles on next login
+
       // Refresh user list
       fetchUsers();
     } catch (error) {
@@ -127,4 +131,4 @@ export default function RoleManagement() {
       </div>
     </div>
   );
-} 
+}

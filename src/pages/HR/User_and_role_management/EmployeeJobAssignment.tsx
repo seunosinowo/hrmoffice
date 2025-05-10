@@ -1,4 +1,4 @@
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '../../../../../../Downloads/hrmoffice/src/lib/supabase';
 import { useState, useEffect } from 'react';
 import { 
   UserIcon, 
@@ -7,7 +7,7 @@ import {
   InfoIcon,
   PencilIcon,
   ChevronDownIcon
-} from "../../../icons";
+} from "../../../../../../Downloads/hrmoffice/src/icons";
 
 interface JobAssignment {
   id: number;

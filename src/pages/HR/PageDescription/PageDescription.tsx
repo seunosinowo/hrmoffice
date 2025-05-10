@@ -1,4 +1,4 @@
-import { UserIcon, GroupIcon, BoxIcon, PieChartIcon } from "../../../icons";
+import { UserIcon, GroupIcon, BoxIcon, PieChartIcon } from "../../../../../../Downloads/hrmoffice/src/icons";
 
 function PageDescription() {
   return (
@@ -11,10 +11,11 @@ function PageDescription() {
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-4">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">
-              HR Management System
+              HR Management System (HR ROLE)
             </h1>
             <p className="max-w-2xl text-gray-600 dark:text-gray-400">
               Our Human Resources team is the heart of Soto Nigeria | Digital Energy, dedicated to fostering a vibrant and high-performing workforce. We empower our people, cultivate talent, and champion a culture of growth and innovation, ensuring every member of our team can contribute to shaping Nigeria's digital energy future
+              
             </p>
           </div>
           </div>
