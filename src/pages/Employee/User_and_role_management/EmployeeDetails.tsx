@@ -1499,9 +1499,11 @@ const EmployeeDetails: React.FC = () => {
                                 console.error(`Edit modal: Image load error for employee ${selectedEmployee.id}`);
 
                                 // Try with a fresh timestamp
-                                const retryUrl = `${selectedEmployee.profile_picture_url.split('?')[0]}?t=${Date.now() + 1000}`;
-                                console.log(`Edit modal: Retrying with fresh URL: ${retryUrl}`);
-                                target.src = retryUrl;
+                                if (selectedEmployee.profile_picture_url) {
+                                  const retryUrl = `${selectedEmployee.profile_picture_url.split('?')[0]}?t=${Date.now() + 1000}`;
+                                  console.log(`Edit modal: Retrying with fresh URL: ${retryUrl}`);
+                                  target.src = retryUrl;
+                                }
                               }}
                               crossOrigin="anonymous"
                             />
