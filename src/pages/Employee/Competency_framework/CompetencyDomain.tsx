@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import {
+import { useState, useEffect } from "react";
+import {  
   TrashBinIcon,
   InfoIcon,
   PencilIcon,
@@ -115,7 +115,7 @@ export default function CompetencyDomain() {
 
   // Handle search
   useEffect(() => {
-    const filtered = data.filter(item =>
+    const filtered = data.filter(item => 
       item.domain_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.category?.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -307,7 +307,7 @@ export default function CompetencyDomain() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Competency Domains</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">Manage organizational competency domains</p>
         </div>
-        <button
+        <button 
           onClick={() => {
             setSelectedItem(null);
             setFormData({ domain_name: "", category_id: "" });
@@ -316,7 +316,7 @@ export default function CompetencyDomain() {
           disabled={isAdding || isUpdating || isDeleting || isBulkDeleting}
           className="flex items-center justify-center rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600"
         >
-
+          
           <span>{isAdding ? "Adding..." : "Add Domain"}</span>
         </button>
       </div>
@@ -363,13 +363,13 @@ export default function CompetencyDomain() {
                 </td>
               </tr>
             ) : Object.entries(groupedData).map(([category, domains], index) => (
-              <React.Fragment key={`category-${category}`}>
+              <>
                 {index > 0 && (
-                  <tr key={`separator-${category}`}>
+                  <tr>
                     <td colSpan={2} className="h-6 bg-transparent border-t-2 border-gray-200 dark:border-gray-700"></td>
                   </tr>
                 )}
-                <tr key={`header-${category}`} className="bg-gray-50 dark:bg-gray-800">
+                <tr className="bg-gray-50 dark:bg-gray-800">
                   <td className="px-8 py-4">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                       {category}
@@ -387,7 +387,7 @@ export default function CompetencyDomain() {
                         <span className="text-sm">Bulk Actions</span>
                         <ChevronDownIcon className="h-4 w-4" />
                       </button>
-
+                      
                       {activeCategoryDropdown === category && (
                         <div className={`actions-dropdown absolute right-0 z-[9999] w-48 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 dark:bg-gray-800 ${
                           category === Object.keys(groupedData)[Object.keys(groupedData).length - 1] ? 'bottom-full mb-1' : 'top-full mt-1'
@@ -432,7 +432,7 @@ export default function CompetencyDomain() {
                           <span className="text-sm">Actions</span>
                           <ChevronDownIcon className="h-4 w-4" />
                         </button>
-
+                        
                         {activeDropdown === item.id && (
                           <div className={`actions-dropdown absolute right-0 z-[9999] w-36 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 dark:bg-gray-800 ${
                             item.id === data[data.length - 1].id ? 'bottom-full mb-1' : 'top-full mt-1'
@@ -468,7 +468,7 @@ export default function CompetencyDomain() {
                     </td>
                   </tr>
                 ))}
-              </React.Fragment>
+              </>
             ))}
           </tbody>
         </table>
@@ -564,8 +564,8 @@ export default function CompetencyDomain() {
                   disabled={isAdding || isUpdating || isDeleting || isBulkDeleting}
                   className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                 >
-                  {bulkEditData ? (isUpdating ? "Updating..." : "Update All") :
-                   selectedItem ? (isUpdating ? "Updating..." : "Update") :
+                  {bulkEditData ? (isUpdating ? "Updating..." : "Update All") : 
+                   selectedItem ? (isUpdating ? "Updating..." : "Update") : 
                    (isAdding ? "Adding..." : "Add")}
                 </button>
               </div>
