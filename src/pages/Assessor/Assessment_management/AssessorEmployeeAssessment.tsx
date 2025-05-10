@@ -39,7 +39,7 @@ export default function AssessorEmployeeAssessment() {
       const formattedData = data.map(item => ({
         id: item.id,
         employee_id: item.employee_id,
-        employee_email: item.users?.email || 'Unknown',
+        employee_email: item.users && item.users[0]?.email || 'Unknown',
         assessment_date: new Date(item.assessment_date).toLocaleDateString(),
         status: item.status,
         score: item.score
@@ -107,9 +107,9 @@ export default function AssessorEmployeeAssessment() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{assessment.employee_email}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{assessment.assessment_date}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                    ${assessment.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 
-                      assessment.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' : 
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                    ${assessment.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' :
+                      assessment.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' :
                       'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'}`}>
                     {assessment.status}
                   </span>
@@ -119,7 +119,7 @@ export default function AssessorEmployeeAssessment() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex space-x-2">
-                    <select 
+                    <select
                       className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm"
                       value={assessment.status}
                       onChange={(e) => updateAssessmentStatus(assessment.id, e.target.value)}
@@ -128,10 +128,10 @@ export default function AssessorEmployeeAssessment() {
                       <option value="in_progress">In Progress</option>
                       <option value="completed">Completed</option>
                     </select>
-                    
-                    <input 
-                      type="number" 
-                      min="0" 
+
+                    <input
+                      type="number"
+                      min="0"
                       max="100"
                       className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm w-16"
                       value={assessment.score || ''}

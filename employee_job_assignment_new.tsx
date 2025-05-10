@@ -1,7 +1,7 @@
 import { supabase } from '../../../lib/supabase';
 import { useState, useEffect } from 'react';
-import {
-  UserIcon,
+import { 
+  UserIcon, 
   InfoIcon
 } from "../../../icons";
 
@@ -43,13 +43,13 @@ export default function EmployeeJobAssignment() {
 
       // Get the current user's auth ID
       const { data: { user } } = await supabase.auth.getUser();
-
+      
       if (!user) {
         setError('You must be logged in to view your job assignments');
         setLoading(false);
         return;
       }
-
+      
       // Fetch only this employee's job assignments
       const { data, error } = await supabase
         .from('employee_job_assignments')
@@ -68,7 +68,7 @@ export default function EmployeeJobAssignment() {
   };
 
   // Filter assignments based on search term
-  const filteredAssignments = assignments.filter(assignment =>
+  const filteredAssignments = assignments.filter(assignment => 
     assignment.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     assignment.job_role.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -109,7 +109,7 @@ export default function EmployeeJobAssignment() {
       {error && !loading && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
           <p className="text-red-700 dark:text-red-400">{error}</p>
-          <button
+          <button 
             onClick={fetchAssignments}
             className="mt-2 rounded-lg bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/40"
           >
@@ -122,7 +122,7 @@ export default function EmployeeJobAssignment() {
       {!loading && !error && filteredAssignments.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredAssignments.map((assignment) => (
-            <div
+            <div 
               key={`job-assignment-${assignment.id}-${assignment.employee_name}`}
               className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-gray-800 dark:bg-white/[0.03]"
             >
@@ -135,7 +135,7 @@ export default function EmployeeJobAssignment() {
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white">{assignment.employee_name}</h3>
                   </div>
                 </div>
-
+                
                 <div className="mt-4 space-y-2">
                   <div className="flex items-start">
                     <div className="flex-shrink-0 mt-0.5">
@@ -148,7 +148,7 @@ export default function EmployeeJobAssignment() {
                       <p className="text-sm text-gray-900 dark:text-white">{assignment.job_role}</p>
                     </div>
                   </div>
-
+                  
                   <div className="flex items-start">
                     <div className="flex-shrink-0 mt-0.5">
                       <span className="flex size-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
@@ -177,8 +177,6 @@ export default function EmployeeJobAssignment() {
           </p>
         </div>
       )}
-
-
     </div>
   );
 }

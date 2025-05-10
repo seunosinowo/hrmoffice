@@ -97,7 +97,7 @@ export default function EmailConfirmation() {
   if (verifying) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+        <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-gray-700 rounded-lg shadow-md">
           <div className="absolute top-4 right-4">
             <ThemeToggleButton />
           </div>
@@ -120,7 +120,7 @@ export default function EmailConfirmation() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+        <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-gray-700 rounded-lg shadow-md">
           <div className="absolute top-4 right-4">
             <ThemeToggleButton />
           </div>
@@ -150,7 +150,7 @@ export default function EmailConfirmation() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+      <div className="max-w-md w-full space-y-8 p-8 bg-white dark:bg-gray-700 rounded-lg shadow-md">
         <div className="absolute top-4 right-4">
           <ThemeToggleButton />
         </div>
@@ -173,4 +173,4 @@ export default function EmailConfirmation() {
       </div>
     </div>
   );
-} 
+}

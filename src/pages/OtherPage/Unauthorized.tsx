@@ -1,10 +1,10 @@
-import React from 'react';
+
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Unauthorized() {
   const { user } = useAuth();
-  
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 text-center">
@@ -15,7 +15,7 @@ export default function Unauthorized() {
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             You don't have permission to access this page.
           </p>
-          
+
           {user && (
             <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-md">
               <p className="text-sm text-yellow-700 dark:text-yellow-300">
@@ -27,7 +27,7 @@ export default function Unauthorized() {
             </div>
           )}
         </div>
-        
+
         <div className="flex flex-col space-y-4">
           <Link
             to="/"
@@ -35,7 +35,7 @@ export default function Unauthorized() {
           >
             Go to Home Page
           </Link>
-          
+
           {user && user.roles.includes('hr') && (
             <Link
               to="/hr/page-description"
@@ -44,7 +44,7 @@ export default function Unauthorized() {
               Go to HR Dashboard
             </Link>
           )}
-          
+
           {user && user.roles.includes('assessor') && (
             <Link
               to="/assessor/page-description"
@@ -53,7 +53,7 @@ export default function Unauthorized() {
               Go to Assessor Dashboard
             </Link>
           )}
-          
+
           {user && user.roles.includes('employee') && (
             <Link
               to="/page-description"
