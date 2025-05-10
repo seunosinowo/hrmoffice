@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { UserIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../../../lib/supabase';
-import { uploadProfilePicture, getDefaultAvatarUrl } from '../../../utils/imageUpload';
+import { uploadImage, getDefaultAvatarUrl, checkBucketExists } from '../../../utils/imageUpload';
+import { useAuth } from '../../../context/AuthContext';
 
 // interfaces
 interface Department {
@@ -11,6 +12,7 @@ interface Department {
 
 interface Employee {
   id: string;
+  user_id: string;
   employee_number: string;
   username: string;
   first_name: string;
@@ -20,6 +22,8 @@ interface Employee {
   department_ids: string[];
   profile_picture_url: string | null;
   departments: Department[];
+  edit_locked_until: string | null;
+  last_edited_by: string | null;
 }
 
 interface NewEmployee {
@@ -32,6 +36,9 @@ interface NewEmployee {
 }
 
 const EmployeeDetails: React.FC = () => {
+  // Get current user from auth context
+  const { user } = useAuth();
+
   // State management
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -71,12 +78,25 @@ const EmployeeDetails: React.FC = () => {
 
       if (employeesError) throw employeesError;
 
-      const formattedEmployees = employeesData.map(emp => ({
-        ...emp,
-        departments: emp.employee_departments.map((ed: any) => ed.department),
-        department_ids: emp.employee_departments.map((ed: any) => ed.department.id),
-        profile_picture_url: emp.profile_picture_url || getDefaultAvatarUrl()
-      }));
+      const formattedEmployees = employeesData.map(emp => {
+        // If the profile picture URL exists, make sure it's properly formatted
+        let profilePictureUrl = emp.profile_picture_url;
+
+        if (profilePictureUrl) {
+          // Add a timestamp to prevent caching if not already present
+          if (!profilePictureUrl.includes('?')) {
+            profilePictureUrl = `${profilePictureUrl}?t=${Date.now()}`;
+            console.log(`HR: Added cache-busting parameter: ${profilePictureUrl}`);
+          }
+        }
+
+        return {
+          ...emp,
+          departments: emp.employee_departments.map((ed: any) => ed.department),
+          department_ids: emp.employee_departments.map((ed: any) => ed.department.id),
+          profile_picture_url: profilePictureUrl
+        };
+      });
 
       setEmployees(formattedEmployees);
     } catch (error) {
@@ -119,23 +139,51 @@ const EmployeeDetails: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       setError('File size must be less than 2MB');
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('File type must be JPEG, JPG, or PNG');
       return;
     }
 
     setAvatarFile(file);
   };
 
+  // Check if the profile_pictures bucket exists
+  const checkProfilePicturesBucket = async () => {
+    try {
+      const bucketExists = await checkBucketExists('profile_pictures');
+      if (!bucketExists) {
+        console.warn('The profile_pictures bucket does not exist. Please create it in the Supabase dashboard.');
+        setError('Profile picture uploads may not work. Please contact the administrator.');
+      } else {
+        console.log('profile_pictures bucket exists and is accessible');
+      }
+    } catch (error) {
+      console.error('Error checking profile_pictures bucket:', error);
+    }
+  };
+
   // Add employee
   const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+
     setIsSubmitting(true);
     setError(null);
 
+    // Check if the bucket exists before uploading
+    await checkProfilePicturesBucket();
+
     try {
       const employeeNumber = generateEmployeeNumber();
-      
+
       // First, create the employee with default avatar
       const { data: employeeData, error: employeeError } = await supabase
         .from('employees')
@@ -146,7 +194,8 @@ const EmployeeDetails: React.FC = () => {
           last_name: newEmployee.last_name,
           email: newEmployee.email,
           phone_number: newEmployee.phone_number,
-          profile_picture_url: getDefaultAvatarUrl()
+          profile_picture_url: getDefaultAvatarUrl(),
+          last_edited_by: user.id
         }])
         .select()
         .single();
@@ -155,15 +204,35 @@ const EmployeeDetails: React.FC = () => {
 
       // Upload profile picture if provided
       if (avatarFile && employeeData) {
-        const uploadedUrl = await uploadProfilePicture(avatarFile, employeeData.id);
-        if (uploadedUrl) {
-          // Update employee with new profile picture URL
-          const { error: updateError } = await supabase
-            .from('employees')
-            .update({ profile_picture_url: uploadedUrl })
-            .eq('id', employeeData.id);
+        console.log('HR: Uploading profile picture for new employee...');
+        const uploadedUrl = await uploadImage(avatarFile, 'profile_pictures');
 
-          if (updateError) throw updateError;
+        if (uploadedUrl) {
+          console.log('HR: Profile picture uploaded successfully, updating employee record with URL:', uploadedUrl);
+
+          // Add a timestamp to the URL to prevent caching
+          const timestampedUrl = uploadedUrl.includes('?')
+            ? uploadedUrl
+            : `${uploadedUrl}?t=${Date.now()}`;
+
+          console.log('HR: Using timestamped URL for database update:', timestampedUrl);
+
+          // Update employee with new profile picture URL
+          const { data: updateData, error: updateError } = await supabase
+            .from('employees')
+            .update({ profile_picture_url: timestampedUrl })
+            .eq('id', employeeData.id)
+            .select();
+
+          if (updateError) {
+            console.error('HR: Error updating profile picture URL in database:', updateError);
+            throw updateError;
+          } else {
+            console.log('HR: Profile picture URL updated successfully in database:', updateData);
+          }
+        } else {
+          console.error('HR: Failed to upload profile picture for new employee');
+          setError('Failed to upload profile picture');
         }
       }
 
@@ -222,9 +291,12 @@ const EmployeeDetails: React.FC = () => {
   // Update employee
   const handleUpdateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEmployee) return;
+    if (!selectedEmployee || !user) return;
     setIsSubmitting(true);
     setError(null);
+
+    // Check if the bucket exists before uploading
+    await checkProfilePicturesBucket();
 
     try {
       // Update employee details
@@ -235,7 +307,10 @@ const EmployeeDetails: React.FC = () => {
           first_name: selectedEmployee.first_name,
           last_name: selectedEmployee.last_name,
           email: selectedEmployee.email,
-          phone_number: selectedEmployee.phone_number
+          phone_number: selectedEmployee.phone_number,
+          last_edited_by: user.id,
+          // HR can update without triggering the 24-hour lock
+          // The database trigger will still set edit_locked_until, but we don't enforce it for HR
         })
         .eq('id', selectedEmployee.id);
 
@@ -243,12 +318,51 @@ const EmployeeDetails: React.FC = () => {
 
       // Handle profile picture update
       if (avatarFile) {
-        const uploadedUrl = await uploadProfilePicture(avatarFile, selectedEmployee.id);
+        console.log('HR: Uploading new profile picture...');
+        const uploadedUrl = await uploadImage(avatarFile, 'profile_pictures');
+
         if (uploadedUrl) {
-          await supabase
+          console.log('HR: Profile picture uploaded successfully, updating employee record with new URL:', uploadedUrl);
+
+          // Add a timestamp to the URL to prevent caching
+          const timestampedUrl = uploadedUrl.includes('?')
+            ? uploadedUrl
+            : `${uploadedUrl}?t=${Date.now()}`;
+
+          console.log('HR: Using timestamped URL for database update:', timestampedUrl);
+
+          const { data: updateData, error: pictureUpdateError } = await supabase
             .from('employees')
-            .update({ profile_picture_url: uploadedUrl })
-            .eq('id', selectedEmployee.id);
+            .update({ profile_picture_url: timestampedUrl })
+            .eq('id', selectedEmployee.id)
+            .select();
+
+          if (pictureUpdateError) {
+            console.error('HR: Error updating profile picture URL in database:', pictureUpdateError);
+            setError('Failed to update profile picture URL in database');
+          } else {
+            console.log('HR: Profile picture URL updated successfully in database:', updateData);
+
+            // Update the local state immediately with the uploaded image URL
+            if (updateData && updateData.length > 0) {
+              // Update the selected employee with the new profile picture URL
+              const updatedEmployee = {
+                ...selectedEmployee,
+                profile_picture_url: timestampedUrl
+              };
+
+              // Update the employees array with this updated employee
+              setEmployees(employees.map(emp =>
+                emp.id === selectedEmployee.id ? {...emp, profile_picture_url: timestampedUrl} : emp
+              ));
+
+              // Set the selected employee to show in the view modal
+              setSelectedEmployee(updatedEmployee);
+            }
+          }
+        } else {
+          console.error('HR: Failed to upload profile picture');
+          setError('Failed to upload profile picture');
         }
       }
 
@@ -300,7 +414,7 @@ const EmployeeDetails: React.FC = () => {
   // Toggle department selection for edit
   const toggleDepartmentEdit = (departmentId: string, isSelected: boolean) => {
     if (!selectedEmployee) return;
-    
+
     if (isSelected) {
       setSelectedEmployee({
         ...selectedEmployee,
@@ -316,22 +430,34 @@ const EmployeeDetails: React.FC = () => {
 
   // Initialize data
   useEffect(() => {
-    fetchEmployees();
-    fetchDepartments();
+    const initialize = async () => {
+      await fetchEmployees();
+      await fetchDepartments();
+
+      // Check if the profile_pictures bucket exists
+      await checkProfilePicturesBucket();
+    };
+
+    initialize();
   }, []);
 
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-          Employee Details
-        </h2>
-        <button 
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+            Employee Management (HR View)
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            As HR, you have full access to add, view, and edit all employee profiles
+          </p>
+        </div>
+        <button
           onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
         >
-          <UserIcon className="w-4 h-4" />
+          <PlusIcon className="w-4 h-4" />
           Add Employee
         </button>
       </div>
@@ -358,13 +484,35 @@ const EmployeeDetails: React.FC = () => {
                   <div className="flex items-center space-x-6">
                     <div className="relative">
                       <img
-                        src={employee.profile_picture_url || getDefaultAvatarUrl()}
+                        src={employee.profile_picture_url || getDefaultAvatarUrl(employee.first_name, employee.last_name)}
                         alt={`${employee.first_name} ${employee.last_name}`}
                         className="h-24 w-24 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                        onLoad={() => console.log(`HR: Image loaded successfully for employee ${employee.id}`)}
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
-                          target.src = getDefaultAvatarUrl();
+                          console.error(`HR: Image load error for employee ${employee.id}. URL: ${employee.profile_picture_url}`);
+
+                          // Try to reload the image with a fresh cache-busting parameter
+                          if (employee.profile_picture_url && !employee.profile_picture_url.includes('default-avatar')) {
+                            const timestamp = Date.now() + 1000;
+                            const retryUrl = employee.profile_picture_url.includes('?')
+                              ? `${employee.profile_picture_url.split('?')[0]}?t=${timestamp}`
+                              : `${employee.profile_picture_url}?t=${timestamp}`;
+
+                            console.log(`HR: Retrying with fresh URL: ${retryUrl}`);
+                            target.src = retryUrl;
+
+                            // If it still fails, show default avatar
+                            target.onerror = () => {
+                              console.log("HR: Retry failed, showing default avatar");
+                              target.src = getDefaultAvatarUrl(employee.first_name, employee.last_name);
+                            };
+                          } else {
+                            target.src = getDefaultAvatarUrl(employee.first_name, employee.last_name);
+                          }
                         }}
+                        crossOrigin="anonymous"
+                        style={{ background: '#f0f4f8' }} // Light background to see if image is loading
                       />
                     </div>
                     <div className="flex items-center space-x-8">
@@ -452,7 +600,7 @@ const EmployeeDetails: React.FC = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -541,10 +689,23 @@ const EmployeeDetails: React.FC = () => {
                       <div className="flex flex-col items-center space-y-2">
                         {avatarFile ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={URL.createObjectURL(avatarFile)} 
-                              alt="Preview" 
+                            <img
+                              src={URL.createObjectURL(avatarFile)}
+                              alt="Preview"
                               className="w-full h-full rounded-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                console.error('Error loading preview image');
+                                // Show a placeholder instead
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  const placeholder = document.createElement('div');
+                                  placeholder.className = 'w-full h-full rounded-full bg-gray-200 flex items-center justify-center';
+                                  placeholder.innerHTML = '<span class="text-gray-500">Error</span>';
+                                  parent.appendChild(placeholder);
+                                }
+                              }}
                             />
                             <button
                               type="button"
@@ -558,9 +719,14 @@ const EmployeeDetails: React.FC = () => {
                             </button>
                           </div>
                         ) : (
-                          <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                          </svg>
+                          <div className="flex flex-col items-center">
+                            <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            </svg>
+                            <span className="mt-2 text-sm font-medium text-blue-600 dark:text-blue-400">
+                              Upload Profile Picture
+                            </span>
+                          </div>
                         )}
                         <span className="text-sm text-gray-500 dark:text-gray-400">
                           {avatarFile ? 'Change image' : 'Click to upload or drag and drop'}
@@ -569,9 +735,9 @@ const EmployeeDetails: React.FC = () => {
                           JPG, JPEG, PNG (max. 2MB)
                         </span>
                       </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        className="hidden"
                         accept="image/jpeg,image/jpg,image/png"
                         onChange={handleFileChange}
                       />
@@ -621,17 +787,75 @@ const EmployeeDetails: React.FC = () => {
 
               <div className="space-y-4">
                 <div className="flex justify-center">
-                  {selectedEmployee.profile_picture_url ? (
-                    <img
-                      src={selectedEmployee.profile_picture_url}
-                      alt={`${selectedEmployee.first_name} ${selectedEmployee.last_name}`}
-                      className="w-24 h-24 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                      <UserIcon className="w-12 h-12 text-gray-400" />
-                    </div>
-                  )}
+                  {(() => {
+                    // Force a refresh of the image URL with a timestamp
+                    let imageUrl = selectedEmployee.profile_picture_url;
+                    if (imageUrl && !imageUrl.includes('default-avatar')) {
+                      // Add a timestamp to prevent caching
+                      imageUrl = imageUrl.includes('?')
+                        ? `${imageUrl.split('?')[0]}?t=${Date.now()}`
+                        : `${imageUrl}?t=${Date.now()}`;
+                      console.log(`HR View modal: Using cache-busted URL: ${imageUrl}`);
+                    }
+
+                    if (imageUrl && !imageUrl.includes('default-avatar')) {
+                      return (
+                        <div className="relative">
+                          <img
+                            src={imageUrl}
+                            alt={`${selectedEmployee.first_name} ${selectedEmployee.last_name}`}
+                            className="w-32 h-32 rounded-full object-cover border-4 border-blue-100 dark:border-blue-900 filter drop-shadow-lg"
+                            onLoad={() => console.log(`HR View modal: Image loaded successfully for employee ${selectedEmployee.id}`)}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              console.error(`HR View modal: Image load error for employee ${selectedEmployee.id}. URL: ${imageUrl}`);
+
+                              // Try to reload the image with a fresh cache-busting parameter
+                              const timestamp = Date.now() + 1000;
+                              const retryUrl = imageUrl.includes('?')
+                                ? `${imageUrl.split('?')[0]}?t=${timestamp}`
+                                : `${imageUrl}?t=${timestamp}`;
+
+                              console.log(`HR View modal: Retrying with fresh URL: ${retryUrl}`);
+                              target.src = retryUrl;
+
+                              // If it still fails, show default avatar
+                              target.onerror = () => {
+                                console.log("HR View modal: Retry failed, showing default avatar");
+                                target.src = getDefaultAvatarUrl(selectedEmployee.first_name, selectedEmployee.last_name);
+                              };
+                            }}
+                            style={{ background: '#f0f4f8' }} // Light background to see if image is loading
+                            crossOrigin="anonymous"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (imageUrl) {
+                                window.open(imageUrl, '_blank');
+                              }
+                            }}
+                            className="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-1.5"
+                            title="View full image"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          </button>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="w-32 h-32 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center border-4 border-blue-100 dark:border-blue-900 filter drop-shadow-lg">
+                          <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                            {selectedEmployee.first_name?.[0]}{selectedEmployee.last_name?.[0]}
+                          </span>
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -714,7 +938,7 @@ const EmployeeDetails: React.FC = () => {
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
-              
+
               <form onSubmit={handleUpdateEmployee} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -724,10 +948,10 @@ const EmployeeDetails: React.FC = () => {
                     type="text"
                     value={selectedEmployee.employee_number}
                     disabled
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-white"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Username
@@ -741,7 +965,7 @@ const EmployeeDetails: React.FC = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -830,10 +1054,15 @@ const EmployeeDetails: React.FC = () => {
                       <div className="flex flex-col items-center space-y-2">
                         {avatarFile ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={URL.createObjectURL(avatarFile)} 
-                              alt="Preview" 
+                            <img
+                              src={URL.createObjectURL(avatarFile)}
+                              alt="Preview"
                               className="w-full h-full rounded-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                console.error('Error loading preview image');
+                                target.src = getDefaultAvatarUrl(selectedEmployee.first_name, selectedEmployee.last_name);
+                              }}
                             />
                             <button
                               type="button"
@@ -848,16 +1077,48 @@ const EmployeeDetails: React.FC = () => {
                           </div>
                         ) : selectedEmployee.profile_picture_url ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={selectedEmployee.profile_picture_url} 
-                              alt="Current" 
-                              className="w-full h-full rounded-full object-cover"
+                            <img
+                              src={selectedEmployee.profile_picture_url ?
+                                `${selectedEmployee.profile_picture_url.split('?')[0]}?t=${Date.now()}` :
+                                getDefaultAvatarUrl(selectedEmployee.first_name, selectedEmployee.last_name)
+                              }
+                              alt="Current"
+                              className="w-full h-full rounded-full object-cover border-2 border-blue-100 dark:border-blue-900 filter drop-shadow-md"
+                              onLoad={() => console.log(`Edit modal: Image loaded successfully for employee ${selectedEmployee.id}`)}
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                console.error(`Edit modal: Image load error for employee ${selectedEmployee.id}`);
+
+                                // Try to reload the image with a fresh cache-busting parameter
+                                const timestamp = Date.now() + 1000;
+                                // Safely handle null profile_picture_url (though this should never happen in this context)
+                                if (selectedEmployee.profile_picture_url) {
+                                  const retryUrl = selectedEmployee.profile_picture_url.includes('?')
+                                    ? `${selectedEmployee.profile_picture_url.split('?')[0]}?t=${timestamp}`
+                                    : `${selectedEmployee.profile_picture_url}?t=${timestamp}`;
+
+                                  console.log(`Edit modal: Retrying with fresh URL: ${retryUrl}`);
+                                  target.src = retryUrl;
+                                } else {
+                                  // Fallback to default avatar if profile_picture_url is null
+                                  target.src = getDefaultAvatarUrl(selectedEmployee.first_name, selectedEmployee.last_name);
+                                }
+
+                                // If it still fails, show default avatar
+                                target.onerror = () => {
+                                  console.log("Edit modal: Retry failed, showing default avatar");
+                                  target.src = getDefaultAvatarUrl(selectedEmployee.first_name, selectedEmployee.last_name);
+                                };
+                              }}
+                              crossOrigin="anonymous"
                             />
                           </div>
                         ) : (
-                          <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                          </svg>
+                          <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center border-2 border-blue-100 dark:border-blue-900">
+                            <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                              {selectedEmployee.first_name?.[0]}{selectedEmployee.last_name?.[0]}
+                            </span>
+                          </div>
                         )}
                         <span className="text-sm text-gray-500 dark:text-gray-400">
                           {avatarFile ? 'Change image' : 'Click to upload or drag and drop'}
@@ -866,9 +1127,9 @@ const EmployeeDetails: React.FC = () => {
                           JPG, JPEG, PNG (max. 2MB)
                         </span>
                       </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        className="hidden"
                         accept="image/jpeg,image/jpg,image/png"
                         onChange={handleFileChange}
                       />
