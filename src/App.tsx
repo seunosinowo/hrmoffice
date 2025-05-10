@@ -20,6 +20,7 @@ const Resources = lazy(() => import("./pages/NavPages/Resources"));
 const BookDemoPage = lazy(() => import('./pages/NavPages/BookDemoPage'));
 const Callback = lazy(() => import('./pages/auth/Callback'));
 const WelcomePage = lazy(() => import("./pages/auth/WelcomePage"));
+const BucketDiagnostic = lazy(() => import("./pages/BucketDiagnostic"));
 
 // Employee Components
 const User = lazy(() => import("./pages/Employee/User_and_role_management/User"));
@@ -125,6 +126,9 @@ export default function App() {
           {/* Protected Routes - Only accessible after login */}
           {user && (
             <Route element={<AppLayout />}>
+              {/* Diagnostic Routes - Available to all authenticated users */}
+              <Route path="/bucket-diagnostic" element={<BucketDiagnostic />} />
+
               {/* Employee Routes */}
               <Route element={<RoleBasedRoute allowedRoles={['employee']} />}>
                 <Route path="/page-description" element={<PageDescription />} />
