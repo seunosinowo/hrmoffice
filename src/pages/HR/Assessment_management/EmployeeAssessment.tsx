@@ -6,7 +6,7 @@ import {
 } from "../../../icons";
 import { supabase } from "../../../lib/supabase";
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable'; // Ensure proper import of the plugin
+import autoTable from 'jspdf-autotable';
 
 
 interface Employee {

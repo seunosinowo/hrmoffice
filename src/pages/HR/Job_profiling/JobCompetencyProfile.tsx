@@ -4,7 +4,7 @@ import {
   TrashBinIcon,
   ChevronDownIcon,
 } from "../../../../../../Downloads/hrmoffice/src/icons";
-import { supabase } from '../../../../../../Downloads/hrmoffice/src/lib/supabase';
+import { supabase } from '../../../lib/supabase';
 
 
 

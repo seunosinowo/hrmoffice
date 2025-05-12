@@ -4,8 +4,8 @@ import {
   InfoIcon,
   PencilIcon,
   ChevronDownIcon
-} from "../../../../../../Downloads/hrmoffice/src/icons";
-import { supabase } from "../../../../../../Downloads/hrmoffice/src/lib/supabase";
+} from "../../../icons";
+import { supabase } from "../../../lib/supabase";
 
 interface CompetencyCategory {
   id: number;

@@ -1,4 +1,4 @@
-import { supabase } from '../../../../../../Downloads/hrmoffice/src/lib/supabase';
+import { supabase } from '../../../lib/supabase';
 import { useState, useEffect } from 'react';
 import { 
   UserIcon, 
@@ -7,7 +7,8 @@ import {
   InfoIcon,
   PencilIcon,
   ChevronDownIcon
-} from "../../../../../../Downloads/hrmoffice/src/icons";
+} from "../../../icons";
+
 
 interface CompetencyProficiency {
   id: number;
