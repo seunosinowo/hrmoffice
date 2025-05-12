@@ -29,10 +29,10 @@ export default function SignUp() {
 
     try {
       await signUp(email, password);
-      navigate("/auth/email-confirmation", { 
-        state: { 
-          message: "Please check your email for the confirmation link. If you don't see it, check your spam folder." 
-        } 
+      navigate("/auth/email-confirmation", {
+        state: {
+          message: "Please check your email for the confirmation link. If you don't see it, check your spam folder."
+        }
       });
     } catch (error: any) {
       if (error.message.includes('already registered')) {
@@ -53,12 +53,12 @@ export default function SignUp() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.hostname === 'localhost' 
+          redirectTo: window.location.hostname === 'localhost'
             ? 'http://localhost:5173/auth/callback'
             : 'https://hrmoffice.vercel.app/auth/callback'
         }
       });
-      
+
       if (error) throw error;
     } catch (error: any) {
       setError(error.message);
@@ -106,8 +106,8 @@ export default function SignUp() {
               >
                 <div className="flex flex-col items-center">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
-                    signUpType === 'individual' 
-                      ? 'bg-blue-100 dark:bg-blue-900/30' 
+                    signUpType === 'individual'
+                      ? 'bg-blue-100 dark:bg-blue-900/30'
                       : 'bg-gray-100 dark:bg-gray-800'
                   }`}>
                     <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,8 +129,8 @@ export default function SignUp() {
               >
                 <div className="flex flex-col items-center">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
-                    signUpType === 'organization' 
-                      ? 'bg-blue-100 dark:bg-blue-900/30' 
+                    signUpType === 'organization'
+                      ? 'bg-blue-100 dark:bg-blue-900/30'
                       : 'bg-gray-100 dark:bg-gray-800'
                   }`}>
                     <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,8 +152,8 @@ export default function SignUp() {
               >
                 <div className="flex flex-col items-center">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
-                    signUpType === 'contractor' 
-                      ? 'bg-blue-100 dark:bg-blue-900/30' 
+                    signUpType === 'contractor'
+                      ? 'bg-blue-100 dark:bg-blue-900/30'
                       : 'bg-gray-100 dark:bg-gray-800'
                   }`}>
                     <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,8 +196,8 @@ export default function SignUp() {
                     type="email"
                     autoComplete="email"
                     required
-                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800"
-                    placeholder="Email address"
+                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
+                    placeholder="Email&nbsp;address"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
@@ -213,7 +213,7 @@ export default function SignUp() {
                     type="password"
                     autoComplete="new-password"
                     required
-                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800"
+                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
                     placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -230,8 +230,8 @@ export default function SignUp() {
                     type="password"
                     autoComplete="new-password"
                     required
-                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800"
-                    placeholder="Confirm Password"
+                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
+                    placeholder="Confirm&nbsp;Password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                   />
@@ -293,4 +293,4 @@ export default function SignUp() {
       </div>
     </div>
   );
-} 
+}
