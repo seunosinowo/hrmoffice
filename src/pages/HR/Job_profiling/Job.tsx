@@ -3,7 +3,7 @@ import {
   PencilIcon, 
   TrashBinIcon,
   ChevronDownIcon,
-} from "../../../../../../Downloads/hrmoffice/src/icons";
+} from "../../../icons";
 import { supabase } from '../../../lib/supabase';
 
 interface Job {

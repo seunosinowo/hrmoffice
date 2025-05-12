@@ -7,7 +7,7 @@ import {
   InfoIcon,
   PencilIcon,
   ChevronDownIcon
-} from "../../../../../../Downloads/hrmoffice/src/icons";
+} from "../../../icons";
 
 interface AssessorAssignment {
   id: number;

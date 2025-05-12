@@ -1,4 +1,4 @@
-import { UserIcon, GroupIcon, BoxIcon, PieChartIcon } from "../../../../../../Downloads/hrmoffice/src/icons";
+import { UserIcon, GroupIcon, BoxIcon, PieChartIcon } from "../../../icons";
 
 function PageDescription() {
   return (
