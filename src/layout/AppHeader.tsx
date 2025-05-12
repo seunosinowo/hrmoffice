@@ -10,10 +10,9 @@ export default function AppHeader() {
 
   const handleSignOut = async () => {
     try {
-      // Sign out first
       await signOut();
 
-      // Then navigate to the home page
+      //navigate to the home page
       window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
@@ -27,7 +26,7 @@ export default function AppHeader() {
           <div className="flex">
             <div className="flex flex-shrink-0 items-center">
               <Link to={user ? "/dashboard" : "/"} className="text-xl font-bold text-gray-900 dark:text-white">
-                HRM Office
+                HRM&nbsp;Office
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
