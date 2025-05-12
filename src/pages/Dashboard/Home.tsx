@@ -16,7 +16,8 @@ export default function HRDashboard() {
         <div className="col-span-1 space-y-6 lg:col-span-8">
           <HRMetrics />
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* Added explicit margin class to ensure consistent spacing */}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 mt-6">
             <EmployeeDistributionChart />
             <CompetencyGapAnalysis />
           </div>
