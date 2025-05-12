@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { HorizontaLDots, CloseLineIcon } from "../icons";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
@@ -7,6 +7,19 @@ import { useAuth } from "../context/AuthContext";
 export default function AppHeader() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      // Sign out first
+      await signOut();
+
+      // Then navigate to the home page
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
