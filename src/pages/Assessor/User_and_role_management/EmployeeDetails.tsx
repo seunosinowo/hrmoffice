@@ -410,8 +410,8 @@ const EmployeeDetails: React.FC = () => {
             <div key={`employee-${employee.id}-${employee.employee_number}`} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
               <div className="p-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-6">
-                    <div className="relative h-24 w-24">
+                  <div className="flex items-center space-x-6 w-full">
+                    <div className="relative h-24 w-24 flex-shrink-0">
                       {employee.profile_picture_url ? (
                         <img
                           src={`${employee.profile_picture_url}?t=${Date.now()}`}
@@ -445,7 +445,7 @@ const EmployeeDetails: React.FC = () => {
                         <UserIcon className="w-12 h-12 text-gray-400" />
                       </div>
                     </div>
-                    <div className="flex items-center space-x-8">
+                    <div className="flex flex-wrap items-center space-x-4 md:space-x-8 w-full">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                           {employee.first_name} {employee.last_name}

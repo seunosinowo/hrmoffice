@@ -985,7 +985,7 @@ const EmployeeDetails: React.FC = () => {
               <div key={`employee-${employee.id}-${employee.employee_number}`} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
                 <div className="p-4">
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 w-full">
                       <div className="relative h-20 w-20">
                         {employee.profile_picture_url ? (
                           <img
@@ -1051,7 +1051,7 @@ const EmployeeDetails: React.FC = () => {
                           </p>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
                           <div className="space-y-2">
                             <div>
                               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</p>
