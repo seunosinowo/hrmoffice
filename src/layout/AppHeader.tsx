@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import { useState } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
 import { HorizontaLDots, CloseLineIcon } from "../icons";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
 import { useAuth } from "../context/AuthContext";
@@ -7,15 +7,58 @@ import { useAuth } from "../context/AuthContext";
 export default function AppHeader() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Close the mobile menu when clicking outside of it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isOpen &&
+          menuRef.current &&
+          buttonRef.current &&
+          !menuRef.current.contains(event.target as Node) &&
+          !buttonRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    // Add event listener when the menu is open
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    // Clean up the event listener
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  // Close the mobile menu when the location changes
+  useEffect(() => {
+    if (isOpen) {
+      setIsOpen(false);
+    }
+  }, [location]);
 
   const handleSignOut = async () => {
     try {
       await signOut();
 
-      //navigate to the home page
-      window.location.href = '/';
+      // Clear any localStorage items to ensure complete sign-out
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('hrmoffice_user_data');
+
+      // Add a small delay to ensure sign-out completes before navigation
+      setTimeout(() => {
+        // Use React Router navigation instead of window.location for consistent behavior
+        navigate('/');
+      }, 100);
     } catch (error) {
       console.error('Error signing out:', error);
+      // Even if there's an error, try to navigate to home page
+      navigate('/');
     }
   };
 
@@ -119,6 +162,7 @@ export default function AppHeader() {
           </div>
           <div className="-mr-2 flex items-center sm:hidden">
           <button
+              ref={buttonRef}
               onClick={() => setIsOpen(!isOpen)}
               className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             >
@@ -135,7 +179,7 @@ export default function AppHeader() {
 
       {/* Mobile menu */}
       {isOpen && (
-        <div className="sm:hidden">
+        <div ref={menuRef} className="sm:hidden">
           <div className="space-y-1 pb-3 pt-2">
             {user ? (
               <>
@@ -143,7 +187,7 @@ export default function AppHeader() {
                   to="/about"
                   className="block border-l-4 border-transparent py-2 pl-3 pr-4 text-base font-medium text-gray-500 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                 >
-                  About Us
+                  About&nbsp;Us
                 </Link>
                 <Link
                   to="/resources"
@@ -164,7 +208,7 @@ export default function AppHeader() {
                   to="/about"
                   className="block border-l-4 border-transparent py-2 pl-3 pr-4 text-base font-medium text-gray-500 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                 >
-                  About Us
+                  About&nbsp;Us
                 </Link>
                 <Link
                   to="/resources"
@@ -192,13 +236,13 @@ export default function AppHeader() {
                     to="/book-demo"
                     className="block px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                   >
-                    Book a demo
+                    Book&nbsp;a&nbsp;demo
                   </Link>
                   <button
                     onClick={handleSignOut}
                     className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                   >
-                    Sign out
+                    Sign&nbsp;out
                   </button>
                 </>
               ) : (
@@ -213,13 +257,13 @@ export default function AppHeader() {
                     to="/auth/signup"
                     className="block px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                   >
-                    Sign up
+                    Sign&nbsp;up
                   </Link>
                   <Link
                     to="/book-demo"
                     className="block px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                   >
-                    Book a demo
+                    Book&nbsp;a&nbsp;demo
                   </Link>
                 </>
               )}

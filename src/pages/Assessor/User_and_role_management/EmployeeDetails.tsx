@@ -837,7 +837,7 @@ const EmployeeDetails: React.FC = () => {
                     type="text"
                     value={selectedEmployee.username}
                     onChange={(e) => setSelectedEmployee({ ...selectedEmployee, username: e.target.value })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
                     required
                   />
                 </div>
@@ -852,7 +852,7 @@ const EmployeeDetails: React.FC = () => {
                       type="text"
                       value={selectedEmployee.first_name}
                       onChange={(e) => setSelectedEmployee({ ...selectedEmployee, first_name: e.target.value })}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
                       required
                     />
                   </div>
@@ -865,7 +865,7 @@ const EmployeeDetails: React.FC = () => {
                       type="text"
                       value={selectedEmployee.last_name}
                       onChange={(e) => setSelectedEmployee({ ...selectedEmployee, last_name: e.target.value })}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
                       required
                     />
                   </div>
@@ -880,7 +880,7 @@ const EmployeeDetails: React.FC = () => {
                     type="email"
                     value={selectedEmployee.email}
                     onChange={(e) => setSelectedEmployee({ ...selectedEmployee, email: e.target.value })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
                     required
                   />
                 </div>
@@ -894,7 +894,7 @@ const EmployeeDetails: React.FC = () => {
                     type="tel"
                     value={selectedEmployee.phone_number}
                     onChange={(e) => setSelectedEmployee({ ...selectedEmployee, phone_number: e.target.value })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
                     required
                   />
                 </div>
