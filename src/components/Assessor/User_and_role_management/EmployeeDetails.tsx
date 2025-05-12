@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../../../lib/supabase';
 import { uploadImage, getDefaultAvatarUrl, checkBucketExists } from '../../../utils/imageUpload';
 import { useAuth } from '../../../context/AuthContext';

@@ -20,10 +20,10 @@ const BucketDiagnostic: React.FC = () => {
     const checkBucket = async () => {
       try {
         setLoading(true);
-        
+
         // Check if the profile_pictures bucket exists
         const exists = await checkBucketExists('profile_pictures');
-        
+
         if (!exists) {
           setBucketStatus({
             exists: false,
@@ -33,15 +33,15 @@ const BucketDiagnostic: React.FC = () => {
           setLoading(false);
           return;
         }
-        
+
         // Check bucket permissions
         const permissionsOk = await checkAndFixBucketPermissions('profile_pictures');
-        
+
         setBucketStatus({
           exists: true,
           permissionsOk,
-          message: permissionsOk 
-            ? 'The profile_pictures bucket exists and has correct permissions.' 
+          message: permissionsOk
+            ? 'The profile_pictures bucket exists and has correct permissions.'
             : 'The profile_pictures bucket exists but has incorrect permissions.'
         });
       } catch (error) {
@@ -55,7 +55,7 @@ const BucketDiagnostic: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     checkBucket();
   }, []);
 
@@ -64,44 +64,44 @@ const BucketDiagnostic: React.FC = () => {
       setLoading(true);
       setTestUploadResult(null);
       setTestImageUrl(null);
-      
+
       // Create a small test image (1x1 pixel transparent PNG)
       const base64Data = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
       const byteString = atob(base64Data);
       const arrayBuffer = new ArrayBuffer(byteString.length);
       const intArray = new Uint8Array(arrayBuffer);
-      
+
       for (let i = 0; i < byteString.length; i++) {
         intArray[i] = byteString.charCodeAt(i);
       }
-      
+
       const blob = new Blob([arrayBuffer], { type: 'image/png' });
       const testFile = new File([blob], 'test-image.png', { type: 'image/png' });
-      
+
       // Upload the test file
       const fileName = `test-${Date.now()}.png`;
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('profile_pictures')
         .upload(fileName, testFile, {
           cacheControl: '3600',
           upsert: true
         });
-      
+
       if (error) {
         setTestUploadResult(`Upload failed: ${error.message}`);
         return;
       }
-      
+
       // Get the public URL
       const { data: urlData } = supabase.storage
         .from('profile_pictures')
         .getPublicUrl(fileName);
-      
+
       // Add cache-busting parameter
       const imageUrl = `${urlData.publicUrl}?t=${Date.now()}`;
       setTestImageUrl(imageUrl);
       setTestUploadResult('Upload successful! Image should appear below.');
-      
+
     } catch (error) {
       console.error('Error in test upload:', error);
       setTestUploadResult(`Test upload error: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -113,10 +113,10 @@ const BucketDiagnostic: React.FC = () => {
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <h1 className="text-3xl font-bold mb-6">Supabase Storage Bucket Diagnostic</h1>
-      
+
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Bucket Status</h2>
-        
+
         {loading ? (
           <div className="flex items-center justify-center py-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -127,7 +127,7 @@ const BucketDiagnostic: React.FC = () => {
             <div className={`p-4 mb-4 rounded-lg ${bucketStatus.exists && bucketStatus.permissionsOk ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200' : 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200'}`}>
               <p className="font-medium">{bucketStatus.message}</p>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="border dark:border-gray-700 rounded-lg p-4">
                 <h3 className="font-medium mb-2">Bucket Exists</h3>
@@ -135,7 +135,7 @@ const BucketDiagnostic: React.FC = () => {
                   {bucketStatus.exists ? 'Yes' : 'No'}
                 </div>
               </div>
-              
+
               <div className="border dark:border-gray-700 rounded-lg p-4">
                 <h3 className="font-medium mb-2">Permissions Configured</h3>
                 <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bucketStatus.permissionsOk ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'}`}>
@@ -143,7 +143,7 @@ const BucketDiagnostic: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <button
               onClick={handleTestUpload}
               disabled={!bucketStatus.exists || loading}
@@ -154,21 +154,21 @@ const BucketDiagnostic: React.FC = () => {
           </div>
         )}
       </div>
-      
+
       {testUploadResult && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold mb-4">Test Upload Result</h2>
           <div className={`p-4 mb-4 rounded-lg ${testUploadResult.includes('successful') ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200'}`}>
             <p>{testUploadResult}</p>
           </div>
-          
+
           {testImageUrl && (
             <div className="mt-4">
               <h3 className="font-medium mb-2">Test Image:</h3>
               <div className="border dark:border-gray-700 rounded-lg p-4 flex items-center justify-center">
-                <img 
-                  src={testImageUrl} 
-                  alt="Test upload" 
+                <img
+                  src={testImageUrl}
+                  alt="Test upload"
                   className="max-w-full h-auto"
                   onError={() => setTestUploadResult('Image failed to load. The URL might be correct but the image is not publicly accessible.')}
                   crossOrigin="anonymous"
@@ -179,10 +179,10 @@ const BucketDiagnostic: React.FC = () => {
           )}
         </div>
       )}
-      
+
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mt-6">
         <h2 className="text-xl font-semibold mb-4">Troubleshooting Guide</h2>
-        
+
         <div className="space-y-4">
           <div>
             <h3 className="font-medium">If the bucket doesn't exist:</h3>
@@ -195,7 +195,7 @@ const BucketDiagnostic: React.FC = () => {
               <li>Click "Create bucket"</li>
             </ol>
           </div>
-          
+
           <div>
             <h3 className="font-medium">If permissions are incorrect:</h3>
             <ol className="list-decimal list-inside ml-4 mt-2 space-y-2 text-gray-700 dark:text-gray-300">
