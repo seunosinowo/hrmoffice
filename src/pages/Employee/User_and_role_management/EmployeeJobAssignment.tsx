@@ -126,6 +126,9 @@ export default function EmployeeJobAssignment() {
               key={`job-assignment-${assignment.id}-${assignment.employee_name}`}
               className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-gray-800 dark:bg-white/[0.03]"
             >
+              <div className="bg-blue-50 dark:bg-blue-900/20 px-5 py-3 border-b border-gray-200 dark:border-gray-800">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Job Assignment</h3>
+              </div>
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex size-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
@@ -136,29 +139,15 @@ export default function EmployeeJobAssignment() {
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">R</span>
-                      </span>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Job Role</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{assignment.job_role}</p>
-                    </div>
+                <div className="mt-4 space-y-4">
+                  <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Job Role</h4>
+                    <p className="text-sm text-gray-900 dark:text-white">{assignment.job_role}</p>
                   </div>
 
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                        <span className="text-xs font-medium text-green-600 dark:text-green-400">D</span>
-                      </span>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{formatDate(assignment.start_date)}</p>
-                    </div>
+                  <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Start Date</h4>
+                    <p className="text-sm text-gray-900 dark:text-white">{formatDate(assignment.start_date)}</p>
                   </div>
                 </div>
               </div>

@@ -135,7 +135,7 @@ const EmployeeDetails: React.FC = () => {
 
     try {
       const employeeNumber = generateEmployeeNumber();
-      
+
       // First, create the employee with default avatar
       const { data: employeeData, error: employeeError } = await supabase
         .from('employees')
@@ -300,7 +300,7 @@ const EmployeeDetails: React.FC = () => {
   // Toggle department selection for edit
   const toggleDepartmentEdit = (departmentId: string, isSelected: boolean) => {
     if (!selectedEmployee) return;
-    
+
     if (isSelected) {
       setSelectedEmployee({
         ...selectedEmployee,
@@ -327,7 +327,7 @@ const EmployeeDetails: React.FC = () => {
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
           Employee Details
         </h2>
-        <button 
+        <button
           onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
         >
@@ -452,7 +452,7 @@ const EmployeeDetails: React.FC = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -541,9 +541,9 @@ const EmployeeDetails: React.FC = () => {
                       <div className="flex flex-col items-center space-y-2">
                         {avatarFile ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={URL.createObjectURL(avatarFile)} 
-                              alt="Preview" 
+                            <img
+                              src={URL.createObjectURL(avatarFile)}
+                              alt="Preview"
                               className="w-full h-full rounded-full object-cover"
                             />
                             <button
@@ -569,9 +569,9 @@ const EmployeeDetails: React.FC = () => {
                           JPG, JPEG, PNG (max. 2MB)
                         </span>
                       </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        className="hidden"
                         accept="image/jpeg,image/jpg,image/png"
                         onChange={handleFileChange}
                       />
@@ -714,7 +714,7 @@ const EmployeeDetails: React.FC = () => {
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
-              
+
               <form onSubmit={handleUpdateEmployee} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -724,10 +724,10 @@ const EmployeeDetails: React.FC = () => {
                     type="text"
                     value={selectedEmployee.employee_number}
                     disabled
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800"
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Username
@@ -741,7 +741,7 @@ const EmployeeDetails: React.FC = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -830,9 +830,9 @@ const EmployeeDetails: React.FC = () => {
                       <div className="flex flex-col items-center space-y-2">
                         {avatarFile ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={URL.createObjectURL(avatarFile)} 
-                              alt="Preview" 
+                            <img
+                              src={URL.createObjectURL(avatarFile)}
+                              alt="Preview"
                               className="w-full h-full rounded-full object-cover"
                             />
                             <button
@@ -848,9 +848,9 @@ const EmployeeDetails: React.FC = () => {
                           </div>
                         ) : selectedEmployee.profile_picture_url ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={selectedEmployee.profile_picture_url} 
-                              alt="Current" 
+                            <img
+                              src={selectedEmployee.profile_picture_url}
+                              alt="Current"
                               className="w-full h-full rounded-full object-cover"
                             />
                           </div>
@@ -866,9 +866,9 @@ const EmployeeDetails: React.FC = () => {
                           JPG, JPEG, PNG (max. 2MB)
                         </span>
                       </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        className="hidden"
                         accept="image/jpeg,image/jpg,image/png"
                         onChange={handleFileChange}
                       />

@@ -265,7 +265,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (sessionError) {
           console.error('Error getting session:', sessionError);
           // Clear any invalid session data
-          await supabase.auth.signOut();
+          try {
+            await supabase.auth.signOut().catch(e => {
+              console.log('Non-critical error signing out after session error:', e);
+            });
+          } catch (signOutError) {
+            console.log('Error during signOut after session error:', signOutError);
+            // Continue even if this fails
+          }
           localStorage.removeItem('hrmoffice_user_data');
           setUser(null);
           return;
@@ -312,11 +319,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Error checking session:', error);
         // On any error, clear the session to be safe
         try {
-          await supabase.auth.signOut();
-          localStorage.removeItem('hrmoffice_user_data');
+          await supabase.auth.signOut().catch(e => {
+            console.log('Non-critical error signing out after session check error:', e);
+          });
         } catch (signOutError) {
           console.error('Error signing out after session check error:', signOutError);
         }
+        localStorage.removeItem('hrmoffice_user_data');
         setUser(null);
       }
     };
@@ -403,8 +412,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Signing in user:', email);
 
-      // First, ensure any existing session is cleared to prevent token conflicts
-      await supabase.auth.signOut();
+      // Clear any stored tokens and user data from localStorage first
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('hrmoffice_user_data');
+
+      try {
+        // First, try to clear any existing session to prevent token conflicts
+        // But handle the case where there might not be an active session
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session) {
+          console.log('Active session found, signing out before sign-in');
+          await supabase.auth.signOut().catch(e => {
+            console.log('Non-critical error signing out before sign-in:', e);
+            // Continue even if this fails
+          });
+        } else {
+          console.log('No active session found before sign-in');
+        }
+      } catch (sessionError) {
+        console.log('Error checking session before sign-in:', sessionError);
+        // Continue even if this fails
+      }
 
       // Then sign in with the new credentials
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -503,27 +532,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Signing out user');
 
-      // Clear any stored tokens and user data from localStorage
+      // Clear any stored tokens and user data from localStorage first
       localStorage.removeItem('supabase.auth.token');
       localStorage.removeItem('hrmoffice_user_data');
 
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
+      try {
+        // Check if there's an active session first
+        const { data: { session } } = await supabase.auth.getSession();
 
-      if (error) {
-        console.error('Error during sign out:', error);
-        throw error;
+        // Only try to sign out if there's an active session
+        if (session) {
+          console.log('Active session found, signing out from Supabase');
+          const { error } = await supabase.auth.signOut();
+
+          if (error) {
+            console.log('Non-critical error during sign out:', error);
+            // Don't throw the error, just log it
+          }
+        } else {
+          console.log('No active session found, skipping Supabase signOut call');
+        }
+      } catch (sessionError) {
+        // If we can't get the session, just log the error and continue
+        console.log('Error checking session during sign out:', sessionError);
+        // Don't throw this error, we'll still clear the user state
       }
 
-      // Clear user state
+      // Always clear user state regardless of any errors
       setUser(null);
-
       console.log('User signed out successfully');
     } catch (error) {
       console.error('Unexpected error during sign out:', error);
       // Still clear the user state even if there was an error
       setUser(null);
-      throw error;
+      // Don't rethrow the error, just log it
     }
   };
 
@@ -531,12 +573,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Starting Google OAuth sign-in');
 
-      // First, ensure any existing session is cleared to prevent token conflicts
-      await supabase.auth.signOut();
-
-      // Clear any stored tokens and user data from localStorage
+      // Clear any stored tokens and user data from localStorage first
       localStorage.removeItem('supabase.auth.token');
       localStorage.removeItem('hrmoffice_user_data');
+
+      try {
+        // First, try to clear any existing session to prevent token conflicts
+        // But handle the case where there might not be an active session
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session) {
+          console.log('Active session found, signing out before Google sign-in');
+          await supabase.auth.signOut().catch(e => {
+            console.log('Non-critical error signing out before Google sign-in:', e);
+            // Continue even if this fails
+          });
+        } else {
+          console.log('No active session found before Google sign-in');
+        }
+      } catch (sessionError) {
+        console.log('Error checking session before Google sign-in:', sessionError);
+        // Continue even if this fails
+      }
 
       // Get the correct redirect URL based on environment
       const redirectUrl = window.location.hostname === 'localhost'

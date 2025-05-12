@@ -35,14 +35,11 @@ export default function EmployeeJobAssignment() {
     fetchAssignments();
   }, []);
 
-  // Fetch job assignments for employees assigned to this assessor
   const fetchAssignments = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // In a real implementation, you would filter by employees assigned to this assessor
-      // For now, we'll fetch all assignments as a placeholder
       const { data, error } = await supabase
         .from('employee_job_assignments')
         .select('*')
@@ -70,7 +67,7 @@ export default function EmployeeJobAssignment() {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Employee Job Assignments</h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">View job assignments for your assigned employees</p>
+          <p className="mt-1 text-gray-600 dark:text-gray-400">View all employee job assignments</p>
         </div>
       </div>
 
@@ -82,7 +79,7 @@ export default function EmployeeJobAssignment() {
         <input
           type="text"
           className="block w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white dark:placeholder-gray-400"
-          placeholder="Search by employee name or job role..."
+          placeholder="Search by employee or job role..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -117,6 +114,9 @@ export default function EmployeeJobAssignment() {
               key={`job-assignment-${assignment.id}-${assignment.employee_name}`}
               className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-gray-800 dark:bg-white/[0.03]"
             >
+              <div className="bg-blue-50 dark:bg-blue-900/20 px-5 py-3 border-b border-gray-200 dark:border-gray-800">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Job Assignment</h3>
+              </div>
               <div className="p-5">
                 <div className="flex items-center">
                   <div className="flex size-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
@@ -127,29 +127,15 @@ export default function EmployeeJobAssignment() {
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">R</span>
-                      </span>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Job Role</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{assignment.job_role}</p>
-                    </div>
+                <div className="mt-4 space-y-4">
+                  <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Job Role</h4>
+                    <p className="text-sm text-gray-900 dark:text-white">{assignment.job_role}</p>
                   </div>
 
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                        <span className="text-xs font-medium text-green-600 dark:text-green-400">D</span>
-                      </span>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{formatDate(assignment.start_date)}</p>
-                    </div>
+                  <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Start Date</h4>
+                    <p className="text-sm text-gray-900 dark:text-white">{formatDate(assignment.start_date)}</p>
                   </div>
                 </div>
               </div>
@@ -164,7 +150,7 @@ export default function EmployeeJobAssignment() {
           <UserIcon className="size-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">No assignments found</h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {searchTerm ? 'Try adjusting your search' : 'No job assignments available for your assigned employees'}
+            {searchTerm ? 'Try adjusting your search' : 'No job assignments available'}
           </p>
         </div>
       )}

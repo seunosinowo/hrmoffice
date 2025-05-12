@@ -39,7 +39,7 @@ export default function AssessorEmployeeAssessment() {
       const formattedData = data.map(item => ({
         id: item.id,
         employee_id: item.employee_id,
-        employee_email: item.users && item.users[0]?.email || 'Unknown',
+        employee_email: Array.isArray(item.users) && item.users.length > 0 ? item.users[0].email : 'Unknown',
         assessment_date: new Date(item.assessment_date).toLocaleDateString(),
         status: item.status,
         score: item.score
@@ -92,7 +92,7 @@ export default function AssessorEmployeeAssessment() {
       <h1 className="text-2xl font-bold mb-4">Employee Assessments</h1>
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white dark:bg-gray-800 shadow-md rounded-lg">
-          <thead className="bg-gray-50 dark:bg-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
               <th className="px-6 py-3 border-b dark:border-gray-600 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee</th>
               <th className="px-6 py-3 border-b dark:border-gray-600 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
@@ -103,7 +103,7 @@ export default function AssessorEmployeeAssessment() {
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {assessments.map((assessment) => (
-              <tr key={assessment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+              <tr key={assessment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{assessment.employee_email}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{assessment.assessment_date}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
@@ -120,7 +120,7 @@ export default function AssessorEmployeeAssessment() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex space-x-2">
                     <select
-                      className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm"
+                      className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm"
                       value={assessment.status}
                       onChange={(e) => updateAssessmentStatus(assessment.id, e.target.value)}
                     >
@@ -133,7 +133,7 @@ export default function AssessorEmployeeAssessment() {
                       type="number"
                       min="0"
                       max="100"
-                      className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm w-16"
+                      className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm w-16"
                       value={assessment.score || ''}
                       onChange={(e) => updateAssessmentScore(assessment.id, parseInt(e.target.value))}
                       placeholder="Score"

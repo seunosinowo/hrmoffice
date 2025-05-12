@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import {
+import { 
   UserIcon,
   FileIcon,
   ChatIcon
-} from "../../../icons";
-import { supabase } from "../../../lib/supabase";
+} from "../../../../../../Downloads/hrmoffice/src/icons";
+import { supabase } from "../../../../../../Downloads/hrmoffice/src/lib/supabase";
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable from 'jspdf-autotable'; // Ensure proper import of the plugin
 
 
 interface Employee {
@@ -70,9 +70,9 @@ export default function EmployeeAssessment() {
     status: 'In Progress' | 'Approved';
     overall_rating: number;
     department_id: string;
-    competencies: {
-      id: string;
-      rating: number;
+    competencies: { 
+      id: string; 
+      rating: number; 
       comments: string;
       competency: Competency;
     }[];
@@ -163,7 +163,7 @@ export default function EmployeeAssessment() {
     try {
       setLoading(true);
       setError(null);
-
+      
       const { data, error } = await supabase
         .from('employee_assessments')
         .select(`
@@ -441,8 +441,8 @@ export default function EmployeeAssessment() {
       };
 
       // Update the state with the transformed assessment
-      setAssessments(prevAssessments =>
-        prevAssessments.map(assessment =>
+      setAssessments(prevAssessments => 
+        prevAssessments.map(assessment => 
           assessment.id === selectedAssessment.id ? transformedAssessment : assessment
         )
       );
@@ -460,14 +460,14 @@ export default function EmployeeAssessment() {
   const handleDeleteAssessment = async (id: string) => {
     try {
       setLoading(true);
-
+      
       const { error } = await supabase
         .from('employee_assessments')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
-
+      
       await fetchAssessments();
       setShowDeleteModal(false);
       setAssessmentToDelete(null);
@@ -531,7 +531,7 @@ export default function EmployeeAssessment() {
   };
 
   const handleCompetencyRatingChange = (id: string, rating: number) => {
-    const updatedCompetencies = formData.competencies.map(comp =>
+    const updatedCompetencies = formData.competencies.map(comp => 
       comp.id === id ? { ...comp, rating } : comp
     );
     setFormData({
@@ -560,7 +560,7 @@ export default function EmployeeAssessment() {
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Employee Competency Assessment</h1>
               <p className="mt-1 text-gray-600 dark:text-gray-400">Manage and track employee competency assessments</p>
             </div>
-            <button
+            <button 
               onClick={handleNewAssessmentClick}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
@@ -593,12 +593,12 @@ export default function EmployeeAssessment() {
           {/* Assessment Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredAssessments.map((assessment) => (
-              <div
+              <div 
                 key={assessment.id}
                 className="group relative rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-blue-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-800/50"
               >
                 <div className="absolute inset-x-0 top-0 h-1 rounded-t-xl bg-gradient-to-r from-blue-600 to-purple-600" />
-
+                
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -638,7 +638,7 @@ export default function EmployeeAssessment() {
                     </div>
                   </div>
                   <div className="mt-2 h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                    <div
+                    <div 
                       className="h-1.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600"
                       style={{ width: `${((assessment.overall_rating || 0) / 5) * 100}%` }}
                     />
@@ -666,7 +666,7 @@ export default function EmployeeAssessment() {
                   >
                     Edit
                   </button>
-                  <button
+                  <button 
                     onClick={() => {
                       setAssessmentToDelete(assessment);
                       setShowDeleteModal(true);
@@ -802,7 +802,7 @@ export default function EmployeeAssessment() {
                   </button>
                 </div>
 
-                <form
+                <form 
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (selectedAssessment) {
@@ -909,7 +909,7 @@ export default function EmployeeAssessment() {
                             <label className="text-sm font-medium text-gray-900 dark:text-white">
                               {formCompetency.competency.name}
                             </label>
-                            <select
+                            <select 
                               value={formCompetency.rating}
                               onChange={(e) => handleCompetencyRatingChange(formCompetency.id, Number(e.target.value))}
                               className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
@@ -927,7 +927,7 @@ export default function EmployeeAssessment() {
                             rows={2}
                             value={formCompetency.comments}
                             onChange={(e) => {
-                              const updatedCompetencies = formData.competencies.map(comp =>
+                              const updatedCompetencies = formData.competencies.map(comp => 
                                 comp.id === formCompetency.id ? { ...comp, comments: e.target.value } : comp
                               );
                               setFormData({ ...formData, competencies: updatedCompetencies });
