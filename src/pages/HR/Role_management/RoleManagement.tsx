@@ -59,25 +59,17 @@ export default function RoleManagement() {
 
   // Assessors state
   const [assessors, setAssessors] = useState<Employee[]>([]);
-  const [loadingAssessors, setLoadingAssessors] = useState(true);
 
-  // Employees for assessor assignment
-  const [employees, setEmployees] = useState<Employee[]>([]);
+
 
   useEffect(() => {
     fetchUsers();
     fetchDepartments();
     fetchJobRoles();
     fetchAssessors();
-    fetchEmployees();
   }, []);
 
-  // Fetch employees when activeTab changes to assessors
-  useEffect(() => {
-    if (activeTab === 'assessors') {
-      fetchEmployees();
-    }
-  }, [activeTab]);
+
 
   // Fetch users
   const fetchUsers = async () => {
@@ -145,7 +137,7 @@ export default function RoleManagement() {
       const { data, error } = await supabase
         .from('departments')
         .select('*')
-        .order('name');
+        .order('id', { ascending: true }); // Order by ID to keep new items at the bottom
 
       if (error) throw error;
 
@@ -165,7 +157,7 @@ export default function RoleManagement() {
       const { data, error } = await supabase
         .from('job_roles')
         .select('*')
-        .order('name');
+        .order('id', { ascending: true }); // Order by ID to keep new items at the bottom
 
       if (error) throw error;
 
@@ -180,106 +172,75 @@ export default function RoleManagement() {
   // Fetch assessors
   const fetchAssessors = async () => {
     try {
-      setLoadingAssessors(true);
-
-      // Get users with assessor role
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_role_assignments')
+      // Fetch directly from the assessors table
+      const { data: assessorsData, error: assessorsError } = await supabase
+        .from('assessors')
         .select(`
+          id,
           user_id,
-          roles:role_id (
-            id,
-            role_name
-          )
-        `);
+          employee_id,
+          first_name,
+          last_name,
+          email,
+          created_at
+        `)
+        .order('first_name', { ascending: true });
 
-      if (roleError) throw roleError;
+      if (assessorsError) throw assessorsError;
 
-      // Filter to get only assessor user IDs
-      const assessorUserIds = roleData
-        .filter(item => {
-          if (!item.roles) return false;
-          const role = item.roles as any;
-          return (
-            (typeof role.role_name === 'string' && role.role_name === 'assessor')
-          );
-        })
-        .map(item => item.user_id);
-
-      if (assessorUserIds.length === 0) {
+      if (!assessorsData || assessorsData.length === 0) {
+        console.log('No assessors found in the assessors table');
         setAssessors([]);
-        setLoadingAssessors(false);
         return;
       }
 
-      // Get employee details for these assessors
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .select(`
-          id,
-          user_id,
-          first_name,
-          last_name,
-          email,
-          employee_departments (
+      console.log('Found assessors:', assessorsData);
+
+      // Get department information for assessors who have employee profiles
+      const assessorIds = assessorsData
+        .filter(a => a.employee_id)
+        .map(a => a.employee_id);
+
+      let departmentsData: any[] = [];
+
+      if (assessorIds.length > 0) {
+        const { data: empDeptData, error: deptError } = await supabase
+          .from('employee_departments')
+          .select(`
+            employee_id,
             department:departments (
               id,
               name
             )
-          )
-        `)
-        .in('user_id', assessorUserIds)
-        .order('first_name', { ascending: true });
+          `)
+          .in('employee_id', assessorIds);
 
-      if (employeeError) throw employeeError;
+        if (!deptError && empDeptData) {
+          departmentsData = empDeptData;
+        }
+      }
 
-      const formattedAssessors = employeeData ? employeeData.map(emp => ({
-        ...emp,
-        departments: emp.employee_departments ? emp.employee_departments.map((ed: any) => ed.department) : []
-      })) : [];
+      // Format the assessors with department information
+      const formattedAssessors = assessorsData.map(assessor => {
+        const assessorDepts = departmentsData
+          .filter(d => d.employee_id === assessor.employee_id)
+          .map(d => d.department);
 
-      setAssessors(formattedAssessors || []);
+        return {
+          ...assessor,
+          departments: assessorDepts
+        };
+      });
+
+      setAssessors(formattedAssessors);
     } catch (error) {
       console.error('Error fetching assessors:', error);
-    } finally {
-      setLoadingAssessors(false);
     }
   };
 
-  // Fetch employees
-  const fetchEmployees = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('employees')
-        .select(`
-          id,
-          user_id,
-          first_name,
-          last_name,
-          email,
-          employee_departments (
-            department:departments (
-              id,
-              name
-            )
-          )
-        `)
-        .order('first_name', { ascending: true });
 
-      if (error) throw error;
 
-      const formattedEmployees = data ? data.map(emp => ({
-        ...emp,
-        departments: emp.employee_departments ? emp.employee_departments.map((ed: any) => ed.department) : []
-      })) : [];
-
-      setEmployees(formattedEmployees || []);
-    } catch (error) {
-      console.error('Error fetching employees:', error);
-    }
-  };
-
-  if (loadingUsers && loadingDepartments && loadingJobRoles && loadingAssessors) {
+  if (loadingUsers && loadingDepartments && loadingJobRoles) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
@@ -345,7 +306,6 @@ export default function RoleManagement() {
             <button
               onClick={() => {
                 setActiveTab('assessors');
-                fetchEmployees(); // Refresh employees when switching to assessors tab
               }}
               className={`inline-flex items-center justify-center p-4 rounded-t-lg ${
                 activeTab === 'assessors'
@@ -367,6 +327,7 @@ export default function RoleManagement() {
           loadingUsers={loadingUsers}
           fetchUsers={fetchUsers}
           fetchAssessors={fetchAssessors}
+          setUsers={setUsers} // Pass the setUsers function to allow immediate UI updates
         />
       )}
 
@@ -376,6 +337,7 @@ export default function RoleManagement() {
           departments={departments}
           loadingDepartments={loadingDepartments}
           fetchDepartments={fetchDepartments}
+          setDepartments={setDepartments} // Pass the setDepartments function to allow immediate UI updates
         />
       )}
 
@@ -385,6 +347,7 @@ export default function RoleManagement() {
           jobRoles={jobRoles}
           loadingJobRoles={loadingJobRoles}
           fetchJobRoles={fetchJobRoles}
+          setJobRoles={setJobRoles} // Pass the setJobRoles function to allow immediate UI updates
         />
       )}
 
@@ -392,8 +355,6 @@ export default function RoleManagement() {
       {activeTab === 'assessors' && (
         <AssessorsTab
           assessors={assessors}
-          employees={employees}
-          loadingAssessors={loadingAssessors}
           fetchAssessors={fetchAssessors}
           fetchUsers={fetchUsers}
         />

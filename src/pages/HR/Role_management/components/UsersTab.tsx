@@ -17,9 +17,10 @@ interface UsersTabProps {
   loadingUsers: boolean;
   fetchUsers: () => Promise<void>;
   fetchAssessors: () => Promise<void>;
+  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
 }
 
-export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssessors }: UsersTabProps) {
+export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssessors, setUsers }: UsersTabProps) {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUpgradeRoleModal, setShowUpgradeRoleModal] = useState(false);
   const [isUpgradingRole, setIsUpgradingRole] = useState(false);
@@ -45,12 +46,35 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
       setErrorMessage(null);
       setSuccessMessage(null);
 
+      // Find the user in the current users array
+      const userToUpdate = users.find(u => u.id === userId);
+
+      if (!userToUpdate) {
+        throw new Error('User not found in the current list');
+      }
+
       const result = await upgradeUserRole(userId, newRole);
 
       if (result.success) {
         // Format role name for display (capitalize first letter)
         const formattedRole = newRole === 'hr' ? 'HR' : newRole.charAt(0).toUpperCase() + newRole.slice(1);
         setSuccessMessage(`User role successfully upgraded to ${formattedRole}`);
+
+        
+        const updatedUsers = users.map(user => {
+          if (user.id === userId) {
+            return {
+              ...user,
+              roles: [newRole] 
+            };
+          }
+          return user; 
+        });
+
+        // Update the parent component's state
+        setUsers(updatedUsers);
+
+        // Close the modal and clear selection
         setShowUpgradeRoleModal(false);
         setSelectedUser(null);
       } else {
@@ -124,8 +148,7 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
         return { success: false, error: `Could not determine role ID for '${newRole}'` };
       }
 
-      // Delete ALL existing role assignments (including 'employee')
-      // This ensures the user only has one role
+      
       for (const role of currentRoles) {
         const { error: deleteError } = await supabase
           .from('user_role_assignments')
@@ -173,8 +196,7 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
           if (rpcError) {
             console.error('Error calling update_user_role_status RPC:', rpcError);
 
-            // Fallback: Try direct update if RPC fails
-            // This might fail if user_email_status is a view without update privileges
+            
             try {
               const { error: statusError } = await supabase
                 .from('user_email_status')
@@ -205,13 +227,18 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
         }
       }
 
-      // Refresh user list
-      await fetchUsers();
+      
+      const fetchPromises = [];
+      fetchPromises.push(fetchUsers());
 
-      // Also refresh assessors list if needed
       if (newRole === 'assessor' || currentRoles.some(r => (r.roles as any).role_name === 'assessor')) {
-        await fetchAssessors();
+        fetchPromises.push(fetchAssessors());
       }
+
+      // Let these run in the background
+      Promise.all(fetchPromises).catch(err => {
+        console.error('Error refreshing data in background:', err);
+      });
 
       return { success: true };
     } catch (error: any) {

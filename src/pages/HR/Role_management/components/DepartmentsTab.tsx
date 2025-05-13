@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../../lib/supabase';
 import {
   TrashBinIcon,
@@ -21,9 +21,10 @@ interface DepartmentsTabProps {
   departments: Department[];
   loadingDepartments: boolean;
   fetchDepartments: () => Promise<void>;
+  setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
 }
 
-export default function DepartmentsTab({ departments, loadingDepartments, fetchDepartments }: DepartmentsTabProps) {
+export default function DepartmentsTab({ departments, loadingDepartments, fetchDepartments, setDepartments }: DepartmentsTabProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [departmentFormData, setDepartmentFormData] = useState<DepartmentFormData>({ name: '', description: '' });
@@ -36,6 +37,9 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
   const [isDeletingDepartment, setIsDeletingDepartment] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredDepartments, setFilteredDepartments] = useState<Department[]>([]);
+
+  // Create refs for dropdown menus
+  const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   // Filter departments based on search query
   useEffect(() => {
@@ -57,6 +61,26 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
 
     setFilteredDepartments(filtered);
   }, [departments, searchQuery]);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (activeDropdown) {
+        const dropdownRef = dropdownRefs.current[activeDropdown];
+        if (dropdownRef && !dropdownRef.contains(event.target as Node)) {
+          setActiveDropdown(null);
+        }
+      }
+    }
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Clean up
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeDropdown]);
 
   const toggleDropdown = (id: string) => {
     if (activeDropdown === id) {
@@ -80,18 +104,34 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
         return;
       }
 
-      const { error } = await supabase
+      const newDepartment = {
+        name: departmentFormData.name.trim(),
+        description: departmentFormData.description.trim()
+      };
+
+      const { data, error } = await supabase
         .from('departments')
-        .insert([
-          {
-            name: departmentFormData.name.trim(),
-            description: departmentFormData.description.trim()
-          }
-        ]);
+        .insert([newDepartment])
+        .select()
+        .single();
 
       if (error) throw error;
 
-      await fetchDepartments();
+      // Update local state immediately to prevent table scattering
+      if (data) {
+        // Add the new department to the end of the local state
+        setDepartments(prevDepartments => [...prevDepartments, data]);
+
+        // Also update the filtered departments, adding to the end
+        setFilteredDepartments(prevFiltered => [...prevFiltered, data]);
+      }
+
+      // Start background fetch but don't wait for it
+      fetchDepartments().catch(err => {
+        console.error('Error refreshing departments in background:', err);
+      });
+
+      // Clear form and close modal
       setShowAddDepartmentModal(false);
       setDepartmentFormData({ name: '', description: '' });
     } catch (error: any) {
@@ -122,19 +162,41 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
         return;
       }
 
+      const updatedDepartment = {
+        id: selectedDepartment.id,
+        name: departmentFormData.name.trim(),
+        description: departmentFormData.description.trim()
+      };
+
       // Update the record
       const { error } = await supabase
         .from('departments')
         .update({
-          name: departmentFormData.name.trim(),
-          description: departmentFormData.description.trim()
+          name: updatedDepartment.name,
+          description: updatedDepartment.description
         })
         .eq('id', selectedDepartment.id);
 
       if (error) throw error;
 
-      // Refresh departments list
-      await fetchDepartments();
+      // Update local state immediately to prevent table scattering
+      setDepartments(prevDepartments =>
+        prevDepartments.map(dept =>
+          dept.id === selectedDepartment.id ? updatedDepartment : dept
+        )
+      );
+
+      // Also update filtered departments
+      setFilteredDepartments(prevFiltered =>
+        prevFiltered.map(dept =>
+          dept.id === selectedDepartment.id ? updatedDepartment : dept
+        )
+      );
+
+      // Start background fetch but don't wait for it
+      fetchDepartments().catch(err => {
+        console.error('Error refreshing departments in background:', err);
+      });
 
       setShowEditDepartmentModal(false);
       setSelectedDepartment(null);
@@ -164,7 +226,21 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
 
       if (error) throw error;
 
-      await fetchDepartments();
+      // Update local state immediately to prevent table scattering
+      setDepartments(prevDepartments =>
+        prevDepartments.filter(dept => dept.id !== selectedDepartment.id)
+      );
+
+      // Also update filtered departments
+      setFilteredDepartments(prevFiltered =>
+        prevFiltered.filter(dept => dept.id !== selectedDepartment.id)
+      );
+
+      // Start background fetch but don't wait for it
+      fetchDepartments().catch(err => {
+        console.error('Error refreshing departments in background:', err);
+      });
+
       setShowDeleteDepartmentModal(false);
       setSelectedDepartment(null);
     } catch (error) {
@@ -196,7 +272,12 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
 
         {/* Add Department Button */}
         <button
-          onClick={() => setShowAddDepartmentModal(true)}
+          onClick={() => {
+            // Clear form data when opening the modal
+            setDepartmentFormData({ name: '', description: '' });
+            setDepartmentError(null);
+            setShowAddDepartmentModal(true);
+          }}
           className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
         >
           Add Department
@@ -248,7 +329,13 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
                         </button>
 
                         {activeDropdown === `dept-${department.id}` && (
-                          <div className="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900">
+                          <div
+                            ref={(el) => {
+                              dropdownRefs.current[`dept-${department.id}`] = el;
+                              return undefined;
+                            }}
+                            className="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900"
+                          >
                             <button
                               onClick={() => {
                                 setSelectedDepartment(department);

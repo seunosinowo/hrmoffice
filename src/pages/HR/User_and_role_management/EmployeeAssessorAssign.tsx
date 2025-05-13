@@ -33,7 +33,7 @@ interface Employee {
   first_name: string;
   last_name: string;
   email: string;
-  departments: {
+  departments?: {
     id: string;
     name: string;
   }[];
@@ -182,33 +182,24 @@ export default function EmployeeAssessorAssign() {
 
   const fetchAssessors = async () => {
     try {
-      // For simplicity, let's just get all employees for now
-      // In a real application, you would filter by role
+      // Get assessors from the assessors table
       const { data, error } = await supabase
-        .from('employees')
+        .from('assessors')
         .select(`
           id,
           user_id,
           first_name,
           last_name,
-          email,
-          employee_departments (
-            department:departments (
-              id,
-              name
-            )
-          )
+          email
         `)
         .order('first_name', { ascending: true });
 
       if (error) throw error;
 
-      const formattedEmployees = data.map(emp => ({
-        ...emp,
-        departments: emp.employee_departments.map((ed: any) => ed.department)
-      }));
+      console.log("Fetched assessors from assessors table:", data);
 
-      setAssessors(formattedEmployees || []);
+      // Set the assessors directly from the assessors table
+      setAssessors(data || []);
     } catch (err) {
       console.error("Error fetching assessors:", err);
     }

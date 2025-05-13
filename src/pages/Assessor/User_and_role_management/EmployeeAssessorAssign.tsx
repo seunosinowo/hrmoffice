@@ -39,27 +39,44 @@ export default function EmployeeAssessorAssign() {
         return;
       }
 
-      // First, get the employee record for the current assessor
+      // First, get the assessor record from the assessors table
       const { data: assessorData, error: assessorError } = await supabase
-        .from('employees')
-        .select('first_name, last_name')
+        .from('assessors')
+        .select('id, first_name, last_name')
         .eq('user_id', user.id)
         .single();
 
       if (assessorError) {
         console.error("Error fetching assessor profile:", assessorError);
-        if (assessorError.code === 'PGRST116') {
-          // No profile found
-          setError('Please contact HR to set up your assessor account.');
-        } else {
-          setError('Unable to access your assessor information. Please contact HR.');
+
+        // If no record in assessors table, try the employees table as fallback
+        const { data: employeeData, error: employeeError } = await supabase
+          .from('employees')
+          .select('first_name, last_name')
+          .eq('user_id', user.id)
+          .single();
+
+        if (employeeError) {
+          console.error("Error fetching employee profile:", employeeError);
+          if (employeeError.code === 'PGRST116') {
+            // No profile found
+            setError('Please contact HR to set up your assessor account.');
+          } else {
+            setError('Unable to access your assessor information. Please contact HR.');
+          }
+          setLoading(false);
+          return;
         }
-        setLoading(false);
-        return;
+
+        // Construct the assessor's full name from employee data
+        const assessorFullName = `${employeeData.first_name} ${employeeData.last_name}`;
+        console.log("Using employee data for assessor name:", assessorFullName);
+        return assessorFullName;
       }
 
-      // Construct the assessor's full name
+      // Construct the assessor's full name from assessor data
       const assessorFullName = `${assessorData.first_name} ${assessorData.last_name}`;
+      console.log("Using assessor data for assessor name:", assessorFullName);
 
       // Then fetch assignments where this assessor is assigned by name
       const { data, error } = await supabase

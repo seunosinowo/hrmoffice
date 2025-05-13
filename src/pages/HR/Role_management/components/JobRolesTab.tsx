@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../../lib/supabase';
 import {
   TrashBinIcon,
@@ -21,9 +21,10 @@ interface JobRolesTabProps {
   jobRoles: JobRole[];
   loadingJobRoles: boolean;
   fetchJobRoles: () => Promise<void>;
+  setJobRoles: React.Dispatch<React.SetStateAction<JobRole[]>>;
 }
 
-export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles }: JobRolesTabProps) {
+export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles, setJobRoles }: JobRolesTabProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [selectedJobRole, setSelectedJobRole] = useState<JobRole | null>(null);
   const [jobRoleFormData, setJobRoleFormData] = useState<JobRoleFormData>({ name: '', description: '' });
@@ -36,6 +37,9 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles }
   const [isDeletingJobRole, setIsDeletingJobRole] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredJobRoles, setFilteredJobRoles] = useState<JobRole[]>([]);
+
+  // Create refs for dropdown menus
+  const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   // Filter job roles based on search query
   useEffect(() => {
@@ -57,6 +61,26 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles }
 
     setFilteredJobRoles(filtered);
   }, [jobRoles, searchQuery]);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (activeDropdown) {
+        const dropdownRef = dropdownRefs.current[activeDropdown];
+        if (dropdownRef && !dropdownRef.contains(event.target as Node)) {
+          setActiveDropdown(null);
+        }
+      }
+    }
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Clean up
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeDropdown]);
 
   const toggleDropdown = (id: string) => {
     if (activeDropdown === id) {
@@ -80,18 +104,34 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles }
         return;
       }
 
-      const { error } = await supabase
+      const newJobRole = {
+        name: jobRoleFormData.name.trim(),
+        description: jobRoleFormData.description.trim()
+      };
+
+      const { data, error } = await supabase
         .from('job_roles')
-        .insert([
-          {
-            name: jobRoleFormData.name.trim(),
-            description: jobRoleFormData.description.trim()
-          }
-        ]);
+        .insert([newJobRole])
+        .select()
+        .single();
 
       if (error) throw error;
 
-      await fetchJobRoles();
+      // Update local state immediately to prevent table scattering
+      if (data) {
+        // Add the new job role to the end of the local state
+        setJobRoles(prevJobRoles => [...prevJobRoles, data]);
+
+        // Also update the filtered job roles, adding to the end
+        setFilteredJobRoles(prevFiltered => [...prevFiltered, data]);
+      }
+
+      // Start background fetch but don't wait for it
+      fetchJobRoles().catch(err => {
+        console.error('Error refreshing job roles in background:', err);
+      });
+
+      // Clear form and close modal
       setShowAddJobRoleModal(false);
       setJobRoleFormData({ name: '', description: '' });
     } catch (error: any) {
@@ -122,19 +162,41 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles }
         return;
       }
 
+      const updatedJobRole = {
+        id: selectedJobRole.id,
+        name: jobRoleFormData.name.trim(),
+        description: jobRoleFormData.description.trim()
+      };
+
       // Update the record
       const { error } = await supabase
         .from('job_roles')
         .update({
-          name: jobRoleFormData.name.trim(),
-          description: jobRoleFormData.description.trim()
+          name: updatedJobRole.name,
+          description: updatedJobRole.description
         })
         .eq('id', selectedJobRole.id);
 
       if (error) throw error;
 
-      // Refresh job roles list
-      await fetchJobRoles();
+      // Update local state immediately to prevent table scattering
+      setJobRoles(prevJobRoles =>
+        prevJobRoles.map(role =>
+          role.id === selectedJobRole.id ? updatedJobRole : role
+        )
+      );
+
+      // Also update filtered job roles
+      setFilteredJobRoles(prevFiltered =>
+        prevFiltered.map(role =>
+          role.id === selectedJobRole.id ? updatedJobRole : role
+        )
+      );
+
+      // Start background fetch but don't wait for it
+      fetchJobRoles().catch(err => {
+        console.error('Error refreshing job roles in background:', err);
+      });
 
       setShowEditJobRoleModal(false);
       setSelectedJobRole(null);
@@ -164,7 +226,21 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles }
 
       if (error) throw error;
 
-      await fetchJobRoles();
+      // Update local state immediately to prevent table scattering
+      setJobRoles(prevJobRoles =>
+        prevJobRoles.filter(role => role.id !== selectedJobRole.id)
+      );
+
+      // Also update filtered job roles
+      setFilteredJobRoles(prevFiltered =>
+        prevFiltered.filter(role => role.id !== selectedJobRole.id)
+      );
+
+      // Start background fetch but don't wait for it
+      fetchJobRoles().catch(err => {
+        console.error('Error refreshing job roles in background:', err);
+      });
+
       setShowDeleteJobRoleModal(false);
       setSelectedJobRole(null);
     } catch (error) {
@@ -196,7 +272,12 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles }
 
         {/* Add Job Role Button */}
         <button
-          onClick={() => setShowAddJobRoleModal(true)}
+          onClick={() => {
+            // Clear form data when opening the modal
+            setJobRoleFormData({ name: '', description: '' });
+            setJobRoleError(null);
+            setShowAddJobRoleModal(true);
+          }}
           className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
         >
           Add Job Role
@@ -248,7 +329,10 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles }
                         </button>
 
                         {activeDropdown === `role-${role.id}` && (
-                          <div className="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900">
+                          <div
+                            ref={(el) => { dropdownRefs.current[`role-${role.id}`] = el; }}
+                            className="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900"
+                          >
                             <button
                               onClick={() => {
                                 setSelectedJobRole(role);

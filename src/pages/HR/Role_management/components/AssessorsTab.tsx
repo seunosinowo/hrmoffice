@@ -1,7 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../../../lib/supabase';
 import {
-  TrashBinIcon
 } from "../../../../icons";
 
 interface Employee {
@@ -15,205 +14,191 @@ interface Employee {
 
 interface AssessorsTabProps {
   assessors: Employee[];
-  employees: Employee[];
-  loadingAssessors: boolean;
   fetchAssessors: () => Promise<void>;
   fetchUsers: () => Promise<void>;
 }
 
-export default function AssessorsTab({ 
-  assessors, 
-  employees, 
-  loadingAssessors, 
-  fetchAssessors, 
-  fetchUsers 
+export default function AssessorsTab({
+  assessors,
+  fetchAssessors,
+  fetchUsers
 }: AssessorsTabProps) {
-  const [selectedAssessor, setSelectedAssessor] = useState<Employee | null>(null);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
-  const [employeeSearchTerm, setEmployeeSearchTerm] = useState<string>('');
   const [assessorError, setAssessorError] = useState<string | null>(null);
   const [showAddAssessorModal, setShowAddAssessorModal] = useState(false);
-  const [showDeleteAssessorModal, setShowDeleteAssessorModal] = useState(false);
   const [isAddingAssessor, setIsAddingAssessor] = useState(false);
-  const [isDeletingAssessor, setIsDeletingAssessor] = useState(false);
+  const [employeeAssignments, setEmployeeAssignments] = useState<any[]>([]);
 
-  // Filtered employees for search
-  const filteredEmployees = useMemo(() => {
-    if (!employeeSearchTerm) return [];
-    
-    const searchTermLower = employeeSearchTerm.toLowerCase();
-    return employees.filter(
-      (employee: Employee) => 
-        employee.first_name.toLowerCase().includes(searchTermLower) ||
-        employee.last_name.toLowerCase().includes(searchTermLower) ||
-        employee.email.toLowerCase().includes(searchTermLower)
-    );
-  }, [employees, employeeSearchTerm]);
-
-  // Add assessor
-  const handleAddAssessor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedEmployeeId) {
-      setAssessorError('Please select an employee');
-      return;
-    }
-    
+  // Add all users with assessor role to the assessors table
+  const handleAddAssessor = async () => {
     try {
       setIsAddingAssessor(true);
       setAssessorError(null);
-      
-      // Get employee details
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .select('user_id, first_name, last_name, email')
-        .eq('id', selectedEmployeeId)
-        .single();
-        
-      if (employeeError) throw employeeError;
-      
-      console.log('Selected employee:', employeeData);
-      
-      if (!employeeData.user_id) {
-        setAssessorError('Employee has no associated user account');
-        setIsAddingAssessor(false);
-        return;
-      }
-      
-      // Check if user already has assessor role
-      const { data: existingRoles, error: existingRolesError } = await supabase
+
+      // Get all users with assessor role
+      const { data: roleAssignments, error: roleError } = await supabase
         .from('user_role_assignments')
         .select(`
+          user_id,
           roles:role_id (
             id,
             role_name
           )
         `)
-        .eq('user_id', employeeData.user_id);
-        
-      if (existingRolesError) throw existingRolesError;
-      
-      console.log('Existing roles:', existingRoles);
-      
-      // Check if user already has assessor role
-      const isAlreadyAssessor = existingRoles.some(item => {
-        const role = item.roles as any;
-        return role && role.role_name === 'assessor';
-      });
-      
-      if (isAlreadyAssessor) {
-        setAssessorError('This employee is already an assessor');
+        .eq('roles.role_name', 'assessor');
+
+      if (roleError) throw roleError;
+
+      if (!roleAssignments || roleAssignments.length === 0) {
+        setAssessorError('No users with assessor role found');
         setIsAddingAssessor(false);
         return;
       }
-      
-      // Get assessor role ID
-      const { data: roleData, error: roleError } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('role_name', 'assessor')
-        .single();
-        
-      if (roleError) {
-        console.error('Error getting assessor role:', roleError);
-        throw roleError;
-      }
-      
-      console.log('Assessor role data:', roleData);
-      
-      // Remove all existing roles (to ensure only one role)
-      for (const roleAssignment of existingRoles) {
-        // We need to delete by user_id and role_id since we don't have the assignment id
-        const { error: deleteError } = await supabase
-          .from('user_role_assignments')
-          .delete()
-          .eq('user_id', employeeData.user_id)
-          .eq('role_id', (roleAssignment.roles as any).id);
-          
-        if (deleteError) {
-          console.error('Error deleting existing role:', deleteError);
-          throw deleteError;
+
+      console.log('Found assessor role assignments:', roleAssignments);
+
+      // Get the user IDs of all assessors
+      const assessorUserIds = roleAssignments.map(item => item.user_id);
+
+      // Get employee details for these assessors
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select(`
+          id,
+          user_id,
+          first_name,
+          last_name,
+          email
+        `)
+        .in('user_id', assessorUserIds);
+
+      if (employeeError) throw employeeError;
+
+      // Check if we have employee data
+      if (!employeeData || employeeData.length === 0) {
+        console.log('No employee profiles found, using auth users data instead');
+
+        // Get user data from auth
+        const { data: authUsers, error: authError } = await supabase
+          .from('auth_users_view')
+          .select('id, email')
+          .in('id', assessorUserIds);
+
+        if (authError) throw authError;
+
+        if (!authUsers || authUsers.length === 0) {
+          setAssessorError('No user data found for assessors');
+          setIsAddingAssessor(false);
+          return;
         }
+
+        // Create assessor records from auth users
+        const assessorsToInsert = authUsers.map(user => {
+          // Extract name from email (e.g., john.doe@example.com -> John Doe)
+          const emailName = user.email.split('@')[0];
+          const nameParts = emailName.replace(/[^a-zA-Z0-9]/g, ' ').split(' ').filter(Boolean);
+          const firstName = nameParts[0] ? nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1) : 'Assessor';
+          const lastName = nameParts.length > 1 ?
+            nameParts.slice(1).map((part: string) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') :
+            'User';
+
+          return {
+            user_id: user.id,
+            first_name: firstName,
+            last_name: lastName,
+            email: user.email
+          };
+        });
+
+        // Insert with upsert to avoid duplicates
+        const { data: insertedData, error: insertError } = await supabase
+          .from('assessors')
+          .upsert(assessorsToInsert, {
+            onConflict: 'user_id',
+            ignoreDuplicates: false // Update existing records
+          })
+          .select();
+
+        if (insertError) {
+          console.error('Error inserting assessors from auth users:', insertError);
+          throw insertError;
+        }
+
+        console.log('Successfully added/updated assessors from auth users:', insertedData);
+      } else {
+        console.log('Found employee data for assessors:', employeeData);
+
+        // Insert into assessors table
+        const assessorsToInsert = employeeData.map(emp => ({
+          employee_id: emp.id,
+          user_id: emp.user_id,
+          first_name: emp.first_name,
+          last_name: emp.last_name,
+          email: emp.email
+        }));
+
+        // Insert with upsert to avoid duplicates
+        const { data: insertedData, error: insertError } = await supabase
+          .from('assessors')
+          .upsert(assessorsToInsert, {
+            onConflict: 'user_id',
+            ignoreDuplicates: false // Update existing records
+          })
+          .select();
+
+        if (insertError) {
+          console.error('Error inserting assessors:', insertError);
+          throw insertError;
+        }
+
+        console.log('Successfully added/updated assessors from employee data:', insertedData);
       }
-      
-      // Assign assessor role
-      const { error: roleAssignError } = await supabase
-        .from('user_role_assignments')
-        .insert([
-          { 
-            user_id: employeeData.user_id,
-            role_id: roleData.id
-          }
-        ]);
-        
-      if (roleAssignError) {
-        console.error('Error assigning assessor role:', roleAssignError);
-        throw roleAssignError;
+
+      // Get all employee assessor assignments to show in the info message
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('employee_assessor_assignments')
+        .select(`
+          id,
+          employee_name,
+          assessor,
+          assessor_id,
+          department,
+          job_role,
+          created_at
+        `)
+        .order('created_at', { ascending: false });
+
+      if (assignmentsError) {
+        console.error('Error fetching employee assessor assignments:', assignmentsError);
+      } else {
+        console.log('Employee assessor assignments:', assignments);
+        setEmployeeAssignments(assignments || []);
       }
-      
+
       // Refresh assessors list
       await fetchAssessors();
       // Refresh users list to update roles
       await fetchUsers();
-      
+
       setShowAddAssessorModal(false);
-      setSelectedEmployeeId('');
-      setEmployeeSearchTerm('');
     } catch (error: any) {
-      console.error('Error adding assessor:', error);
-      if (error.code === '23505') {
-        setAssessorError('This employee is already an assessor');
-      } else {
-        setAssessorError('Failed to add assessor. Please try again: ' + error.message);
-      }
+      console.error('Error adding assessors:', error);
+      setAssessorError('Failed to add assessors. Please try again: ' + error.message);
     } finally {
       setIsAddingAssessor(false);
     }
   };
 
-  // Delete assessor
-  const handleDeleteAssessor = async () => {
-    if (!selectedAssessor) return;
-    
-    try {
-      setIsDeletingAssessor(true);
-      
-      // Get role ID for assessor
-      const { data: roleData, error: roleError } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('role_name', 'assessor')
-        .single();
-        
-      if (roleError) throw roleError;
-      
-      // Remove assessor role assignment
-      const { error: roleAssignError } = await supabase
-        .from('user_role_assignments')
-        .delete()
-        .eq('user_id', selectedAssessor.user_id)
-        .eq('role_id', roleData.id);
-        
-      if (roleAssignError) throw roleAssignError;
-      
-      // Refresh assessors list
-      await fetchAssessors();
-      // Refresh users list to update roles
-      await fetchUsers();
-      
-      setShowDeleteAssessorModal(false);
-      setSelectedAssessor(null);
-    } catch (error) {
-      console.error('Error deleting assessor:', error);
-      setAssessorError('Failed to delete assessor. Please try again.');
-    } finally {
-      setIsDeletingAssessor(false);
-    }
-  };
+
 
   return (
     <div>
-      <div className="mb-6 flex justify-center">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Search Bar (can be added later if needed) */}
+        <div className="relative w-full sm:max-w-xs">
+          {/* Placeholder for search functionality */}
+        </div>
+
+        {/* Add Assessor Button */}
         <button
           onClick={() => setShowAddAssessorModal(true)}
           className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
@@ -258,16 +243,9 @@ export default function AssessorsTab({
                       }
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-medium">
-                      <button
-                        onClick={() => {
-                          setSelectedAssessor(assessor);
-                          setShowDeleteAssessorModal(true);
-                        }}
-                        className="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
-                      >
-                        <TrashBinIcon className="mr-2 size-4" />
-                        Remove
-                      </button>
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                        Active
+                      </span>
                     </td>
                   </tr>
                 ))
@@ -287,9 +265,9 @@ export default function AssessorsTab({
       {showAddAssessorModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
           <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
-            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Add Assessor</h2>
+            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Add Assessors</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
-              Assign an employee as an assessor
+              This will add all users with the assessor role to the assessors table
             </p>
 
             {assessorError && (
@@ -298,67 +276,67 @@ export default function AssessorsTab({
               </div>
             )}
 
-            <form onSubmit={handleAddAssessor} className="mt-6 space-y-4">
-              <div>
-                <label htmlFor="employee_search" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Search Employee
-                </label>
-                <div className="relative mt-1">
-                  <input
-                    type="text"
-                    id="employee_search"
-                    placeholder="Search by name or email"
-                    value={employeeSearchTerm}
-                    onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                    className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
-                  />
-                  
-                  {employeeSearchTerm && (
-                    <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 shadow-lg dark:bg-gray-800">
-                      {filteredEmployees.length > 0 ? (
-                        filteredEmployees.map((employee: Employee) => (
-                          <div
-                            key={employee.id}
-                            onClick={() => {
-                              setSelectedEmployeeId(employee.id);
-                              setEmployeeSearchTerm(`${employee.first_name} ${employee.last_name} (${employee.email})`);
-                            }}
-                            className="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white"
-                          >
-                            {employee.first_name} {employee.last_name} ({employee.email})
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-4 py-2 text-gray-500 dark:text-gray-400">No employees found</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                
-                {selectedEmployeeId && (
-                  <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-                    Selected: {employees.find(e => e.id === selectedEmployeeId)?.first_name} {employees.find(e => e.id === selectedEmployeeId)?.last_name}
-                  </div>
-                )}
+            <div className="mt-6 space-y-4">
+              <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                <p className="font-medium">Information</p>
+                <p className="mt-1">
+                  Clicking "Add Assessors" will find all users with the assessor role and add them to the assessors table.
+                  This will make them available for selection in the Employee Assessor Assignment page.
+                </p>
+                <p className="mt-2">
+                  These assessors will be able to view employee details in the Assessor section.
+                </p>
               </div>
+
+              {employeeAssignments.length > 0 && (
+                <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/20">
+                  <h3 className="font-medium text-gray-900 dark:text-white">Current Employee-Assessor Assignments</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    These are the current assignments from the Employee Assessor Assign page:
+                  </p>
+                  <div className="mt-3 max-h-40 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                      <thead className="bg-gray-50 dark:bg-gray-800/50">
+                        <tr>
+                          <th scope="col" className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            Employee
+                          </th>
+                          <th scope="col" className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            Assessor
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-white/[0.03]">
+                        {employeeAssignments.map((assignment) => (
+                          <tr key={assignment.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
+                            <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-900 dark:text-white">
+                              {assignment.employee_name}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-900 dark:text-white">
+                              {assignment.assessor}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowAddAssessorModal(false);
-                    setEmployeeSearchTerm('');
-                    setSelectedEmployeeId('');
-                  }}
+                  onClick={() => setShowAddAssessorModal(false)}
                   className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
                   disabled={isAddingAssessor}
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleAddAssessor}
                   className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                  disabled={isAddingAssessor || !selectedEmployeeId}
+                  disabled={isAddingAssessor}
                 >
                   {isAddingAssessor ? (
                     <>
@@ -366,56 +344,10 @@ export default function AssessorsTab({
                       Adding...
                     </>
                   ) : (
-                    'Add Assessor'
+                    'Add Assessors'
                   )}
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Assessor Confirmation Modal */}
-      {showDeleteAssessorModal && selectedAssessor && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
-          <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
-            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Remove Assessor</h2>
-            <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
-              Are you sure you want to remove {selectedAssessor.first_name} {selectedAssessor.last_name} as an assessor?
-            </p>
-            <p className="mt-2 text-center text-sm text-red-500">
-              This will remove their assessor role but will not delete the employee.
-            </p>
-
-            {assessorError && (
-              <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/20">
-                <p className="text-red-600 dark:text-red-400">{assessorError}</p>
-              </div>
-            )}
-
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteAssessorModal(false)}
-                className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
-                disabled={isDeletingAssessor}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteAssessor}
-                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
-                disabled={isDeletingAssessor}
-              >
-                {isDeletingAssessor ? (
-                  <>
-                    <div className="mr-2 size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                    Removing...
-                  </>
-                ) : (
-                  'Remove Assessor'
-                )}
-              </button>
             </div>
           </div>
         </div>
