@@ -1,8 +1,8 @@
 import { supabase } from '../../../lib/supabase';
 import { useState, useEffect } from 'react';
-import { 
-  UserIcon, 
-  PlusIcon, 
+import {
+  UserIcon,
+  PlusIcon,
   TrashBinIcon,
   InfoIcon,
   PencilIcon,
@@ -25,17 +25,25 @@ interface JobRole {
   created_at: string;
 }
 
-interface Department {
+
+
+interface Employee {
   id: string;
-  name: string;
-  description: string | null;
-  created_at: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  departments: {
+    id: string;
+    name: string;
+  }[];
 }
 
 export default function EmployeeAssessorAssign() {
   const [assignments, setAssignments] = useState<AssessorAssignment[]>([]);
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [assessors, setAssessors] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -49,19 +57,23 @@ export default function EmployeeAssessorAssign() {
     job_role: "",
     assessor: ""
   });
-  
+
   // Loading states for actions
   const [isAdding, setIsAdding] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   // Dropdown state
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("");
+  const [selectedAssessor, setSelectedAssessor] = useState<string>("");
 
   useEffect(() => {
     fetchAssignments();
     fetchJobRoles();
     fetchDepartments();
+    fetchEmployees();
+    fetchAssessors();
   }, []);
 
   // Close dropdown when clicking outside
@@ -79,14 +91,43 @@ export default function EmployeeAssessorAssign() {
     };
   }, []);
 
+  // Update form data when employee or assessor selection changes
+  useEffect(() => {
+    if (selectedEmployee) {
+      const employee = employees.find(emp => emp.id === selectedEmployee);
+      if (employee) {
+        const departmentName = employee.departments && employee.departments.length > 0
+          ? employee.departments[0].name
+          : "";
+
+        setFormData(prev => ({
+          ...prev,
+          employee_name: `${employee.first_name} ${employee.last_name}`,
+          department: departmentName
+        }));
+      }
+    }
+  }, [selectedEmployee, employees]);
+
+  useEffect(() => {
+    if (selectedAssessor) {
+      const assessor = assessors.find(emp => emp.id === selectedAssessor);
+      if (assessor) {
+        setFormData(prev => ({
+          ...prev,
+          assessor: `${assessor.first_name} ${assessor.last_name}`
+        }));
+      }
+    }
+  }, [selectedAssessor, assessors]);
+
   const fetchAssignments = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       console.log("Fetching assignments...");
-      
-      // Try using a different approach
+
       const { data, error } = await supabase
         .from('employee_assessor_assignments')
         .select('*')
@@ -96,7 +137,7 @@ export default function EmployeeAssessorAssign() {
         console.error("Error fetching assignments:", error);
         throw error;
       }
-      
+
       console.log("Fetched assignments:", data);
       setAssignments(data || []);
     } catch (err) {
@@ -104,6 +145,72 @@ export default function EmployeeAssessorAssign() {
       setError('Failed to load assessor assignments. Please try again later.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .select(`
+          id,
+          user_id,
+          first_name,
+          last_name,
+          email,
+          employee_departments (
+            department:departments (
+              id,
+              name
+            )
+          )
+        `)
+        .order('first_name', { ascending: true });
+
+      if (error) throw error;
+
+      const formattedEmployees = data.map(emp => ({
+        ...emp,
+        departments: emp.employee_departments.map((ed: any) => ed.department)
+      }));
+
+      setEmployees(formattedEmployees || []);
+    } catch (err) {
+      console.error("Error fetching employees:", err);
+    }
+  };
+
+  const fetchAssessors = async () => {
+    try {
+      // For simplicity, let's just get all employees for now
+      // In a real application, you would filter by role
+      const { data, error } = await supabase
+        .from('employees')
+        .select(`
+          id,
+          user_id,
+          first_name,
+          last_name,
+          email,
+          employee_departments (
+            department:departments (
+              id,
+              name
+            )
+          )
+        `)
+        .order('first_name', { ascending: true });
+
+      if (error) throw error;
+
+      const formattedEmployees = data.map(emp => ({
+        ...emp,
+        departments: emp.employee_departments.map((ed: any) => ed.department)
+      }));
+
+      setAssessors(formattedEmployees || []);
+    } catch (err) {
+      console.error("Error fetching assessors:", err);
     }
   };
 
@@ -124,52 +231,26 @@ export default function EmployeeAssessorAssign() {
   const fetchDepartments = async () => {
     try {
       console.log("Fetching departments...");
-      
-      // Try using a direct query with explicit schema
-      const { data, error, count } = await supabase
+
+      const { data, error } = await supabase
         .from('departments')
-        .select('*', { count: 'exact' })
+        .select('*')
         .order('name');
 
       if (error) {
         console.error("Error fetching departments:", error);
         throw error;
       }
-      
+
+      // We don't need to store departments anymore
       console.log("Fetched departments:", data);
-      console.log("Department count:", count);
-      
-      // If no departments found, try to insert some test data
-      if (!data || data.length === 0) {
-        console.log("No departments found. Inserting test data...");
-        
-        // Insert some test departments
-        const { data: insertData, error: insertError } = await supabase
-          .from('departments')
-          .insert([
-            { name: 'Human Resources', description: 'HR department' },
-            { name: 'Finance', description: 'Finance department' },
-            { name: 'Marketing', description: 'Marketing department' }
-          ])
-          .select();
-          
-        if (insertError) {
-          console.error("Error inserting test departments:", insertError);
-        } else {
-          console.log("Inserted test departments:", insertData);
-          setDepartments(insertData || []);
-          return;
-        }
-      }
-      
-      setDepartments(data || []);
     } catch (err) {
       console.error("Error fetching departments:", err);
     }
   };
 
   // Filter assignments based on search term
-  const filteredAssignments = assignments.filter(assignment => 
+  const filteredAssignments = assignments.filter(assignment =>
     assignment.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     assignment.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
     assignment.job_role.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -178,10 +259,17 @@ export default function EmployeeAssessorAssign() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       setIsAdding(true);
-      
+
+      // Validate required fields
+      if (!formData.employee_name || !formData.assessor || !formData.job_role) {
+        setError('Please fill in all required fields');
+        setIsAdding(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('employee_assessor_assignments')
         .insert([formData])
@@ -189,9 +277,11 @@ export default function EmployeeAssessorAssign() {
         .single();
 
       if (error) throw error;
-      
+
       setAssignments([...assignments, data]);
       setShowAddModal(false);
+      setSelectedEmployee("");
+      setSelectedAssessor("");
       setFormData({
         employee_name: "",
         department: "",
@@ -208,24 +298,50 @@ export default function EmployeeAssessorAssign() {
 
   const handleEdit = (assignment: AssessorAssignment) => {
     setSelectedAssignment(assignment);
+
+    // Try to find matching employees and assessors by name
+    const employee = employees.find(emp =>
+      `${emp.first_name} ${emp.last_name}` === assignment.employee_name
+    );
+
+    const assessor = assessors.find(emp =>
+      `${emp.first_name} ${emp.last_name}` === assignment.assessor
+    );
+
+    if (employee) {
+      setSelectedEmployee(employee.id);
+    }
+
+    if (assessor) {
+      setSelectedAssessor(assessor.id);
+    }
+
     setFormData({
       employee_name: assignment.employee_name,
       department: assignment.department,
       job_role: assignment.job_role,
       assessor: assignment.assessor
     });
+
     setShowEditModal(true);
     setActiveDropdown(null);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedAssignment) return;
-    
+
     try {
       setIsUpdating(true);
-      
+
+      // Validate required fields
+      if (!formData.employee_name || !formData.assessor || !formData.job_role) {
+        setError('Please fill in all required fields');
+        setIsUpdating(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('employee_assessor_assignments')
         .update(formData)
@@ -234,12 +350,14 @@ export default function EmployeeAssessorAssign() {
         .single();
 
       if (error) throw error;
-      
-      setAssignments(assignments.map(assignment => 
+
+      setAssignments(assignments.map(assignment =>
         assignment.id === selectedAssignment.id ? data : assignment
       ));
       setShowEditModal(false);
       setSelectedAssignment(null);
+      setSelectedEmployee("");
+      setSelectedAssessor("");
     } catch (err) {
       console.error("Error updating assignment:", err);
       setError('Failed to update assignment. Please try again later.');
@@ -250,17 +368,17 @@ export default function EmployeeAssessorAssign() {
 
   const handleDeleteConfirm = async () => {
     if (!selectedAssignment) return;
-    
+
     try {
       setIsDeleting(true);
-      
+
       const { error } = await supabase
         .from('employee_assessor_assignments')
         .delete()
         .eq('id', selectedAssignment.id);
 
       if (error) throw error;
-      
+
       setAssignments(assignments.filter(assignment => assignment.id !== selectedAssignment.id));
       setShowDeleteModal(false);
       setSelectedAssignment(null);
@@ -289,7 +407,7 @@ export default function EmployeeAssessorAssign() {
           <p className="mt-1 text-gray-600 dark:text-gray-400">Manage employee assessor assignments</p>
         </div>
         <div className="flex justify-center sm:justify-end">
-          <button 
+          <button
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 w-full sm:w-auto"
           >
@@ -323,11 +441,14 @@ export default function EmployeeAssessorAssign() {
 
       {/* Error State */}
       {error && !loading && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
-          <p className="text-red-700 dark:text-red-400">{error}</p>
-          <button 
+        <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/20">
+          <div className="flex items-center">
+            <UserIcon className="size-5 text-blue-600 dark:text-blue-400 mr-3" />
+            <p className="text-gray-700 dark:text-gray-300">{error}</p>
+          </div>
+          <button
             onClick={fetchAssignments}
-            className="mt-2 rounded-lg bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/40"
+            className="mt-3 rounded-lg bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/40"
           >
             Try Again
           </button>
@@ -382,24 +503,24 @@ export default function EmployeeAssessorAssign() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-medium">
                       <div className="relative actions-dropdown">
-                        <button 
+                        <button
                           onClick={() => toggleDropdown(assignment.id)}
                           className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
                         >
                           Actions
                           <ChevronDownIcon className="ml-1 size-4" />
                         </button>
-                        
+
                         {activeDropdown === assignment.id && (
                           <div className="absolute right-0 z-50 mt-2 w-36 origin-top-right rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900" style={{ position: 'fixed' }}>
-                            <button 
+                            <button
                               onClick={() => handleEdit(assignment)}
                               className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                               <PencilIcon className="mr-2 size-4 text-amber-500" />
                               Edit
                             </button>
-                            <button 
+                            <button
                               onClick={() => {
                                 setSelectedAssignment(assignment);
                                 setShowDeleteModal(true);
@@ -430,7 +551,7 @@ export default function EmployeeAssessorAssign() {
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {searchTerm ? 'Try adjusting your search' : 'Create your first assessor assignment'}
           </p>
-          <button 
+          <button
             onClick={() => setShowAddModal(true)}
             className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
@@ -448,40 +569,44 @@ export default function EmployeeAssessorAssign() {
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
               Create a new assessor assignment for an employee
             </p>
-            
+
             <form onSubmit={handleSubmit} className="mt-6 space-y-4 max-h-[70vh] overflow-y-auto pr-2 pl-1">
               <div>
-                <label htmlFor="employee_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Employee Name
+                <label htmlFor="employee_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Employee
                 </label>
-                <input
-                  type="text"
-                  id="employee_name"
-                  value={formData.employee_name}
-                  onChange={(e) => setFormData({...formData, employee_name: e.target.value})}
+                <select
+                  id="employee_id"
+                  value={selectedEmployee}
+                  onChange={(e) => setSelectedEmployee(e.target.value)}
                   required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
-                />
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
+                >
+                  <option value="">Select an employee</option>
+                  {employees.map(emp => (
+                    <option key={`emp-${emp.id}`} value={emp.id}>
+                      {emp.first_name} {emp.last_name} ({emp.email})
+                    </option>
+                  ))}
+                </select>
               </div>
-              
+
               <div>
                 <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Department
                 </label>
-                <select
+                <input
+                  type="text"
                   id="department"
                   value={formData.department}
-                  onChange={(e) => setFormData({...formData, department: e.target.value})}
-                  required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
-                >
-                  <option value="">Select a department</option>
-                  {departments.map(dept => (
-                    <option key={`dept-${dept.id}-${dept.name}`} value={dept.name}>{dept.name}</option>
-                  ))}
-                </select>
+                  readOnly
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Department is automatically set based on the selected employee
+                </p>
               </div>
-              
+
               <div>
                 <label htmlFor="job_role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Job Role
@@ -499,21 +624,32 @@ export default function EmployeeAssessorAssign() {
                   ))}
                 </select>
               </div>
-              
+
               <div>
-                <label htmlFor="assessor" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor="assessor_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Assessor
                 </label>
-                <input
-                  type="text"
-                  id="assessor"
-                  value={formData.assessor}
-                  onChange={(e) => setFormData({...formData, assessor: e.target.value})}
+                <select
+                  id="assessor_id"
+                  value={selectedAssessor}
+                  onChange={(e) => setSelectedAssessor(e.target.value)}
                   required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
-                />
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
+                >
+                  <option value="">Select an assessor</option>
+                  {assessors.map(assessor => (
+                    <option key={`assessor-${assessor.id}`} value={assessor.id}>
+                      {assessor.first_name} {assessor.last_name} ({assessor.email})
+                    </option>
+                  ))}
+                </select>
+                {assessors.length === 0 && (
+                  <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                    No assessors found. Please assign the assessor role to users first.
+                  </p>
+                )}
               </div>
-              
+
               <div className="flex items-center justify-end gap-3 pt-4">
                 <button
                   type="button"
@@ -551,40 +687,44 @@ export default function EmployeeAssessorAssign() {
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
               Update assessor assignment details
             </p>
-            
+
             <form onSubmit={handleUpdate} className="mt-6 space-y-4 max-h-[70vh] overflow-y-auto pr-2 pl-1">
               <div>
-                <label htmlFor="edit_employee_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Employee Name
+                <label htmlFor="edit_employee_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Employee
                 </label>
-                <input
-                  type="text"
-                  id="edit_employee_name"
-                  value={formData.employee_name}
-                  onChange={(e) => setFormData({...formData, employee_name: e.target.value})}
+                <select
+                  id="edit_employee_id"
+                  value={selectedEmployee}
+                  onChange={(e) => setSelectedEmployee(e.target.value)}
                   required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
-                />
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
+                >
+                  <option value="">Select an employee</option>
+                  {employees.map(emp => (
+                    <option key={`edit-emp-${emp.id}`} value={emp.id}>
+                      {emp.first_name} {emp.last_name} ({emp.email})
+                    </option>
+                  ))}
+                </select>
               </div>
-              
+
               <div>
                 <label htmlFor="edit_department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Department
                 </label>
-                <select
+                <input
+                  type="text"
                   id="edit_department"
                   value={formData.department}
-                  onChange={(e) => setFormData({...formData, department: e.target.value})}
-                  required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
-                >
-                  <option value="">Select a department</option>
-                  {departments.map(dept => (
-                    <option key={`dept-${dept.id}-${dept.name}`} value={dept.name}>{dept.name}</option>
-                  ))}
-                </select>
+                  readOnly
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Department is automatically set based on the selected employee
+                </p>
               </div>
-              
+
               <div>
                 <label htmlFor="edit_job_role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Job Role
@@ -598,25 +738,36 @@ export default function EmployeeAssessorAssign() {
                 >
                   <option value="">Select a job role</option>
                   {jobRoles.map(role => (
-                    <option key={`role-${role.id}-${role.name}`} value={role.name}>{role.name}</option>
+                    <option key={`edit-role-${role.id}-${role.name}`} value={role.name}>{role.name}</option>
                   ))}
                 </select>
               </div>
-              
+
               <div>
-                <label htmlFor="edit_assessor" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor="edit_assessor_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Assessor
                 </label>
-                <input
-                  type="text"
-                  id="edit_assessor"
-                  value={formData.assessor}
-                  onChange={(e) => setFormData({...formData, assessor: e.target.value})}
+                <select
+                  id="edit_assessor_id"
+                  value={selectedAssessor}
+                  onChange={(e) => setSelectedAssessor(e.target.value)}
                   required
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white"
-                />
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
+                >
+                  <option value="">Select an assessor</option>
+                  {assessors.map(assessor => (
+                    <option key={`edit-assessor-${assessor.id}`} value={assessor.id}>
+                      {assessor.first_name} {assessor.last_name} ({assessor.email})
+                    </option>
+                  ))}
+                </select>
+                {assessors.length === 0 && (
+                  <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                    No assessors found. Please assign the assessor role to users first.
+                  </p>
+                )}
               </div>
-              
+
               <div className="flex items-center justify-end gap-3 pt-4">
                 <button
                   type="button"
@@ -654,7 +805,7 @@ export default function EmployeeAssessorAssign() {
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
               Are you sure you want to delete this assessor assignment?
             </p>
-            
+
             <div className="mt-6 flex items-center justify-end gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
