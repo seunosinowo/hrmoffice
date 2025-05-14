@@ -19,13 +19,11 @@ export default function WelcomePage() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        // First try to get the current session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) throw sessionError;
 
         if (!session) {
-          // If no session, try to refresh it
           const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
 
           if (refreshError) throw refreshError;
@@ -61,7 +59,7 @@ export default function WelcomePage() {
             console.error('Error fetching roles:', roleError);
           }
 
-          let redirectPath = '/page-description'; // Default path
+          let redirectPath = '/';
 
           if (roleAssignments && roleAssignments.length > 0) {
             // Get role names
@@ -78,20 +76,20 @@ export default function WelcomePage() {
               redirectPath = '/hr/page-description';
             } else if (roleNames.includes('assessor')) {
               redirectPath = '/assessor/page-description';
+            } else {
+              redirectPath = '/page-description';
             }
           }
 
           // Store the redirect path for the button click
           window.redirectPath = redirectPath;
 
-          // Automatically redirect after 5 seconds
+          // Automatically redirect after 10 seconds
           const redirectTimer = setTimeout(() => {
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-              navigate(redirectPath, { replace: true });
-            } else {
-              window.location.href = `https://hrmoffice.vercel.app${redirectPath}`;
-            }
-          }, 5000);
+            console.log("Redirecting to dashboard:", redirectPath);
+            // Always use Vercel URL for consistency
+            window.location.href = `https://hrmoffice.vercel.app${redirectPath}`;
+          }, 10000);
 
           return () => clearTimeout(redirectTimer);
         } else {
@@ -219,13 +217,18 @@ export default function WelcomePage() {
 
             <div className="mt-8">
               <button
-                onClick={() => navigate(window.redirectPath || '/page-description')}
+                onClick={() => {
+                  const redirectPath = window.redirectPath || '/';
+                  console.log("Button clicked, redirecting to:", redirectPath);
+                  // Always use Vercel URL for consistency
+                  window.location.href = `https://hrmoffice.vercel.app${redirectPath}`;
+                }}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800"
               >
-                Continue to HR Management System
+                Continue to Dashboard
               </button>
               <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
-                You will be automatically redirected in a few seconds...
+                You will be automatically redirected in 10 seconds...
               </p>
             </div>
           </div>

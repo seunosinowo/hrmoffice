@@ -13,29 +13,51 @@ export default function EmailConfirmation() {
     // Get the hash part of the URL
     const hash = window.location.hash.substring(1);
     const params = new URLSearchParams(hash);
-    
+
     const token_hash = params.get("token_hash") || searchParams.get("token_hash");
     const type = params.get("type") || searchParams.get("type");
     const error = params.get("error") || searchParams.get("error");
     const error_description = params.get("error_description") || searchParams.get("error_description");
-    
+
     console.log("Verification params:", { token_hash, type, error, error_description });
-    
+
     if (error) {
       setError(error_description || "Verification failed. The link may have expired.");
       return;
     }
-    
+
     if (token_hash && type === "email") {
       setVerifying(true);
       verifyEmail(token_hash);
+    } else {
+      // Check if we already have a session (user might have clicked the link in email)
+      const checkSession = async () => {
+        try {
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+          if (sessionError) {
+            console.error("Session error:", sessionError);
+            return;
+          }
+
+          if (session) {
+            console.log("Session already exists, redirecting to welcome page");
+            // Always use Vercel URL for consistency
+            window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
+          }
+        } catch (error) {
+          console.error("Error checking session:", error);
+        }
+      };
+
+      checkSession();
     }
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
   const verifyEmail = async (token_hash: string) => {
     try {
       console.log("Verifying email with token:", token_hash);
-      
+
       // First, verify the email
       const { error: verifyError } = await supabase.auth.verifyOtp({
         token_hash,
@@ -49,7 +71,7 @@ export default function EmailConfirmation() {
 
       // Get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError) {
         console.error("Session error:", sessionError);
         throw sessionError;
@@ -57,18 +79,13 @@ export default function EmailConfirmation() {
 
       if (session) {
         console.log("Session found, redirecting to welcome page");
-        // For local development, use navigate
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          navigate("/auth/welcome", { replace: true });
-        } else {
-          // For production, redirect to Vercel
-          window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
-        }
+        // Always use Vercel URL for consistency
+        window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
       } else {
         console.log("No session found, trying to refresh");
         // If no session, try to refresh it
         const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-        
+
         if (refreshError) {
           console.error("Refresh error:", refreshError);
           throw refreshError;
@@ -76,13 +93,8 @@ export default function EmailConfirmation() {
 
         if (newSession) {
           console.log("New session created, redirecting to welcome page");
-          // For local development, use navigate
-          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            navigate("/auth/welcome", { replace: true });
-          } else {
-            // For production, redirect to Vercel
-            window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
-          }
+          // Always use Vercel URL for consistency
+          window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
         } else {
           throw new Error("No session found after verification");
         }
@@ -173,4 +185,4 @@ export default function EmailConfirmation() {
       </div>
     </div>
   );
-} 
+}
