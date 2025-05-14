@@ -60,15 +60,15 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
         const formattedRole = newRole === 'hr' ? 'HR' : newRole.charAt(0).toUpperCase() + newRole.slice(1);
         setSuccessMessage(`User role successfully upgraded to ${formattedRole}`);
 
-        
+
         const updatedUsers = users.map(user => {
           if (user.id === userId) {
             return {
               ...user,
-              roles: [newRole] 
+              roles: [newRole]
             };
           }
-          return user; 
+          return user;
         });
 
         // Update the parent component's state
@@ -90,88 +90,106 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
 
   const upgradeUserRole = async (userId: string, newRole: string): Promise<{success: boolean, error?: string}> => {
     try {
-      // First, get all current role assignments for this user
-      const { data: currentRoles, error: rolesError } = await supabase
-        .from('user_role_assignments')
-        .select(`
-          id,
-          roles:role_id (
-            id,
-            role_name
-          )
-        `)
-        .eq('user_id', userId);
+      // Use our new RPC function to update the user's role
+      // This avoids the ambiguous column reference issue
+      const { data: result, error: rpcError } = await supabase.rpc('update_user_role', {
+        p_user_id: userId,
+        p_role_name: newRole
+      });
 
-      if (rolesError) {
-        return { success: false, error: `Error fetching current roles: ${rolesError.message}` };
-      }
+      if (rpcError) {
+        console.error('Error calling update_user_role RPC:', rpcError);
 
-      // Get the role ID for the new role
-      let roleId: string | null = null;
+        // Fall back to the old method if the RPC fails
+        try {
+          // First, get all current role assignments for this user
+          const { data: currentRoles, error: rolesError } = await supabase
+            .from('user_role_assignments')
+            .select(`
+              id,
+              roles:role_id (
+                id,
+                role_name
+              )
+            `)
+            .eq('user_id', userId);
 
-      const { data: roleData, error: roleError } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('role_name', newRole)
-        .single();
+          if (rolesError) {
+            return { success: false, error: `Error fetching current roles: ${rolesError.message}` };
+          }
 
-      if (roleError) {
-        console.error('Role error:', roleError);
-        // If the role doesn't exist, create it
-        if (roleError.code === 'PGRST116') {
-          const { data: newRoleData, error: createRoleError } = await supabase
+          // Get the role ID for the new role
+          let roleId: string | null = null;
+
+          const { data: roleData, error: roleError } = await supabase
             .from('roles')
-            .insert([
-              { role_name: newRole }
-            ])
             .select('id')
+            .eq('role_name', newRole)
             .single();
 
-          if (createRoleError) {
-            return { success: false, error: `Failed to create role '${newRole}': ${createRoleError.message}` };
+          if (roleError) {
+            console.error('Role error:', roleError);
+            // If the role doesn't exist, create it
+            if (roleError.code === 'PGRST116') {
+              const { data: newRoleData, error: createRoleError } = await supabase
+                .from('roles')
+                .insert([
+                  { role_name: newRole }
+                ])
+                .select('id')
+                .single();
+
+              if (createRoleError) {
+                return { success: false, error: `Failed to create role '${newRole}': ${createRoleError.message}` };
+              }
+
+              // Use the newly created role
+              if (newRoleData) {
+                roleId = newRoleData.id;
+              } else {
+                return { success: false, error: `Failed to create role '${newRole}'` };
+              }
+            } else {
+              return { success: false, error: `Role '${newRole}' not found in the system: ${roleError.message}` };
+            }
+          } else if (roleData) {
+            roleId = roleData.id;
           }
 
-          // Use the newly created role
-          if (newRoleData) {
-            roleId = newRoleData.id;
-          } else {
-            return { success: false, error: `Failed to create role '${newRole}'` };
+          if (!roleId) {
+            return { success: false, error: `Could not determine role ID for '${newRole}'` };
           }
-        } else {
-          return { success: false, error: `Role '${newRole}' not found in the system: ${roleError.message}` };
+
+          // Delete existing roles one by one with explicit table aliases
+          for (const role of currentRoles) {
+            const { error: deleteError } = await supabase
+              .from('user_role_assignments')
+              .delete()
+              .eq('id', role.id);
+
+            if (deleteError) {
+              return { success: false, error: `Error removing existing role: ${deleteError.message}` };
+            }
+          }
+
+          // Add the new role with explicit column names
+          const { error: insertError } = await supabase
+            .from('user_role_assignments')
+            .insert([
+              {
+                user_id: userId,
+                role_id: roleId
+              }
+            ]);
+
+          if (insertError) {
+            return { success: false, error: `Error assigning new role: ${insertError.message}` };
+          }
+        } catch (fallbackError: any) {
+          return { success: false, error: `Error in fallback method: ${fallbackError.message}` };
         }
-      } else if (roleData) {
-        roleId = roleData.id;
-      }
-
-      if (!roleId) {
-        return { success: false, error: `Could not determine role ID for '${newRole}'` };
-      }
-
-      
-      for (const role of currentRoles) {
-        const { error: deleteError } = await supabase
-          .from('user_role_assignments')
-          .delete()
-          .eq('id', role.id);
-
-        if (deleteError) {
-          return { success: false, error: `Error removing existing role: ${deleteError.message}` };
-        }
-      }
-
-      // Add the new role
-      const { error: insertError } = await supabase
-        .from('user_role_assignments')
-        .insert([
-          {
-            user_id: userId,
-            role_id: roleId
-          }
-        ]);
-
-      if (insertError) {
-        return { success: false, error: `Error assigning new role: ${insertError.message}` };
+      } else if (!result) {
+        return { success: false, error: 'Role update function returned no result' };
       }
 
       // Get user email
@@ -196,7 +214,7 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
           if (rpcError) {
             console.error('Error calling update_user_role_status RPC:', rpcError);
 
-            
+
             try {
               const { error: statusError } = await supabase
                 .from('user_email_status')
@@ -227,11 +245,26 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
         }
       }
 
-      
+
       const fetchPromises = [];
       fetchPromises.push(fetchUsers());
 
-      if (newRole === 'assessor' || currentRoles.some(r => (r.roles as any).role_name === 'assessor')) {
+      // Check if the user is being upgraded to assessor or was previously an assessor
+      // Get the current user to check their roles
+      const { data: currentUserData } = await supabase
+        .from('user_role_assignments')
+        .select(`
+          roles:role_id (
+            role_name
+          )
+        `)
+        .eq('user_id', userId);
+
+      const wasAssessor = currentUserData && currentUserData.some((r: any) =>
+        r.roles && r.roles.role_name === 'assessor'
+      );
+
+      if (newRole === 'assessor' || wasAssessor) {
         fetchPromises.push(fetchAssessors());
       }
 
