@@ -75,10 +75,22 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({ allowedRoles }) 
   }
 
   // Access roles directly from the user object, fallback to cached roles if available
-  let roles = user.roles && user.roles.length > 0 ? user.roles :
+  let userRoles = user.roles && user.roles.length > 0 ? user.roles :
               cachedRoles.length > 0 ? cachedRoles : ['employee'];
 
-  console.log('RoleBasedRoute - Using roles:', roles);
+  // Ensure user has only one role based on hierarchy (HR > Assessor > Employee)
+  let primaryRole = 'employee';
+  if (userRoles.includes('hr')) {
+    primaryRole = 'hr';
+  } else if (userRoles.includes('assessor')) {
+    primaryRole = 'assessor';
+  }
+
+  // Use only the primary role
+  let roles = [primaryRole];
+
+  console.log('RoleBasedRoute - All roles:', userRoles);
+  console.log('RoleBasedRoute - Using primary role:', primaryRole);
 
   // Define role hierarchy - higher roles can access routes requiring lower roles
   const roleHierarchy: { [key: string]: string[] } = {

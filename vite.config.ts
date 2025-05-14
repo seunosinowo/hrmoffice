@@ -14,7 +14,11 @@ export default defineConfig({
       },
     }),
   ],
+  css: {
+    devSourcemap: true,
+  },
   build: {
+    cssMinify: 'lightningcss',
     rollupOptions: {
       output: {
         manualChunks: (id) => {
@@ -22,7 +26,7 @@ export default defineConfig({
           if (id.includes('/icons/') || id.endsWith('Icon.js') || id.endsWith('Icon.jsx') || id.endsWith('Icon.tsx')) {
             return 'icons';
           }
-          
+
           // Group by feature instead of by role
           if (id.includes('Competency_framework')) {
             return 'competency-framework';
@@ -36,7 +40,7 @@ export default defineConfig({
           if (id.includes('Analytics')) {
             return 'analytics';
           }
-          
+
           // Group common dependencies
           if (id.includes('node_modules')) {
             if (id.includes('react') || id.includes('react-dom')) {
@@ -47,6 +51,9 @@ export default defineConfig({
             }
             if (id.includes('chart') || id.includes('apex')) {
               return 'vendor-charts';
+            }
+            if (id.includes('tailwind') || id.includes('css') || id.includes('style')) {
+              return 'vendor-styles';
             }
             return 'vendor';
           }

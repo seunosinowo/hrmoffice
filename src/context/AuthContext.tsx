@@ -94,11 +94,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('Direct roles query found roles:', directRoleNames);
 
           if (directRoleNames.length > 0) {
-            // If we found roles directly, return them immediately
-            if (!directRoleNames.includes('employee')) {
-              directRoleNames.push('employee');
+            // Ensure user has only one role based on hierarchy (HR > Assessor > Employee)
+            let primaryRole = 'employee';
+            if (directRoleNames.includes('hr')) {
+              primaryRole = 'hr';
+            } else if (directRoleNames.includes('assessor')) {
+              primaryRole = 'assessor';
+            } else if (directRoleNames.length > 0) {
+              primaryRole = directRoleNames[0];
             }
-            return directRoleNames;
+
+            console.log('Primary role from direct query:', primaryRole);
+            return [primaryRole];
           }
         }
       }
@@ -106,10 +113,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If both fail, try a user_roles view if it exists
       if (error || !data || data.length === 0) {
         console.log('Second query failed or returned no data, trying user_roles view');
-        const { data: viewData, error: viewError } = await supabase
-          .from('user_roles')
-          .select('role_name')
-          .eq('user_id', userId);
+        // Try both user_roles and user_role_view
+        let viewData = null;
+        let viewError = null;
+
+        // First try user_roles
+        try {
+          const result = await supabase
+            .from('user_roles')
+            .select('role_name')
+            .eq('user_id', userId);
+
+          viewData = result.data;
+          viewError = result.error;
+
+          if (viewError) {
+            console.log('Error querying user_roles, trying user_role_view instead');
+
+            // If that fails, try user_role_view
+            const viewResult = await supabase
+              .from('user_role_view')
+              .select('role_name')
+              .eq('user_id', userId);
+
+            viewData = viewResult.data;
+            viewError = viewResult.error;
+          }
+        } catch (e) {
+          console.error('Error querying roles views:', e);
+
+          // Try user_role_view as a fallback
+          try {
+            const viewResult = await supabase
+              .from('user_role_view')
+              .select('role_name')
+              .eq('user_id', userId);
+
+            viewData = viewResult.data;
+            viewError = viewResult.error;
+          } catch (viewError) {
+            console.error('Error querying user_role_view:', viewError);
+          }
+        }
 
         if (!viewError && viewData && viewData.length > 0) {
           // Extract role names directly
@@ -117,11 +162,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('User roles view found roles:', viewRoleNames);
 
           if (viewRoleNames.length > 0) {
-            // If we found roles from the view, return them immediately
-            if (!viewRoleNames.includes('employee')) {
-              viewRoleNames.push('employee');
+            // Ensure user has only one role based on hierarchy (HR > Assessor > Employee)
+            let primaryRole = 'employee';
+            if (viewRoleNames.includes('hr')) {
+              primaryRole = 'hr';
+            } else if (viewRoleNames.includes('assessor')) {
+              primaryRole = 'assessor';
+            } else if (viewRoleNames.length > 0) {
+              primaryRole = viewRoleNames[0];
             }
-            return viewRoleNames;
+
+            console.log('Primary role from view:', primaryRole);
+            return [primaryRole];
           }
         }
       }
@@ -137,11 +189,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Try to get roles from a different table first
         try {
-          // Try to get roles from the user_roles table directly
-          const { data: directRoles, error: directError } = await supabase
-            .from('user_roles')
-            .select('role_name')
-            .eq('user_id', userId);
+          // Try to get roles from the user_roles table or view
+          let directRoles = null;
+          let directError = null;
+
+          // First try user_roles
+          try {
+            const result = await supabase
+              .from('user_roles')
+              .select('role_name')
+              .eq('user_id', userId);
+
+            directRoles = result.data;
+            directError = result.error;
+
+            if (directError) {
+              console.log('Error querying user_roles, trying user_role_view instead');
+
+              // If that fails, try user_role_view
+              const viewResult = await supabase
+                .from('user_role_view')
+                .select('role_name')
+                .eq('user_id', userId);
+
+              directRoles = viewResult.data;
+              directError = viewResult.error;
+            }
+          } catch (e) {
+            console.error('Error querying roles views:', e);
+
+            // Try user_role_view as a fallback
+            try {
+              const viewResult = await supabase
+                .from('user_role_view')
+                .select('role_name')
+                .eq('user_id', userId);
+
+              directRoles = viewResult.data;
+              directError = viewResult.error;
+            } catch (viewError) {
+              console.error('Error querying user_role_view:', viewError);
+            }
+          }
 
           if (!directError && directRoles && directRoles.length > 0) {
             // Extract role names
@@ -149,11 +238,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('Found roles in user_roles table:', roleNames);
 
             if (roleNames.length > 0) {
-              // Ensure employee role is included
-              if (!roleNames.includes('employee')) {
-                roleNames.push('employee');
+              // Ensure user has only one role based on hierarchy (HR > Assessor > Employee)
+              let primaryRole = 'employee';
+              if (roleNames.includes('hr')) {
+                primaryRole = 'hr';
+              } else if (roleNames.includes('assessor')) {
+                primaryRole = 'assessor';
+              } else if (roleNames.length > 0) {
+                primaryRole = roleNames[0];
               }
-              return roleNames;
+
+              console.log('Primary role from user_roles table:', primaryRole);
+              return [primaryRole];
             }
           }
         } catch (e) {
@@ -172,11 +268,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const roleNames = rolesData.map(item => item.role_name || item.name).filter(Boolean);
 
             if (roleNames.length > 0) {
-              // Ensure employee role is included
-              if (!roleNames.includes('employee')) {
-                roleNames.push('employee');
+              // Ensure user has only one role based on hierarchy (HR > Assessor > Employee)
+              let primaryRole = 'employee';
+              if (roleNames.includes('hr')) {
+                primaryRole = 'hr';
+              } else if (roleNames.includes('assessor')) {
+                primaryRole = 'assessor';
+              } else if (roleNames.length > 0) {
+                primaryRole = roleNames[0];
               }
-              return roleNames;
+
+              console.log('Primary role from roles table:', primaryRole);
+              return [primaryRole];
             }
           }
         } catch (e) {
@@ -220,15 +323,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // Always ensure 'employee' is included if the user has any role
-        if (roleNames.length > 0 && !roleNames.includes('employee')) {
-          roleNames.push('employee');
+        console.log('Extracted roles before processing:', roleNames);
+
+        // Ensure user has only one role based on hierarchy (HR > Assessor > Employee)
+        let primaryRole = 'employee';
+        if (roleNames.includes('hr')) {
+          primaryRole = 'hr';
+        } else if (roleNames.includes('assessor')) {
+          primaryRole = 'assessor';
+        } else if (roleNames.length > 0) {
+          primaryRole = roleNames[0];
         }
 
-        console.log('Final extracted roles:', roleNames);
+        console.log('Final primary role:', primaryRole);
 
-        // If we have valid roles, return them, otherwise return the default role
-        return roleNames.length > 0 ? roleNames : ['employee'];
+        // Return only the primary role in an array
+        return [primaryRole];
       } catch (error) {
         console.error('Error processing roles:', error);
         return ['employee']; // Return default role on any error
