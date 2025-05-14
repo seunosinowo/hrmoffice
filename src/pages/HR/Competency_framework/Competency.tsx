@@ -30,6 +30,8 @@ function Competency() {
     const [isAdding, setIsAdding] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [hasAddedItem, setHasAddedItem] = useState(false);
+    const [hasUpdatedItem, setHasUpdatedItem] = useState(false);
 
     // Add click outside handler
     useEffect(() => {
@@ -59,12 +61,25 @@ function Competency() {
                 .from('competencies')
                 .select(`
                     *,
-                    domain:competencydomains(*)
+                    domain:competencydomains(id, name)
                 `)
-                .order('name');
+                .order('created_at');
 
             if (error) throw error;
-            setData(data);
+
+            // Process the data to ensure domain information is properly structured
+            const processedData = data.map(item => {
+                // If domain is an array with data, extract the first item
+                if (item.domain && Array.isArray(item.domain) && item.domain.length > 0) {
+                    return {
+                        ...item,
+                        domain: item.domain[0]
+                    };
+                }
+                return item;
+            });
+
+            setData(processedData);
         } catch (error) {
             console.error('Error fetching competencies:', error);
         } finally {
@@ -93,14 +108,24 @@ function Competency() {
             domain_id: item.domain?.name || item.domain_id.toString(),
             definition: item.definition
         });
+        // Reset the flags when opening the modal for editing
+        setHasAddedItem(false);
+        setHasUpdatedItem(false);
         setShowAddModal(true);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Check if user has already added or updated an item in this modal session
+        if ((selectedItem && hasUpdatedItem) || (!selectedItem && hasAddedItem)) {
+            alert("You have already " + (selectedItem ? "updated" : "added") + " this item. Please close this dialog and try again.");
+            return;
+        }
+
         try {
             let domainId = parseInt(formData.domain_id);
-            
+
             // If domain_id is not a number (new domain name entered)
             if (isNaN(domainId)) {
                 // Check if domain exists
@@ -137,6 +162,32 @@ function Competency() {
                     .eq('id', selectedItem.id);
 
                 if (error) throw error;
+
+                // Get the domain name for immediate display
+                const { data: domainData } = await supabase
+                    .from('competencydomains')
+                    .select('name')
+                    .eq('id', domainId)
+                    .single();
+
+                // Update the item in the current state without a full refresh
+                const updatedData = data.map(item => {
+                    if (item.id === selectedItem.id) {
+                        return {
+                            ...item,
+                            name: formData.name,
+                            domain_id: domainId,
+                            domain: { id: domainId, name: domainData?.name || formData.domain_id },
+                            definition: formData.definition
+                        };
+                    }
+                    return item;
+                });
+
+                setData(updatedData);
+
+                // Mark as updated
+                setHasUpdatedItem(true);
             } else {
                 setIsAdding(true);
                 const { data: newItem, error } = await supabase
@@ -150,9 +201,24 @@ function Competency() {
                     .single();
 
                 if (error) throw error;
-                
-                // Add new item at the end of the array
-                setData([...data, newItem]);
+
+                // Get the domain name for immediate display
+                const { data: domainData } = await supabase
+                    .from('competencydomains')
+                    .select('name')
+                    .eq('id', domainId)
+                    .single();
+
+                // Add new item with domain information to the end of the array
+                const enhancedNewItem = {
+                    ...newItem,
+                    domain: { id: domainId, name: domainData?.name || formData.domain_id }
+                };
+
+                setData([...data, enhancedNewItem]);
+
+                // Mark as added
+                setHasAddedItem(true);
             }
 
             await fetchDomains();
@@ -200,11 +266,14 @@ function Competency() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Competency Layout</h1>
             <p className="mt-1 text-gray-600 dark:text-gray-400">Manage organizational competencies</p>
           </div>
-          <button 
+          <button
             onClick={() => {
               setSelectedItem(null);
               setFormData({ name: "", domain_id: "", definition: "" });
               setShowAddModal(true);
+              // Reset the flags when opening the modal for a new item
+              setHasAddedItem(false);
+              setHasUpdatedItem(false);
             }}
             disabled={isAdding || isUpdating || isDeleting}
             className="flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600"
@@ -244,7 +313,9 @@ function Competency() {
                     {item.name}
                   </td>
                   <td className="whitespace-nowrap px-8 py-4 text-sm text-gray-900 dark:text-gray-100">
-                    {item.domain?.name || 'N/A'}
+                    {item.domain?.name || (
+                      <span className="text-gray-500 italic">Loading domain...</span>
+                    )}
                   </td>
                   <td className="px-8 py-4 text-sm text-gray-900 dark:text-gray-100">
                     {item.definition}
@@ -259,7 +330,7 @@ function Competency() {
                         <span className="text-sm">Actions</span>
                         <ChevronDownIcon className="h-4 w-4" />
                       </button>
-                      
+
                       {activeDropdown === item.id && (
                         <div className={`actions-dropdown absolute right-0 z-[9999] w-36 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 dark:bg-gray-800 ${
                           item.id === data[data.length - 1].id ? 'bottom-full mb-1' : 'top-full mt-1'
@@ -418,5 +489,5 @@ function Competency() {
       </div>
     );
   }
-  
+
 export default Competency;
