@@ -8,14 +8,15 @@ interface Competency {
   domain_id: number;
   domain?: {
     id: number;
-    name: string;
+    domain_name: string;
   };
   definition: string;
 }
 
 interface Domain {
   id: number;
-  name: string;
+  domain_name: string;
+  name?: string; // For backward compatibility
 }
 
 function Competency() {
@@ -57,10 +58,10 @@ function Competency() {
         try {
             setLoading(true);
             const { data, error } = await supabase
-                .from('competencies')
+                .from('competency_new')
                 .select(`
                     *,
-                    domain:competencydomains(id, name)
+                    domain:competency_domains(id, domain_name)
                 `)
                 .order('created_at');
 
@@ -89,12 +90,20 @@ function Competency() {
     const fetchDomains = async () => {
         try {
             const { data, error } = await supabase
-                .from('competencydomains')
+                .from('competency_domains')
                 .select('*')
-                .order('name');
+                .order('domain_name');
 
             if (error) throw error;
-            setDomains(data);
+
+            // Map the data to match the expected format
+            const formattedData = data.map(domain => ({
+                id: domain.id,
+                domain_name: domain.domain_name,
+                name: domain.domain_name // For backward compatibility
+            }));
+
+            setDomains(formattedData);
         } catch (error) {
             console.error('Error fetching domains:', error);
         }
@@ -104,7 +113,7 @@ function Competency() {
         setSelectedItem(item);
         setFormData({
             name: item.name,
-            domain_id: item.domain?.name || item.domain_id.toString(),
+            domain_id: item.domain?.domain_name || item.domain_id.toString(),
             definition: item.definition
         });
         // Reset the flags when opening the modal for editing
@@ -129,9 +138,9 @@ function Competency() {
             if (isNaN(domainId)) {
                 // Check if domain exists
                 const { data: existingDomain } = await supabase
-                    .from('competencydomains')
+                    .from('competency_domains')
                     .select('id')
-                    .eq('name', formData.domain_id)
+                    .eq('domain_name', formData.domain_id)
                     .single();
 
                 if (existingDomain) {
@@ -139,8 +148,8 @@ function Competency() {
                 } else {
                     // Create new domain
                     const { data: newDomain, error: domainError } = await supabase
-                        .from('competencydomains')
-                        .insert([{ name: formData.domain_id }])
+                        .from('competency_domains')
+                        .insert([{ domain_name: formData.domain_id }])
                         .select()
                         .single();
 
@@ -152,7 +161,7 @@ function Competency() {
             if (selectedItem) {
                 setIsUpdating(true);
                 const { error } = await supabase
-                    .from('competencies')
+                    .from('competency_new')
                     .update({
                         name: formData.name,
                         domain_id: domainId,
@@ -164,8 +173,8 @@ function Competency() {
 
                 // Get the domain name for immediate display
                 const { data: domainData } = await supabase
-                    .from('competencydomains')
-                    .select('name')
+                    .from('competency_domains')
+                    .select('domain_name')
                     .eq('id', domainId)
                     .single();
 
@@ -176,7 +185,7 @@ function Competency() {
                             ...item,
                             name: formData.name,
                             domain_id: domainId,
-                            domain: { id: domainId, name: domainData?.name || formData.domain_id },
+                            domain: { id: domainId, domain_name: domainData?.domain_name || formData.domain_id },
                             definition: formData.definition
                         };
                     }
@@ -190,7 +199,7 @@ function Competency() {
             } else {
                 setIsAdding(true);
                 const { data: newItem, error } = await supabase
-                    .from('competencies')
+                    .from('competency_new')
                     .insert([{
                         name: formData.name,
                         domain_id: domainId,
@@ -203,15 +212,15 @@ function Competency() {
 
                 // Get the domain name for immediate display
                 const { data: domainData } = await supabase
-                    .from('competencydomains')
-                    .select('name')
+                    .from('competency_domains')
+                    .select('domain_name')
                     .eq('id', domainId)
                     .single();
 
                 // Add new item with domain information to the end of the array
                 const enhancedNewItem = {
                     ...newItem,
-                    domain: { id: domainId, name: domainData?.name || formData.domain_id }
+                    domain: { id: domainId, domain_name: domainData?.domain_name || formData.domain_id }
                 };
 
                 setData([...data, enhancedNewItem]);
@@ -242,7 +251,7 @@ function Competency() {
         try {
             setIsDeleting(true);
             const { error } = await supabase
-                .from('competencies')
+                .from('competency_new')
                 .delete()
                 .eq('id', selectedItem.id);
 
@@ -312,7 +321,7 @@ function Competency() {
                     {item.name}
                   </td>
                   <td className="whitespace-nowrap px-8 py-4 text-sm text-gray-900 dark:text-gray-100">
-                    {item.domain?.name || (
+                    {item.domain?.domain_name || (
                       <span className="text-gray-500 italic">Loading domain...</span>
                     )}
                   </td>
@@ -402,14 +411,14 @@ function Competency() {
                       name="domain_id"
                       value={formData.domain_id}
                       onChange={handleFormChange}
-                      list="domains-list"
                       className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm shadow-sm placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-400"
-                      placeholder="Enter or select domain"
+                      placeholder="Enter domain name"
+                      list="domains-list"
                       required
                     />
                     <datalist id="domains-list">
                       {domains.map(domain => (
-                        <option key={domain.id} value={domain.name} />
+                        <option key={domain.id} value={domain.domain_name} />
                       ))}
                     </datalist>
                   </div>
