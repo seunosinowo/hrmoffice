@@ -23,7 +23,7 @@ const WelcomePage = lazy(() => import("./pages/auth/WelcomePage"));
 const BucketDiagnostic = lazy(() => import("./pages/BucketDiagnostic"));
 
 // Employee Components
-const User = lazy(() => import("./pages/Employee/User_and_role_management/User"));
+// const User = lazy(() => import("./pages/Employee/User_and_role_management/User"));
 const EmployeeDetails = lazy(() => import("./pages/Employee/User_and_role_management/EmployeeDetails"));
 const EmployeeJobAssignment = lazy(() => import("./pages/Employee/User_and_role_management/EmployeeJobAssignment"));
 const EmployeeAssessorAssign = lazy(() => import("./pages/Employee/User_and_role_management/EmployeeAssessorAssign"));
@@ -57,7 +57,7 @@ const AssessorPageDescription = lazy(() => import("./pages/Assessor/PageDescript
 const AssessorEmployeeAssessorAssign = lazy(() => import("./pages/Assessor/User_and_role_management/EmployeeAssessorAssign"));
 const AssessorEmployeeDetails = lazy(() => import("./pages/Assessor/User_and_role_management/EmployeeDetails"));
 const AssessorEmployeeJobAssignment = lazy(() => import("./pages/Assessor/User_and_role_management/EmployeeJobAssignment"));
-const AssessorUser = lazy(() => import("./pages/Assessor/User_and_role_management/User"));
+// const AssessorUser = lazy(() => import("./pages/Assessor/User_and_role_management/User"));
 
 // HR Components
 const HRPageDescription = lazy(() => import("./pages/HR/PageDescription/PageDescription"));
@@ -78,7 +78,7 @@ const HRJobCompetencyProfile = lazy(() => import("./pages/HR/Job_profiling/JobCo
 const HREmployeeAssessorAssign = lazy(() => import("./pages/HR/User_and_role_management/EmployeeAssessorAssign"));
 const HREmployeeDetails = lazy(() => import("./pages/HR/User_and_role_management/EmployeeDetails"));
 const HREmployeeJobAssignment = lazy(() => import("./pages/HR/User_and_role_management/EmployeeJobAssignment"));
-const HRUser = lazy(() => import("./pages/HR/User_and_role_management/User"));
+// const HRUser = lazy(() => import("./pages/HR/User_and_role_management/User"));
 
 // Loading component
 const LoadingFallback = () => (
@@ -133,7 +133,7 @@ export default function App() {
               <Route element={<RoleBasedRoute allowedRoles={['employee']} />}>
                 <Route path="/page-description" element={<PageDescription />} />
                 <Route path="/dashboard" element={<Home />} />
-                <Route path="/user" element={<User />} />
+                {/* <Route path="/user" element={<User />} /> */}
                 <Route path="/employee-details" element={<EmployeeDetails />} />
                 <Route path="/employee-job-assignment" element={<EmployeeJobAssignment />} />
                 <Route path="/employee-assessor-assign" element={<EmployeeAssessorAssign />} />
@@ -154,7 +154,7 @@ export default function App() {
               {/* Assessor Routes */}
               <Route element={<RoleBasedRoute allowedRoles={['assessor']} />}>
                 <Route path="/assessor/page-description" element={<AssessorPageDescription />} />
-                <Route path="/assessor/user" element={<AssessorUser />} />
+                {/* <Route path="/assessor/user" element={<AssessorUser />} /> */}
                 <Route path="/assessor/employee-details" element={<AssessorEmployeeDetails />} />
                 <Route path="/assessor/employee-job-assignment" element={<AssessorEmployeeJobAssignment />} />
                 <Route path="/assessor/employee-assessor-assign" element={<AssessorEmployeeAssessorAssign />} />
@@ -191,7 +191,7 @@ export default function App() {
                 <Route path="/hr/employee-assessor-assign" element={<HREmployeeAssessorAssign />} />
                 <Route path="/hr/employee-details" element={<HREmployeeDetails />} />
                 <Route path="/hr/employee-job-assignment" element={<HREmployeeJobAssignment />} />
-                <Route path="/hr/user" element={<HRUser />} />
+                {/* <Route path="/hr/user" element={<HRUser />} /> */}
                 <Route path="/hr/analytics" element={<HRAnalytics />} />
               </Route>
             </Route>

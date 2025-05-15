@@ -45,7 +45,7 @@ const employeeNavItems: NavItem[] = [
     icon: <UserCircleIcon />,
     name: "User & Role Management",
     subItems: [
-      { name: "User", path: "/user" },
+      // { name: "User", path: "/user" },
       { name: "Employee Details", path: "/employee-details" },
       { name: "Employee Job Assignment", path: "/employee-job-assignment" },
       { name: "Employee Assessor Assign", path: "/employee-assessor-assign" },
@@ -98,7 +98,7 @@ const assessorNavItems: NavItem[] = [
     icon: <UserCircleIcon />,
     name: "User & Role Management",
     subItems: [
-      { name: "User", path: "/assessor/user" },
+      // { name: "User", path: "/assessor/user" },
       { name: "Employee Details", path: "/assessor/employee-details" },
       { name: "Employee Job Assignment", path: "/assessor/employee-job-assignment" },
       { name: "Employee Assessor Assign", path: "/assessor/employee-assessor-assign" },
@@ -152,7 +152,7 @@ const hrNavItems: NavItem[] = [
     icon: <UserCircleIcon />,
     name: "User & Role Management",
     subItems: [
-      { name: "User", path: "/hr/user" },
+      // { name: "User", path: "/hr/user" },
       { name: "Employee Details", path: "/hr/employee-details" },
       { name: "Employee Job Assignment", path: "/hr/employee-job-assignment" },
       { name: "Employee Assessor Assign", path: "/hr/employee-assessor-assign" },
