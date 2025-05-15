@@ -198,6 +198,10 @@ layer(base);
   @apply bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400;
 }
 
+@utility menu-item-expanded {
+  @apply bg-gray-100 text-gray-700 dark:bg-white/5 dark:text-gray-300;
+}
+
 @utility menu-item-inactive {
   @apply text-gray-700 hover:bg-gray-100 group-hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-300;
 }
@@ -208,6 +212,10 @@ layer(base);
 
 @utility menu-item-icon-active {
   @apply text-brand-500 dark:text-brand-400;
+}
+
+@utility menu-item-icon-expanded {
+  @apply text-gray-700 dark:text-gray-300;
 }
 
 @utility menu-item-icon-size {
@@ -226,6 +234,10 @@ layer(base);
 
 @utility menu-item-arrow-active {
   @apply rotate-180 text-brand-500 dark:text-brand-400;
+}
+
+@utility menu-item-arrow-expanded {
+  @apply rotate-180 text-gray-700 dark:text-gray-300;
 }
 
 @utility menu-item-arrow-inactive {
