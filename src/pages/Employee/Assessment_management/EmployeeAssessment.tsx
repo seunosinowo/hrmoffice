@@ -20,9 +20,9 @@ interface CompetencyRating {
 
 interface Assessment {
   id?: string;
-  employeeId: string;
+  employeeId: string | null;
   employeeName: string;
-  departmentId: string;
+  departmentId: string | null;
   departmentName: string;
   startDate: string;
   lastUpdated: string;
@@ -72,9 +72,9 @@ export default function EmployeeAssessment() {
   const startNewAssessment = () => {
     // Create a new assessment without department selection
     const newAssessment: Assessment = {
-      employeeId: user?.id || '',
+      employeeId: user?.id || null,
       employeeName: user?.email?.split('@')[0] || 'Current User',
-      departmentId: '',
+      departmentId: null,
       departmentName: '',
       startDate: new Date().toISOString().split('T')[0],
       lastUpdated: new Date().toISOString().split('T')[0],
@@ -241,6 +241,17 @@ export default function EmployeeAssessment() {
 
       const now = new Date().toISOString();
 
+      // Make sure we have valid competency ratings
+      const validCompetencyRatings = finalAssessment.competencyRatings
+        .filter(rating => rating.rating > 0)
+        .map(rating => ({
+          id: rating.id || crypto.randomUUID(),
+          competency_id: rating.competencyId,
+          rating: rating.rating,
+          comments: rating.comments || '',
+          created_at: now
+        }));
+
       // If assessment already exists in Supabase, update it
       if (assessment.id) {
         // Update the assessment with all data in a single record
@@ -250,13 +261,7 @@ export default function EmployeeAssessment() {
             status: 'completed',
             last_updated: now,
             progress: finalAssessment.progress,
-            competency_ratings: finalAssessment.competencyRatings.map(rating => ({
-              id: rating.id || crypto.randomUUID(),
-              competency_id: rating.competencyId,
-              rating: rating.rating,
-              comments: rating.comments,
-              updated_at: now
-            }))
+            competency_ratings: validCompetencyRatings
           })
           .eq('id', assessment.id);
 
@@ -267,27 +272,33 @@ export default function EmployeeAssessment() {
         setShowSummaryModal(false);
         setShowSuccessModal(true);
       } else {
+        // Get user profile to ensure we have department info
+        const { data: profileData, error: profileError } = await supabase
+          .from('employees')
+          .select('*')
+          .eq('user_id', user?.id)
+          .single();
+
+        if (profileError && profileError.code !== 'PGRST116') {
+          // PGRST116 is "no rows returned" - this is fine if user doesn't have a profile yet
+          throw profileError;
+        }
+
         // Save new assessment to Supabase with all data in a single record
         const { data, error } = await supabase
           .from('employee_assessments')
           .insert({
-            employee_id: user?.id || '',
+            employee_id: user?.id || null,
             employee_name: user?.email?.split('@')[0] || 'Employee',
             employee_email: user?.email || '',
-            department_id: finalAssessment.departmentId,
-            department_name: finalAssessment.departmentName,
-            start_date: finalAssessment.startDate,
+            department_id: profileData?.department_id || null,
+            department_name: profileData?.department_name || '',
+            start_date: finalAssessment.startDate || now.split('T')[0],
             last_updated: now,
             status: 'completed',
             progress: finalAssessment.progress,
             created_at: now,
-            competency_ratings: finalAssessment.competencyRatings.map(rating => ({
-              id: crypto.randomUUID(),
-              competency_id: rating.competencyId,
-              rating: rating.rating,
-              comments: rating.comments,
-              created_at: now
-            }))
+            competency_ratings: validCompetencyRatings
           })
           .select()
           .single();
@@ -407,7 +418,7 @@ export default function EmployeeAssessment() {
               id: existingAssessment.id,
               employeeId: existingAssessment.employee_id,
               employeeName: existingAssessment.employee_name,
-              departmentId: existingAssessment.department_id || '',
+              departmentId: existingAssessment.department_id || null,
               departmentName: existingAssessment.department_name || '',
               startDate: existingAssessment.start_date,
               lastUpdated: existingAssessment.last_updated,
