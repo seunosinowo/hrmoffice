@@ -37,64 +37,64 @@ interface AssessorAssessment {
   };
 }
 
-const mockAssessments: AssessorAssessment[] = [
-  {
-    id: "1",
-    assessor: {
-      name: "Michael Chen",
-      role: "Engineering Manager",
-      department: "Engineering",
-      avatar: "https://ui-avatars.com/api/?name=Michael+Chen&background=0D8ABC&color=fff"
-    },
-    metrics: {
-      totalAssessments: 24,
-      averageRating: 4.5,
-      consistencyScore: 92,
-      feedbackScore: 4.8
-    },
-    status: "Active",
-    lastReview: "2024-02-15",
-    feedback: {
-      positive: [
-        "Consistent and fair evaluations",
-        "Detailed feedback provided",
-        "Strong technical assessment skills"
-      ],
-      areasForImprovement: [
-        "Could provide more specific examples",
-        "Consider more frequent check-ins"
-      ]
-    }
-  },
-  {
-    id: "2",
-    assessor: {
-      name: "Lisa Rodriguez",
-      role: "HR Director",
-      department: "Human Resources",
-      avatar: "https://ui-avatars.com/api/?name=Lisa+Rodriguez&background=0D8ABC&color=fff"
-    },
-    metrics: {
-      totalAssessments: 18,
-      averageRating: 4.2,
-      consistencyScore: 88,
-      feedbackScore: 4.5
-    },
-    status: "Active",
-    lastReview: "2024-01-20",
-    feedback: {
-      positive: [
-        "Excellent communication skills",
-        "Strong focus on employee development",
-        "Balanced approach to assessments"
-      ],
-      areasForImprovement: [
-        "Could improve technical assessment depth",
-        "Consider more structured feedback format"
-      ]
-    }
-  }
-];
+// const mockAssessments: AssessorAssessment[] = [
+//   {
+//     id: "1",
+//     assessor: {
+//       name: "Michael Chen",
+//       role: "Engineering Manager",
+//       department: "Engineering",
+//       avatar: "https://ui-avatars.com/api/?name=Michael+Chen&background=0D8ABC&color=fff"
+//     },
+//     metrics: {
+//       totalAssessments: 24,
+//       averageRating: 4.5,
+//       consistencyScore: 92,
+//       feedbackScore: 4.8
+//     },
+//     status: "Active",
+//     lastReview: "2024-02-15",
+//     feedback: {
+//       positive: [
+//         "Consistent and fair evaluations",
+//         "Detailed feedback provided",
+//         "Strong technical assessment skills"
+//       ],
+//       areasForImprovement: [
+//         "Could provide more specific examples",
+//         "Consider more frequent check-ins"
+//       ]
+//     }
+//   },
+//   {
+//     id: "2",
+//     assessor: {
+//       name: "Lisa Rodriguez",
+//       role: "HR Director",
+//       department: "Human Resources",
+//       avatar: "https://ui-avatars.com/api/?name=Lisa+Rodriguez&background=0D8ABC&color=fff"
+//     },
+//     metrics: {
+//       totalAssessments: 18,
+//       averageRating: 4.2,
+//       consistencyScore: 88,
+//       feedbackScore: 4.5
+//     },
+//     status: "Active",
+//     lastReview: "2024-01-20",
+//     feedback: {
+//       positive: [
+//         "Excellent communication skills",
+//         "Strong focus on employee development",
+//         "Balanced approach to assessments"
+//       ],
+//       areasForImprovement: [
+//         "Could improve technical assessment depth",
+//         "Consider more structured feedback format"
+//       ]
+//     }
+//   }
+// ];
 
 export default function AssessorAssessment() {
   const [assessments] = useState<AssessorAssessment[]>(mockAssessments);

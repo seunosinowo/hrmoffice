@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { 
+import { useState, useEffect } from 'react';
+import {
   UserIcon,
   ChartBarIcon,
   DocumentCheckIcon,
@@ -9,127 +9,205 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ArrowPathIcon,
-  PlusIcon,
-  ShieldCheckIcon,
-  ExclamationTriangleIcon,
-  DocumentTextIcon
+  PlusIcon
 } from "@heroicons/react/24/outline";
+import { useAuth } from "../../../context/AuthContext";
+import { supabase } from "../../../lib/supabase";
 
-interface AssessorAssessment {
+interface CompetencyRating {
   id: string;
-  assessor: {
-    name: string;
-    role: string;
-    department: string;
-    avatar: string;
-  };
-  metrics: {
-    totalAssessments: number;
-    averageRating: number;
-    consistencyScore: number;
-    feedbackScore: number;
-  };
-  status: 'Active' | 'In Review' | 'Suspended';
-  lastReview: string;
-  feedback: {
-    positive: string[];
-    areasForImprovement: string[];
-  };
+  competencyId: string;
+  rating: number;
+  comments: string;
+  assessor_comments?: string;
 }
 
-const mockAssessments: AssessorAssessment[] = [
-  {
-    id: "1",
-    assessor: {
-      name: "Michael Chen",
-      role: "Engineering Manager",
-      department: "Engineering",
-      avatar: "https://ui-avatars.com/api/?name=Michael+Chen&background=0D8ABC&color=fff"
-    },
-    metrics: {
-      totalAssessments: 24,
-      averageRating: 4.5,
-      consistencyScore: 92,
-      feedbackScore: 4.8
-    },
-    status: "Active",
-    lastReview: "2024-02-15",
-    feedback: {
-      positive: [
-        "Consistent and fair evaluations",
-        "Detailed feedback provided",
-        "Strong technical assessment skills"
-      ],
-      areasForImprovement: [
-        "Could provide more specific examples",
-        "Consider more frequent check-ins"
-      ]
-    }
-  },
-  {
-    id: "2",
-    assessor: {
-      name: "Lisa Rodriguez",
-      role: "HR Director",
-      department: "Human Resources",
-      avatar: "https://ui-avatars.com/api/?name=Lisa+Rodriguez&background=0D8ABC&color=fff"
-    },
-    metrics: {
-      totalAssessments: 18,
-      averageRating: 4.2,
-      consistencyScore: 88,
-      feedbackScore: 4.5
-    },
-    status: "Active",
-    lastReview: "2024-01-20",
-    feedback: {
-      positive: [
-        "Excellent communication skills",
-        "Strong focus on employee development",
-        "Balanced approach to assessments"
-      ],
-      areasForImprovement: [
-        "Could improve technical assessment depth",
-        "Consider more structured feedback format"
-      ]
-    }
-  }
-];
+interface EmployeeAssessment {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  employeeEmail?: string;
+  departmentId: string;
+  departmentName: string;
+  startDate: string;
+  lastUpdated: string;
+  status: string;
+  progress: number;
+  competencyRatings: CompetencyRating[];
+}
+
+// Helper functions
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  };
+  return date.toLocaleDateString('en-US', options);
+};
 
 export default function AssessorAssessment() {
-  const [assessments] = useState<AssessorAssessment[]>(mockAssessments);
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [employeeAssessments, setEmployeeAssessments] = useState<EmployeeAssessment[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedAssessment, setSelectedAssessment] = useState<AssessorAssessment | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showNewAssessmentModal, setShowNewAssessmentModal] = useState(false);
+  const [selectedAssessment, setSelectedAssessment] = useState<EmployeeAssessment | null>(null);
+  const [showAssessmentModal, setShowAssessmentModal] = useState(false);
+  const [assessorComments, setAssessorComments] = useState<Record<string, string>>({});
 
-  const filteredAssessments = assessments.filter(assessment =>
-    assessment.assessor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    assessment.assessor.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Load employee assessments from Supabase
+  useEffect(() => {
+    const loadEmployeeAssessments = async () => {
+      if (!user) return;
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Active':
-        return <ShieldCheckIcon className="h-5 w-5 text-green-500" />;
-      case 'In Review':
-        return <DocumentTextIcon className="h-5 w-5 text-yellow-500" />;
-      case 'Suspended':
-        return <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />;
-      default:
-        return null;
+      try {
+        setLoading(true);
+
+        // Get assessments for employees assigned to this assessor
+        const { data, error: assessmentsError } = await supabase
+          .from('employee_assessments')
+          .select('*')
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false });
+
+        if (assessmentsError) throw assessmentsError;
+
+        if (data && data.length > 0) {
+          // Process assessments
+          const processedAssessments = data.map(assessment => {
+            // Get competency ratings from the assessment data
+            const competencyRatings = assessment.competency_ratings || [];
+
+            // Map to EmployeeAssessment type
+            return {
+              id: assessment.id,
+              employeeId: assessment.employee_id,
+              employeeName: assessment.employee_name,
+              employeeEmail: assessment.employee_email,
+              departmentId: assessment.department_id || '',
+              departmentName: assessment.department_name || '',
+              startDate: assessment.start_date,
+              lastUpdated: assessment.last_updated,
+              status: assessment.status,
+              progress: assessment.progress,
+              competencyRatings: competencyRatings.map((rating: any) => ({
+                id: rating.id,
+                competencyId: rating.competency_id,
+                rating: rating.rating,
+                comments: rating.comments || '',
+                assessor_comments: rating.assessor_comments || ''
+              }))
+            };
+          });
+
+          setEmployeeAssessments(processedAssessments);
+        }
+
+      } catch (err) {
+        console.error('Error loading assessor data:', err);
+        setError('Failed to load data. Please refresh the page or contact support.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadEmployeeAssessments();
+  }, [user]);
+
+  // Function to view assessment details
+  const viewAssessment = (assessment: EmployeeAssessment) => {
+    setSelectedAssessment(assessment);
+
+    // Initialize assessor comments from existing data
+    const comments: Record<string, string> = {};
+    assessment.competencyRatings.forEach(rating => {
+      if (rating.assessor_comments) {
+        comments[rating.competencyId] = rating.assessor_comments;
+      }
+    });
+
+    setAssessorComments(comments);
+    setShowAssessmentModal(true);
+  };
+
+  // Function to save assessor comments
+  const saveAssessorComments = async () => {
+    if (!selectedAssessment) return;
+
+    try {
+      setLoading(true);
+
+      // Update competency ratings with assessor comments
+      const updatedRatings = selectedAssessment.competencyRatings.map(rating => ({
+        ...rating,
+        assessor_comments: assessorComments[rating.competencyId] || rating.assessor_comments
+      }));
+
+      // Update the assessment in Supabase
+      const { error: updateError } = await supabase
+        .from('employee_assessments')
+        .update({
+          status: 'reviewed',
+          last_updated: new Date().toISOString(),
+          competency_ratings: updatedRatings.map(rating => ({
+            id: rating.id,
+            competency_id: rating.competencyId,
+            rating: rating.rating,
+            comments: rating.comments,
+            assessor_comments: rating.assessor_comments
+          }))
+        })
+        .eq('id', selectedAssessment.id);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      const updatedAssessment: EmployeeAssessment = {
+        ...selectedAssessment,
+        status: 'reviewed',
+        lastUpdated: new Date().toISOString(),
+        competencyRatings: updatedRatings
+      };
+
+      setEmployeeAssessments(prevAssessments =>
+        prevAssessments.map(a => a.id === updatedAssessment.id ? updatedAssessment : a)
+      );
+
+      setSelectedAssessment(updatedAssessment);
+      setShowAssessmentModal(false);
+
+    } catch (err) {
+      console.error('Error saving assessor comments:', err);
+      setError('Failed to save comments. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Filter assessments by search term
+  const filteredAssessments = employeeAssessments.filter(assessment =>
+    assessment.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    assessment.departmentName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       <div className="max-w-7xl mx-auto">
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-8 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Assessor Assesments Review</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Assessor Dashboard</h1>
             <p className="mt-2 text-gray-600 dark:text-gray-400">
-              Monitor and evaluate the effectiveness of assessment managers
+              Review employee assessments and manage your assessor profile
             </p>
           </div>
           <button
@@ -141,32 +219,108 @@ export default function AssessorAssessment() {
           </button>
         </div>
 
-        {/* Search and Filters */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="Search by assessor name or department..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            />
-            <UserIcon className="absolute left-3 top-1/2 h-5 w-5 text-gray-400 -translate-y-1/2" />
-          </div>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-              <ChartBarIcon className="h-5 w-5" />
-            </button>
-            <button className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-              <DocumentCheckIcon className="h-5 w-5" />
-            </button>
+        {/* Employee Assessments Section */}
+        <div className="mb-12">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Employee Assessments</h2>
+
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            </div>
+          ) : employeeAssessments.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
+              <div className="flex flex-col items-center justify-center space-y-4">
+                <div className="bg-blue-100 dark:bg-blue-900/30 p-4 rounded-full">
+                  <UserIcon className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">No Assessments Available</h2>
+                <p className="text-gray-600 dark:text-gray-400 max-w-lg">
+                  There are no completed assessments from your assigned employees yet.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {employeeAssessments.map(assessment => (
+                <div
+                  key={assessment.id}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden"
+                >
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {assessment.employeeName}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {assessment.departmentName || 'No Department'}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        assessment.status === 'reviewed'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                      }`}>
+                        {assessment.status === 'reviewed' ? 'Reviewed' : 'Completed'}
+                      </span>
+                    </div>
+
+                    <div className="mb-4">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        Completed on {formatDate(assessment.lastUpdated)}
+                      </div>
+                      <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        {assessment.competencyRatings.length} competencies rated
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        // Handle view employee assessment
+                        console.log('View employee assessment:', assessment.id);
+                      }}
+                      className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    >
+                      View Assessment
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Assessor Performance Section */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Assessor Performance</h2>
+
+          {/* Search and Filters */}
+          <div className="mb-6 flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search by assessor name or department..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              />
+              <UserIcon className="absolute left-3 top-1/2 h-5 w-5 text-gray-400 -translate-y-1/2" />
+            </div>
+            <div className="flex gap-2">
+              <button className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <ChartBarIcon className="h-5 w-5" />
+              </button>
+              <button className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <DocumentCheckIcon className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Assessment Cards */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredAssessments.map((assessment) => (
-            <div 
+            <div
               key={assessment.id}
               className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow"
             >

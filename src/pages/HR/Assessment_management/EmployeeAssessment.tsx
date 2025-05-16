@@ -92,65 +92,44 @@ export default function EmployeeAssessment() {
     const loadData = async () => {
       try {
         setLoading(true);
-        // First load departments
-        const { data: deptData, error: deptError } = await supabase
+
+        // Fetch departments from Supabase
+        const { data: departmentsData, error: departmentsError } = await supabase
           .from('departments')
           .select('*');
 
-        if (deptError) throw deptError;
-        setDepartments(deptData);
+        if (departmentsError) throw departmentsError;
 
-        // Load competencies
-        const { data: compData, error: compError } = await supabase
-          .from('competencies')
-          .select('*');
+        if (departmentsData && departmentsData.length > 0) {
+          setDepartments(departmentsData);
+        } else {
+          // Fallback to mock data if no departments found
+          const mockDepartments = [
+            { id: '1', name: 'Engineering' },
+            { id: '2', name: 'Marketing' },
+            { id: '3', name: 'Human Resources' },
+            { id: '4', name: 'Finance' },
+            { id: '5', name: 'Operations' }
+          ];
+          setDepartments(mockDepartments);
+        }
 
-        if (compError) throw compError;
-        setCompetencies(compData);
+        // Use mock competencies since we're using a single table approach
+        const mockCompetencies = [
+          { id: '1', name: 'Communication' },
+          { id: '2', name: 'Problem Solving' },
+          { id: '3', name: 'Leadership' },
+          { id: '4', name: 'Technical Skills' },
+          { id: '5', name: 'Teamwork' }
+        ];
+        setCompetencies(mockCompetencies);
 
-        // Then load assessments
-        const { data: assessmentData, error: assessmentError } = await supabase
-          .from('employee_assessments')
-          .select(`
-            *,
-            employee_competencies (
-              *,
-              competency:competencies (*)
-            )
-          `)
-          .order('created_at', { ascending: true });
+        // Fetch assessments from Supabase
+        await fetchAssessments();
 
-        if (assessmentError) throw assessmentError;
-
-        const transformedData = assessmentData.map(item => {
-          const department = deptData.find(d => d.id === item.department_id);
-          return {
-            id: item.id,
-            employee: {
-              name: item.employee_name,
-              department: item.department_id ? [{
-                id: item.department_id,
-                name: department?.name || 'Unknown Department'
-              }] : []
-            },
-            assessor_name: item.assessor_name,
-            assessment_date: item.assessment_date,
-            status: item.status,
-            overall_rating: item.overall_rating,
-            isEdited: item.is_edited,
-            competencies: item.employee_competencies.map((comp: { id: string; rating: number; comments: string; competency: { id: string; name: string } }) => ({
-              id: comp.id,
-              rating: comp.rating,
-              comments: comp.comments,
-              competency: comp.competency
-            }))
-          };
-        });
-
-        setAssessments(transformedData);
       } catch (err) {
         console.error('Error loading data:', err);
-        setError('Failed to load data');
+        setError('Failed to load data. Please refresh the page or contact support.');
       } finally {
         setLoading(false);
       }
@@ -164,48 +143,72 @@ export default function EmployeeAssessment() {
       setLoading(true);
       setError(null);
 
+      // Fetch all employee assessments
       const { data, error } = await supabase
         .from('employee_assessments')
-        .select(`
-          *,
-          employee_competencies (
-            *,
-            competency:competencies (*)
-          )
-        `)
-        .order('created_at', { ascending: true });
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const transformedData = data.map(item => {
-        const department = departments.find(d => d.id === item.department_id);
+      if (!data || data.length === 0) {
+        setAssessments([]);
+        return;
+      }
+
+      // Process assessments
+      const processedAssessments = data.map(assessment => {
+        // Get department info
+        const department = departments.find(d => d.id === assessment.department_id);
+
+        // Get competency ratings from the assessment data
+        const competencyRatings = assessment.competency_ratings || [];
+
+        // Map competency ratings to the expected format
+        const mappedCompetencies = competencyRatings.map((rating: any) => {
+          // Find competency details
+          const competency = competencies.find(c => c.id === rating.competency_id);
+          const competencyName = competency ? competency.name : `Competency ${rating.competency_id}`;
+
+          return {
+            id: rating.id,
+            rating: rating.rating || 0,
+            comments: rating.comments || '',
+            competency: {
+              id: rating.competency_id,
+              name: competencyName
+            }
+          };
+        });
+
+        // Calculate overall rating
+        const overallRating = mappedCompetencies.length > 0
+          ? mappedCompetencies.reduce((sum: number, comp: any) => sum + (comp.rating || 0), 0) / mappedCompetencies.length
+          : 0;
+
+        // Map to Assessment type
         return {
-          id: item.id,
+          id: assessment.id,
           employee: {
-            name: item.employee_name,
-            department: item.department_id ? [{
-              id: item.department_id,
+            name: assessment.employee_name,
+            department: assessment.department_id ? [{
+              id: assessment.department_id,
               name: department?.name || 'Unknown Department'
             }] : []
           },
-          assessor_name: item.assessor_name,
-          assessment_date: item.assessment_date,
-          status: item.status,
-          overall_rating: item.overall_rating,
-          isEdited: item.is_edited,
-          competencies: item.employee_competencies.map((comp: { id: string; rating: number; comments: string; competency: { id: string; name: string } }) => ({
-            id: comp.id,
-            rating: comp.rating,
-            comments: comp.comments,
-            competency: comp.competency
-          }))
+          assessor_name: assessment.assessor_name || '',
+          assessment_date: assessment.start_date || assessment.created_at,
+          status: assessment.status === 'completed' ? 'Approved' as const : 'In Progress' as const,
+          overall_rating: Number(overallRating.toFixed(1)),
+          isEdited: false,
+          competencies: mappedCompetencies
         };
       });
 
-      setAssessments(transformedData);
+      setAssessments(processedAssessments);
     } catch (err) {
       console.error('Error fetching assessments:', err);
-      setError('Failed to load assessments');
+      setError('Failed to load assessments. Please refresh the page or contact support.');
     } finally {
       setLoading(false);
     }
@@ -229,39 +232,43 @@ export default function EmployeeAssessment() {
       }
 
       const department = departments.find(d => d.id === formData.department_id);
+      const now = new Date().toISOString();
+      const status = formData.status === 'Approved' ? 'completed' : 'in_progress';
 
-      // Start a transaction
+      // Filter competencies with ratings
+      const competencyRatings = formData.competencies
+        .filter(comp => comp.rating > 0) // Only include competencies with ratings
+        .map(comp => ({
+          id: crypto.randomUUID(),
+          competency_id: comp.id,
+          rating: comp.rating,
+          comments: comp.comments,
+          created_at: now
+        }));
+
+      // Insert assessment with competency ratings in a single record
       const { data: assessment, error: assessmentError } = await supabase
         .from('employee_assessments')
         .insert({
+          employee_id: '', // This would normally be the user ID
           employee_name: formData.employee_name,
+          employee_email: '',
           assessor_name: formData.assessor_name,
-          assessment_date: formData.assessment_date,
-          status: 'In Progress',
-          overall_rating: Number(formData.overall_rating) || 0,
-          is_edited: false,
-          department_id: formData.department_id
+          department_id: formData.department_id,
+          department_name: department?.name || '',
+          start_date: formData.assessment_date.split('T')[0],
+          last_updated: now,
+          status: status,
+          progress: 100, // Since HR is creating a complete assessment
+          created_at: now,
+          competency_ratings: competencyRatings
         })
         .select()
         .single();
 
       if (assessmentError) throw assessmentError;
 
-      // Insert competencies
-      const competencyInserts = formData.competencies.map(comp => ({
-        assessment_id: assessment.id,
-        competency_id: comp.id,
-        rating: comp.rating,
-        comments: comp.comments
-      }));
-
-      const { error: competencyError } = await supabase
-        .from('employee_competencies')
-        .insert(competencyInserts);
-
-      if (competencyError) throw competencyError;
-
-      // Add the new assessment to the end of the list
+      // Create a new assessment object for the UI
       const newAssessment: Assessment = {
         id: assessment.id,
         employee: {
@@ -273,31 +280,44 @@ export default function EmployeeAssessment() {
         },
         assessor_name: formData.assessor_name,
         assessment_date: formData.assessment_date,
-        status: 'In Progress' as const,
+        status: formData.status,
         overall_rating: Number(formData.overall_rating) || 0,
         isEdited: false,
-        competencies: competencyInserts.map(comp => ({
-          id: comp.competency_id,
-          rating: comp.rating,
-          comments: comp.comments,
-          competency: competencies.find(c => c.id === comp.competency_id) || { id: '', name: 'Unknown Competency' }
-        }))
+        competencies: competencyRatings.map(comp => {
+          // Find the competency from our list
+          const foundCompetency = competencies.find(c => c.id === comp.competency_id);
+          const competencyName = foundCompetency ? foundCompetency.name : `Competency ${comp.competency_id}`;
+
+          return {
+            id: comp.id,
+            rating: comp.rating,
+            comments: comp.comments,
+            competency: {
+              id: comp.competency_id,
+              name: competencyName
+            }
+          };
+        })
       };
 
-      setAssessments(prevAssessments => [...prevAssessments, newAssessment]);
+      // Add the new assessment to the state
+      setAssessments(prevAssessments => [newAssessment, ...prevAssessments]);
       setShowNewAssessmentModal(false);
+
+      // Reset the form
       setFormData({
         employee_name: '',
         assessor_name: '',
-        assessment_date: new Date().toISOString().slice(0, 16),
+        assessment_date: new Date().toISOString().split('T')[0],
         status: 'In Progress',
         overall_rating: 0,
         department_id: '',
         competencies: []
       });
+
     } catch (err) {
       console.error('Error creating assessment:', err);
-      setError('Failed to create assessment');
+      setError('Failed to create assessment. Please try again or contact support.');
     } finally {
       setLoading(false);
     }
@@ -363,87 +383,75 @@ export default function EmployeeAssessment() {
       setLoading(true);
       setError(null);
 
-      // Update the existing assessment
+      const department = departments.find(d => d.id === formData.department_id);
+      const now = new Date().toISOString();
+      const status = formData.status === 'Approved' ? 'completed' : 'in_progress';
+
+      // Filter competencies with ratings
+      const competencyRatings = formData.competencies
+        .filter(comp => comp.rating > 0)
+        .map(comp => ({
+          id: comp.id || crypto.randomUUID(),
+          competency_id: comp.id,
+          rating: comp.rating,
+          comments: comp.comments,
+          updated_at: now
+        }));
+
+      // Update the existing assessment with all data in a single record
       const { error: updateError } = await supabase
         .from('employee_assessments')
         .update({
           employee_name: formData.employee_name,
           assessor_name: formData.assessor_name,
-          assessment_date: formData.assessment_date,
-          status: formData.status,
-          overall_rating: Number(formData.overall_rating) || 0,
-          department_id: formData.department_id
+          department_id: formData.department_id,
+          department_name: department?.name || '',
+          start_date: formData.assessment_date.split('T')[0],
+          last_updated: now,
+          status: status,
+          progress: 100, // Since HR is updating a complete assessment
+          competency_ratings: competencyRatings
         })
         .eq('id', selectedAssessment.id);
 
       if (updateError) throw updateError;
 
-      // Update competencies
-      const competencyUpdates = formData.competencies.map(comp => ({
-        assessment_id: selectedAssessment.id,
-        competency_id: comp.id,
-        rating: comp.rating,
-        comments: comp.comments
-      }));
-
-      // Delete existing competencies
-      const { error: deleteError } = await supabase
-        .from('employee_competencies')
-        .delete()
-        .eq('assessment_id', selectedAssessment.id);
-
-      if (deleteError) throw deleteError;
-
-      // Insert updated competencies
-      const { error: insertError } = await supabase
-        .from('employee_competencies')
-        .insert(competencyUpdates);
-
-      if (insertError) throw insertError;
-
-      // Fetch the updated assessment with all its data
-      const { data: updatedAssessment, error: fetchError } = await supabase
-        .from('employee_assessments')
-        .select(`
-          *,
-          employee_competencies (
-            *,
-            competency:competencies (*)
-          )
-        `)
-        .eq('id', selectedAssessment.id)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Transform the updated assessment data
-      const department = departments.find(d => d.id === updatedAssessment.department_id);
-      const transformedAssessment = {
-        id: updatedAssessment.id,
+      // Create updated assessment object for the UI
+      const updatedAssessment: Assessment = {
+        id: selectedAssessment.id,
         employee: {
-          name: updatedAssessment.employee_name,
-          department: updatedAssessment.department_id ? [{
-            id: updatedAssessment.department_id,
+          name: formData.employee_name,
+          department: formData.department_id ? [{
+            id: formData.department_id,
             name: department?.name || 'Unknown Department'
           }] : []
         },
-        assessor_name: updatedAssessment.assessor_name,
-        assessment_date: updatedAssessment.assessment_date,
-        status: updatedAssessment.status,
-        overall_rating: updatedAssessment.overall_rating,
-        isEdited: updatedAssessment.is_edited,
-        competencies: updatedAssessment.employee_competencies.map((comp: { id: string; rating: number; comments: string; competency: { id: string; name: string } }) => ({
-          id: comp.id,
-          rating: comp.rating,
-          comments: comp.comments,
-          competency: comp.competency
-        }))
+        assessor_name: formData.assessor_name,
+        assessment_date: formData.assessment_date,
+        status: formData.status,
+        overall_rating: Number(formData.overall_rating) || 0,
+        isEdited: true,
+        competencies: competencyRatings.map(comp => {
+          // Find the competency from our list
+          const foundCompetency = competencies.find(c => c.id === comp.competency_id);
+          const competencyName = foundCompetency ? foundCompetency.name : `Competency ${comp.competency_id}`;
+
+          return {
+            id: comp.id,
+            rating: comp.rating,
+            comments: comp.comments,
+            competency: {
+              id: comp.competency_id,
+              name: competencyName
+            }
+          };
+        })
       };
 
-      // Update the state with the transformed assessment
+      // Update the state with the updated assessment
       setAssessments(prevAssessments =>
         prevAssessments.map(assessment =>
-          assessment.id === selectedAssessment.id ? transformedAssessment : assessment
+          assessment.id === selectedAssessment.id ? updatedAssessment : assessment
         )
       );
 
@@ -451,7 +459,7 @@ export default function EmployeeAssessment() {
       setSelectedAssessment(null);
     } catch (err) {
       console.error('Error updating assessment:', err);
-      setError('Failed to update assessment');
+      setError('Failed to update assessment. Please try again or contact support.');
     } finally {
       setLoading(false);
     }
@@ -461,6 +469,7 @@ export default function EmployeeAssessment() {
     try {
       setLoading(true);
 
+      // Delete the assessment (competency ratings are stored in the same record)
       const { error } = await supabase
         .from('employee_assessments')
         .delete()
@@ -468,12 +477,16 @@ export default function EmployeeAssessment() {
 
       if (error) throw error;
 
-      await fetchAssessments();
+      // Update the UI by removing the deleted assessment
+      setAssessments(prevAssessments =>
+        prevAssessments.filter(assessment => assessment.id !== id)
+      );
+
       setShowDeleteModal(false);
       setAssessmentToDelete(null);
     } catch (err) {
       console.error('Error deleting assessment:', err);
-      setError('Failed to delete assessment');
+      setError('Failed to delete assessment. Please try again or contact support.');
     } finally {
       setLoading(false);
     }

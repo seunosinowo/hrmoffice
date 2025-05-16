@@ -1,48 +1,37 @@
 import { useState, useEffect } from 'react';
-import { 
-  UserIcon,
-  FileIcon,
-  ChatIcon
-} from "../../../icons";
+import { UserIcon } from "../../../icons";
+import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable'; // Ensure proper import of the plugin
 
-
-interface Employee {
-  name: string;
-  department: {
-    id: string;
-    name: string;
-  }[];
-}
-
+// Types
 interface Competency {
   id: string;
   name: string;
+  description: string;
+  category: string;
 }
 
-interface AssessmentCompetency {
-  id: string;
+interface CompetencyRating {
+  id?: string;
+  competencyId: string;
   rating: number;
   comments: string;
-  competency: {
-    id: string;
-    name: string;
-  };
 }
 
 interface Assessment {
-  id: string;
-  employee: Employee;
-  assessor_name: string;
-  assessment_date: string;
-  status: 'In Progress' | 'Approved';
-  overall_rating: number;
-  isEdited: boolean;
-  competencies: AssessmentCompetency[];
+  id?: string;
+  employeeId: string;
+  employeeName: string;
+  departmentId: string;
+  departmentName: string;
+  startDate: string;
+  lastUpdated: string;
+  status: 'not_started' | 'in_progress' | 'completed' | 'reviewed';
+  progress: number;
+  competencyRatings: CompetencyRating[];
 }
 
+// Helper functions
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   const options: Intl.DateTimeFormatOptions = {
@@ -53,493 +42,405 @@ const formatDate = (dateString: string) => {
   return date.toLocaleDateString('en-US', options);
 };
 
+// Calculate progress percentage
+const calculateProgress = (ratings: CompetencyRating[], totalCompetencies: number): number => {
+  if (!ratings || totalCompetencies === 0) return 0;
+  const ratedCompetencies = ratings.filter(r => r.rating > 0).length;
+  return Math.round((ratedCompetencies / totalCompetencies) * 100);
+};
+
+
+
 export default function EmployeeAssessment() {
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showNewAssessmentModal, setShowNewAssessmentModal] = useState(false);
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Assessment data
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
-  const [formData, setFormData] = useState<{
-    employee_name: string;
-    assessor_name: string;
-    assessment_date: string;
-    status: 'In Progress' | 'Approved';
-    overall_rating: number;
-    department_id: string;
-    competencies: { 
-      id: string; 
-      rating: number; 
-      comments: string;
-      competency: Competency;
-    }[];
-  }>({
-    employee_name: '',
-    assessor_name: '',
-    assessment_date: new Date().toISOString().split('T')[0],
-    status: 'In Progress',
-    overall_rating: 0,
-    department_id: '',
-    competencies: []
-  });
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [assessmentToDelete, setAssessmentToDelete] = useState<Assessment | null>(null);
+
+  // UI state
+  const [activeCompetencyIndex, setActiveCompetencyIndex] = useState<number>(0);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [currentRating, setCurrentRating] = useState<number>(0);
+  const [currentComments, setCurrentComments] = useState<string>('');
+
+  // Function to start a new assessment
+  const startNewAssessment = () => {
+    // Create a new assessment without department selection
+    const newAssessment: Assessment = {
+      employeeId: user?.id || '',
+      employeeName: user?.email?.split('@')[0] || 'Current User',
+      departmentId: '',
+      departmentName: '',
+      startDate: new Date().toISOString().split('T')[0],
+      lastUpdated: new Date().toISOString().split('T')[0],
+      status: 'in_progress',
+      progress: 0,
+      competencyRatings: []
+    };
+
+    setAssessment(newAssessment);
+    setShowRatingModal(true);
+    setActiveCompetencyIndex(0);
+  };
+
+  // Function to check if assessment is locked (created more than 24 hours ago)
+  const isAssessmentLocked = (assessment: Assessment): boolean => {
+    const creationDate = new Date(assessment.startDate);
+    const now = new Date();
+    const hoursDifference = (now.getTime() - creationDate.getTime()) / (1000 * 60 * 60);
+    return hoursDifference > 24 || assessment.status === 'completed' || assessment.status === 'reviewed';
+  };
+
+  // Function to handle competency rating
+  const handleCompetencyRating = (rating: number, comments: string) => {
+    if (!assessment || !competencies[activeCompetencyIndex]) return;
+
+    // Check if assessment is locked
+    if (isAssessmentLocked(assessment)) {
+      setError('This assessment is locked and cannot be edited (created more than 24 hours ago).');
+      setShowRatingModal(false);
+      return;
+    }
+
+    const competency = competencies[activeCompetencyIndex];
+
+    // Update the assessment with the new rating
+    const updatedRatings = [...assessment.competencyRatings];
+    const existingRatingIndex = updatedRatings.findIndex(r => r.competencyId === competency.id);
+
+    if (existingRatingIndex >= 0) {
+      updatedRatings[existingRatingIndex] = {
+        ...updatedRatings[existingRatingIndex],
+        rating,
+        comments
+      };
+    } else {
+      updatedRatings.push({
+        competencyId: competency.id,
+        rating,
+        comments
+      });
+    }
+
+    // Calculate progress
+    const progress = calculateProgress(updatedRatings, competencies.length);
+
+    // Update the assessment
+    const updatedAssessment: Assessment = {
+      ...assessment,
+      competencyRatings: updatedRatings,
+      progress,
+      lastUpdated: new Date().toISOString().split('T')[0]
+    };
+
+    // Save the updated assessment to Supabase
+    const saveRating = async () => {
+      try {
+        // If the assessment has an ID, update it in Supabase
+        if (assessment.id) {
+          // Update the assessment
+          const { error: updateError } = await supabase
+            .from('employee_assessments')
+            .update({
+              progress: updatedAssessment.progress,
+              last_updated: updatedAssessment.lastUpdated
+            })
+            .eq('id', assessment.id);
+
+          if (updateError) throw updateError;
+
+          // Update or insert the competency rating
+          if (existingRatingIndex >= 0 && updatedRatings[existingRatingIndex].id) {
+            // Update existing rating
+            const { error: ratingError } = await supabase
+              .from('employee_competency_ratings')
+              .update({
+                rating: rating,
+                comments: comments,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', updatedRatings[existingRatingIndex].id);
+
+            if (ratingError) throw ratingError;
+          } else {
+            // Insert new rating
+            const { error: ratingError } = await supabase
+              .from('employee_competency_ratings')
+              .insert({
+                assessment_id: assessment.id,
+                competency_id: competency.id,
+                rating: rating,
+                comments: comments,
+                created_at: new Date().toISOString()
+              });
+
+            if (ratingError) throw ratingError;
+          }
+        }
+      } catch (err) {
+        console.error('Error saving rating:', err);
+        // Continue with UI updates even if save fails
+      }
+    };
+
+    // Save in background
+    saveRating();
+
+    setAssessment(updatedAssessment);
+
+    // Move to the next competency or show summary
+    if (activeCompetencyIndex < competencies.length - 1) {
+      setActiveCompetencyIndex(activeCompetencyIndex + 1);
+    } else {
+      setShowRatingModal(false);
+      setShowSummaryModal(true);
+    }
+  };
+
+  // Set current rating and comments when active competency changes
+  useEffect(() => {
+    if (assessment && competencies[activeCompetencyIndex]) {
+      const competency = competencies[activeCompetencyIndex];
+      const existingRating = assessment.competencyRatings.find(r => r.competencyId === competency.id);
+
+      if (existingRating) {
+        setCurrentRating(existingRating.rating);
+        setCurrentComments(existingRating.comments || '');
+      } else {
+        setCurrentRating(0);
+        setCurrentComments('');
+      }
+    }
+  }, [activeCompetencyIndex, assessment, competencies]);
+
+  // Function to submit the assessment
+  const submitAssessment = async () => {
+    if (!assessment) return;
+
+    // Check if assessment is locked
+    if (isAssessmentLocked(assessment)) {
+      setError('This assessment is locked and cannot be submitted (created more than 24 hours ago).');
+      setShowSummaryModal(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Update the assessment status
+      const finalAssessment: Assessment = {
+        ...assessment,
+        status: 'completed',
+        lastUpdated: new Date().toISOString().split('T')[0]
+      };
+
+      const now = new Date().toISOString();
+
+      // If assessment already exists in Supabase, update it
+      if (assessment.id) {
+        // Update the assessment with all data in a single record
+        const { error: updateError } = await supabase
+          .from('employee_assessments')
+          .update({
+            status: 'completed',
+            last_updated: now,
+            progress: finalAssessment.progress,
+            competency_ratings: finalAssessment.competencyRatings.map(rating => ({
+              id: rating.id || crypto.randomUUID(),
+              competency_id: rating.competencyId,
+              rating: rating.rating,
+              comments: rating.comments,
+              updated_at: now
+            }))
+          })
+          .eq('id', assessment.id);
+
+        if (updateError) throw updateError;
+
+        // Update UI
+        setAssessment(finalAssessment);
+        setShowSummaryModal(false);
+        setShowSuccessModal(true);
+      } else {
+        // Save new assessment to Supabase with all data in a single record
+        const { data, error } = await supabase
+          .from('employee_assessments')
+          .insert({
+            employee_id: user?.id || '',
+            employee_name: user?.email?.split('@')[0] || 'Employee',
+            employee_email: user?.email || '',
+            department_id: finalAssessment.departmentId,
+            department_name: finalAssessment.departmentName,
+            start_date: finalAssessment.startDate,
+            last_updated: now,
+            status: 'completed',
+            progress: finalAssessment.progress,
+            created_at: now,
+            competency_ratings: finalAssessment.competencyRatings.map(rating => ({
+              id: crypto.randomUUID(),
+              competency_id: rating.competencyId,
+              rating: rating.rating,
+              comments: rating.comments,
+              created_at: now
+            }))
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Update the assessment with the ID from Supabase
+        if (data) {
+          finalAssessment.id = data.id;
+        }
+
+        // Update UI
+        setAssessment(finalAssessment);
+        setShowSummaryModal(false);
+        setShowSuccessModal(true);
+      }
+
+    } catch (err) {
+      console.error('Error submitting assessment:', err);
+      setError('Failed to submit assessment. Please try again or contact support.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to set mock competencies
+  const setMockCompetencies = () => {
+    const mockCompetencies: Competency[] = [
+      {
+        id: '1',
+        name: 'Communication',
+        description: 'Ability to convey information clearly and effectively',
+        category: 'Interpersonal Skills'
+      },
+      {
+        id: '2',
+        name: 'Problem Solving',
+        description: 'Ability to identify issues and implement effective solutions',
+        category: 'Technical Skills'
+      },
+      {
+        id: '3',
+        name: 'Leadership',
+        description: 'Ability to guide and motivate team members',
+        category: 'Management Skills'
+      },
+      {
+        id: '4',
+        name: 'Technical Skills',
+        description: 'Proficiency in job-specific tools and technologies',
+        category: 'Technical Skills'
+      },
+      {
+        id: '5',
+        name: 'Teamwork',
+        description: 'Ability to collaborate effectively with others',
+        category: 'Interpersonal Skills'
+      }
+    ];
+    setCompetencies(mockCompetencies);
+  };
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        // First load departments
-        const { data: deptData, error: deptError } = await supabase
-          .from('departments')
-          .select('*');
 
-        if (deptError) throw deptError;
-        setDepartments(deptData);
+        // Use mock competencies for now since we're using a single table approach
+        // In a real implementation, you would store competency data in the employee_assessments table
+        // or fetch it from another source
 
-        // Load competencies
-        const { data: compData, error: compError } = await supabase
-          .from('competencies')
-          .select('*');
-
-        if (compError) throw compError;
-        setCompetencies(compData);
-
-        // Then load assessments
-        const { data: assessmentData, error: assessmentError } = await supabase
+        // Check if there are any template assessments with competencies
+        const { data: templateData, error: templateError } = await supabase
           .from('employee_assessments')
-          .select(`
-            *,
-            employee_competencies (
-              *,
-              competency:competencies (*)
-            )
-          `)
-          .order('created_at', { ascending: true });
+          .select('competency_data')
+          .eq('status', 'template')
+          .limit(1);
 
-        if (assessmentError) throw assessmentError;
+        if (templateError) throw templateError;
 
-        const transformedData = assessmentData.map(item => {
-          const department = deptData.find(d => d.id === item.department_id);
-          return {
-            id: item.id,
-            employee: {
-              name: item.employee_name,
-              department: item.department_id ? [{
-                id: item.department_id,
-                name: department?.name || 'Unknown Department'
-              }] : []
-            },
-            assessor_name: item.assessor_name,
-            assessment_date: item.assessment_date,
-            status: item.status,
-            overall_rating: item.overall_rating,
-            isEdited: item.is_edited,
-            competencies: item.employee_competencies.map((comp: { id: string; rating: number; comments: string; competency: { id: string; name: string } }) => ({
-              id: comp.id,
-              rating: comp.rating,
-              comments: comp.comments,
-              competency: comp.competency
-            }))
-          };
-        });
+        if (templateData && templateData.length > 0 && templateData[0].competency_data) {
+          // Parse the competency data from the template
+          try {
+            const parsedCompetencies = templateData[0].competency_data;
+            setCompetencies(parsedCompetencies);
+          } catch (parseError) {
+            console.error('Error parsing competency data:', parseError);
+            // Fall back to mock data
+            setMockCompetencies();
+          }
+        } else {
+          // Fallback to mock data if no competencies found
+          setMockCompetencies();
+        }
 
-        setAssessments(transformedData);
+        // Check if the user already has an assessment
+        if (user?.id) {
+          const { data: assessmentData, error: assessmentError } = await supabase
+            .from('employee_assessments')
+            .select('*')
+            .eq('employee_id', user.id)
+            .eq('status', 'in_progress')
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (assessmentError) throw assessmentError;
+
+          if (assessmentData && assessmentData.length > 0) {
+            // User has an existing in-progress assessment
+            const existingAssessment = assessmentData[0];
+
+            // Get competency ratings from the assessment data
+            const competencyRatings = existingAssessment.competency_ratings || [];
+
+            // Convert the Supabase data to our Assessment type
+            const assessment: Assessment = {
+              id: existingAssessment.id,
+              employeeId: existingAssessment.employee_id,
+              employeeName: existingAssessment.employee_name,
+              departmentId: existingAssessment.department_id || '',
+              departmentName: existingAssessment.department_name || '',
+              startDate: existingAssessment.start_date,
+              lastUpdated: existingAssessment.last_updated,
+              status: existingAssessment.status,
+              progress: existingAssessment.progress,
+              competencyRatings: competencyRatings.map((rating: any) => ({
+                id: rating.id,
+                competencyId: rating.competency_id,
+                rating: rating.rating,
+                comments: rating.comments || ''
+              }))
+            };
+
+            setAssessment(assessment);
+          }
+        }
+
       } catch (err) {
         console.error('Error loading data:', err);
-        setError('Failed to load data');
+        setError('Failed to load data. Please refresh the page or contact support.');
       } finally {
         setLoading(false);
       }
     };
 
-    loadData();
-  }, []);
-
-  const fetchAssessments = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const { data, error } = await supabase
-        .from('employee_assessments')
-        .select(`
-          *,
-          employee_competencies (
-            *,
-            competency:competencies (*)
-          )
-        `)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      const transformedData = data.map(item => {
-        const department = departments.find(d => d.id === item.department_id);
-        return {
-          id: item.id,
-          employee: {
-            name: item.employee_name,
-            department: item.department_id ? [{
-              id: item.department_id,
-              name: department?.name || 'Unknown Department'
-            }] : []
-          },
-          assessor_name: item.assessor_name,
-          assessment_date: item.assessment_date,
-          status: item.status,
-          overall_rating: item.overall_rating,
-          isEdited: item.is_edited,
-          competencies: item.employee_competencies.map((comp: { id: string; rating: number; comments: string; competency: { id: string; name: string } }) => ({
-            id: comp.id,
-            rating: comp.rating,
-            comments: comp.comments,
-            competency: comp.competency
-          }))
-        };
-      });
-
-      setAssessments(transformedData);
-    } catch (err) {
-      console.error('Error fetching assessments:', err);
-      setError('Failed to load assessments');
-    } finally {
-      setLoading(false);
+    if (user) {
+      loadData();
     }
-  };
+  }, [user]);
 
-  const calculateOverallRating = (competencies: { rating: number }[]) => {
-    if (competencies.length === 0) return 0;
-    const sum = competencies.reduce((total, comp) => total + (comp.rating || 0), 0);
-    return Number((sum / competencies.length).toFixed(1));
-  };
 
-  const handleCreateAssessment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      setError(null);
 
-      if (!formData.employee_name || !formData.assessor_name) {
-        setError('Please fill in all required fields');
-        return;
-      }
 
-      const department = departments.find(d => d.id === formData.department_id);
-
-      // Start a transaction
-      const { data: assessment, error: assessmentError } = await supabase
-        .from('employee_assessments')
-        .insert({
-          employee_name: formData.employee_name,
-          assessor_name: formData.assessor_name,
-          assessment_date: formData.assessment_date,
-          status: 'In Progress',
-          overall_rating: Number(formData.overall_rating) || 0,
-          is_edited: false,
-          department_id: formData.department_id
-        })
-        .select()
-        .single();
-
-      if (assessmentError) throw assessmentError;
-
-      // Insert competencies
-      const competencyInserts = formData.competencies.map(comp => ({
-        assessment_id: assessment.id,
-        competency_id: comp.id,
-        rating: comp.rating,
-        comments: comp.comments
-      }));
-
-      const { error: competencyError } = await supabase
-        .from('employee_competencies')
-        .insert(competencyInserts);
-
-      if (competencyError) throw competencyError;
-
-      // Add the new assessment to the end of the list
-      const newAssessment: Assessment = {
-        id: assessment.id,
-        employee: {
-          name: formData.employee_name,
-          department: formData.department_id ? [{
-            id: formData.department_id,
-            name: department?.name || 'Unknown Department'
-          }] : []
-        },
-        assessor_name: formData.assessor_name,
-        assessment_date: formData.assessment_date,
-        status: 'In Progress' as const,
-        overall_rating: Number(formData.overall_rating) || 0,
-        isEdited: false,
-        competencies: competencyInserts.map(comp => ({
-          id: comp.competency_id,
-          rating: comp.rating,
-          comments: comp.comments,
-          competency: competencies.find(c => c.id === comp.competency_id) || { id: '', name: 'Unknown Competency' }
-        }))
-      };
-
-      setAssessments(prevAssessments => [...prevAssessments, newAssessment]);
-      setShowNewAssessmentModal(false);
-      setFormData({
-        employee_name: '',
-        assessor_name: '',
-        assessment_date: new Date().toISOString().slice(0, 16),
-        status: 'In Progress',
-        overall_rating: 0,
-        department_id: '',
-        competencies: []
-      });
-    } catch (err) {
-      console.error('Error creating assessment:', err);
-      setError('Failed to create assessment');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleNewAssessmentClick = () => {
-    setSelectedAssessment(null);
-    const now = new Date();
-    const formattedDate = now.toISOString().slice(0, 16); // This will give us YYYY-MM-DDTHH:mm
-    setFormData({
-      employee_name: '',
-      assessor_name: '',
-      assessment_date: formattedDate,
-      status: 'In Progress',
-      overall_rating: 0,
-      department_id: '',
-      competencies: competencies.map(comp => ({
-        id: comp.id,
-        rating: 0,
-        comments: '',
-        competency: comp
-      }))
-    });
-    setShowNewAssessmentModal(true);
-  };
-
-  const handleEditClick = (assessment: Assessment) => {
-    setSelectedAssessment(assessment);
-    const mappedCompetencies = assessment.competencies.map(comp => ({
-      id: comp.competency.id,
-      rating: comp.rating,
-      comments: comp.comments || '',
-      competency: comp.competency
-    }));
-
-    // Add any missing competencies
-    const allCompetencies = competencies.map(comp => {
-      const existingComp = mappedCompetencies.find(c => c.id === comp.id);
-      return existingComp || {
-        id: comp.id,
-        rating: 0,
-        comments: '',
-        competency: comp
-      };
-    });
-
-    setFormData({
-      employee_name: assessment.employee.name,
-      assessor_name: assessment.assessor_name,
-      assessment_date: assessment.assessment_date,
-      status: assessment.status,
-      overall_rating: assessment.overall_rating,
-      department_id: assessment.employee.department[0]?.id || '',
-      competencies: allCompetencies
-    });
-    setShowNewAssessmentModal(true);
-  };
-
-  const handleEditAssessment = async () => {
-    if (!selectedAssessment) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Update the existing assessment
-      const { error: updateError } = await supabase
-        .from('employee_assessments')
-        .update({
-          employee_name: formData.employee_name,
-          assessor_name: formData.assessor_name,
-          assessment_date: formData.assessment_date,
-          status: formData.status,
-          overall_rating: Number(formData.overall_rating) || 0,
-          department_id: formData.department_id
-        })
-        .eq('id', selectedAssessment.id);
-
-      if (updateError) throw updateError;
-
-      // Update competencies
-      const competencyUpdates = formData.competencies.map(comp => ({
-        assessment_id: selectedAssessment.id,
-        competency_id: comp.id,
-        rating: comp.rating,
-        comments: comp.comments
-      }));
-
-      // Delete existing competencies
-      const { error: deleteError } = await supabase
-        .from('employee_competencies')
-        .delete()
-        .eq('assessment_id', selectedAssessment.id);
-
-      if (deleteError) throw deleteError;
-
-      // Insert updated competencies
-      const { error: insertError } = await supabase
-        .from('employee_competencies')
-        .insert(competencyUpdates);
-
-      if (insertError) throw insertError;
-
-      // Fetch the updated assessment with all its data
-      const { data: updatedAssessment, error: fetchError } = await supabase
-        .from('employee_assessments')
-        .select(`
-          *,
-          employee_competencies (
-            *,
-            competency:competencies (*)
-          )
-        `)
-        .eq('id', selectedAssessment.id)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Transform the updated assessment data
-      const department = departments.find(d => d.id === updatedAssessment.department_id);
-      const transformedAssessment = {
-        id: updatedAssessment.id,
-        employee: {
-          name: updatedAssessment.employee_name,
-          department: updatedAssessment.department_id ? [{
-            id: updatedAssessment.department_id,
-            name: department?.name || 'Unknown Department'
-          }] : []
-        },
-        assessor_name: updatedAssessment.assessor_name,
-        assessment_date: updatedAssessment.assessment_date,
-        status: updatedAssessment.status,
-        overall_rating: updatedAssessment.overall_rating,
-        isEdited: updatedAssessment.is_edited,
-        competencies: updatedAssessment.employee_competencies.map((comp: { id: string; rating: number; comments: string; competency: { id: string; name: string } }) => ({
-          id: comp.id,
-          rating: comp.rating,
-          comments: comp.comments,
-          competency: comp.competency
-        }))
-      };
-
-      // Update the state with the transformed assessment
-      setAssessments(prevAssessments => 
-        prevAssessments.map(assessment => 
-          assessment.id === selectedAssessment.id ? transformedAssessment : assessment
-        )
-      );
-
-      setShowNewAssessmentModal(false);
-      setSelectedAssessment(null);
-    } catch (err) {
-      console.error('Error updating assessment:', err);
-      setError('Failed to update assessment');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteAssessment = async (id: string) => {
-    try {
-      setLoading(true);
-      
-      const { error } = await supabase
-        .from('employee_assessments')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      
-      await fetchAssessments();
-      setShowDeleteModal(false);
-      setAssessmentToDelete(null);
-    } catch (err) {
-      console.error('Error deleting assessment:', err);
-      setError('Failed to delete assessment');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleExportPDF = (assessment: Assessment) => {
-    const doc = new jsPDF();
-
-    // Add title
-    doc.setFontSize(16);
-    doc.text('Employee Assessment Report', 14, 15);
-
-    // Add assessment details
-    doc.setFontSize(12);
-    doc.text(`Employee: ${assessment.employee.name}`, 14, 30);
-    doc.text(`Department: ${assessment.employee.department[0]?.name || 'N/A'}`, 14, 40);
-    doc.text(`Assessor: ${assessment.assessor_name}`, 14, 50);
-    doc.text(`Date: ${formatDate(assessment.assessment_date)}`, 14, 60);
-    doc.text(`Overall Rating: ${assessment.overall_rating}`, 14, 70);
-
-    // Add competencies table
-    const tableData = assessment.competencies.map(comp => [
-        comp.competency.name,
-        comp.rating.toString(),
-        comp.comments || 'N/A'
-    ]);
-
-    autoTable(doc, {
-        startY: 80,
-        head: [['Competency', 'Rating', 'Comments']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [41, 128, 185] },
-        styles: { fontSize: 10 }
-    });
-
-    // Save the PDF
-    doc.save(`Assessment_${assessment.employee.name}_${new Date().toISOString().split('T')[0]}.pdf`);
-  };
-
-  const filteredAssessments = assessments.filter(assessment =>
-    assessment.employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    assessment.employee.department.some(dept => dept.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Approved':
-        return { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', icon: '✓' };
-      case 'In Progress':
-        return { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-800 dark:text-yellow-300', icon: '⏳' };
-      default:
-        return { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-800 dark:text-gray-300', icon: '•' };
-    }
-  };
-
-  const handleCompetencyRatingChange = (id: string, rating: number) => {
-    const updatedCompetencies = formData.competencies.map(comp => 
-      comp.id === id ? { ...comp, rating } : comp
-    );
-    setFormData({
-      ...formData,
-      competencies: updatedCompetencies,
-      overall_rating: calculateOverallRating(updatedCompetencies)
-    });
-  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -557,455 +458,404 @@ export default function EmployeeAssessment() {
           {/* Header Section */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Employee Competency Assessment</h1>
-              <p className="mt-1 text-gray-600 dark:text-gray-400">Manage and track employee competency assessments</p>
-            </div>
-            <button 
-              onClick={handleNewAssessmentClick}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-            >
-              New Assessment
-            </button>
-          </div>
-
-          {/* Search and Filter Section */}
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <UserIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                className="block w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white dark:placeholder-gray-400"
-                placeholder="Search by employee name or department..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2">
-              <button className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]">
-                <FileIcon className="h-4 w-4" />
-              </button>
-              <button className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]">
-                <ChatIcon className="h-4 w-4" />
-              </button>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">My Competency Assessment</h1>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">
+                {assessment
+                  ? "View and manage your competency self-assessment"
+                  : "Create your competency self-assessment"}
+              </p>
             </div>
           </div>
 
-          {/* Assessment Cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredAssessments.map((assessment) => (
-              <div 
-                key={assessment.id}
-                className="group relative rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-blue-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-800/50"
-              >
-                <div className="absolute inset-x-0 top-0 h-1 rounded-t-xl bg-gradient-to-r from-blue-600 to-purple-600" />
-                
-                <div className="flex items-start justify-between">
+          {/* Start Assessment Section */}
+          {!assessment && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
+              <div className="flex flex-col items-center justify-center space-y-6 text-center">
+                <div className="bg-blue-100 dark:bg-blue-900/30 p-4 rounded-full">
+                  <UserIcon className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Start Your Competency Assessment</h2>
+                <p className="text-gray-600 dark:text-gray-400 max-w-lg">
+                  This assessment will help you evaluate your skills and competencies across different areas.
+                  Your responses will be used to create a personalized development plan.
+                </p>
+                <button
+                  onClick={startNewAssessment}
+                  className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                >
+                  Start Assessment
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Assessment in Progress */}
+          {assessment && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+              <div className="p-6">
+                {/* Assessment Header */}
+                <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {assessment.employee.name}
-                    </h3>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      Self-Assessment
+                    </h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {assessment.employee.department.map(dept => dept.name).join(', ')}
+                      Started on {formatDate(assessment.startDate)}
                     </p>
                   </div>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(assessment.status).bg} ${getStatusColor(assessment.status).text} whitespace-nowrap`}>
-                    <span>{getStatusColor(assessment.status).icon}</span>
-                    {assessment.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                      <div
+                        className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full"
+                        style={{ width: `${assessment.progress}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                      {assessment.progress}%
+                    </span>
+                  </div>
                 </div>
 
-                <div className="mt-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Overall Rating</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">
-                        {assessment.overall_rating || 0}
-                      </span>
-                      <div className="flex items-center">
-                        {[...Array(5)].map((_, i) => (
-                          <ChatIcon
-                            key={i}
-                            className={`h-5 w-5 ${
-                              i < Math.floor(assessment.overall_rating || 0)
-                                ? 'text-yellow-400'
-                                : i < (assessment.overall_rating || 0)
-                                ? 'text-yellow-400'
-                                : 'text-gray-300 dark:text-gray-600'
-                            }`}
-                          />
-                        ))}
-                      </div>
+                {/* Assessment Info */}
+                <div className="mb-6">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h3>
+                    <p className="mt-1 text-gray-900 dark:text-white capitalize">
+                      {assessment.status.replace('_', ' ')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status Message */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        {assessment.status === 'completed'
+                          ? "Your assessment has been completed. Thank you for your participation."
+                          : "Continue your assessment by rating your competencies. Your progress is automatically saved."}
+                      </p>
                     </div>
                   </div>
-                  <div className="mt-2 h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                    <div 
-                      className="h-1.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600"
-                      style={{ width: `${((assessment.overall_rating || 0) / 5) * 100}%` }}
-                    />
+                </div>
+
+                {/* Competencies Section */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">Competency Ratings</h3>
+                    {assessment.status !== 'completed' && (
+                      <button
+                        onClick={() => {
+                          setActiveCompetencyIndex(0);
+                          setShowRatingModal(true);
+                        }}
+                        className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                      >
+                        Continue Assessment
+                      </button>
+                    )}
                   </div>
+
+                  {assessment.competencyRatings.length === 0 ? (
+                    <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-6 text-center">
+                      <p className="text-gray-500 dark:text-gray-400">
+                        No competencies have been rated yet. Click "Continue Assessment" to start rating your competencies.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {assessment.competencyRatings.map((rating) => {
+                        const competency = competencies.find(c => c.id === rating.competencyId);
+                        return (
+                          <div key={rating.competencyId} className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <h4 className="font-medium text-gray-900 dark:text-white">{competency?.name || 'Unknown Competency'}</h4>
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Rating:</span>
+                                <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-2 py-1 rounded text-sm font-medium">
+                                  {rating.rating}/5
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-gray-600 dark:text-gray-400 text-sm">{rating.comments}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
-                <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-                  <p>Assessment Date: {formatDate(assessment.assessment_date)}</p>
-                  <p>Assessor: {assessment.assessor_name}</p>
-                </div>
-
-                <div className="mt-6 flex justify-end gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedAssessment(assessment);
-                      setShowDetailsModal(true);
-                    }}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
-                  >
-                    View Details
-                  </button>
-                  <button
-                    onClick={() => handleEditClick(assessment)}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
-                  >
-                    Edit
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setAssessmentToDelete(assessment);
-                      setShowDeleteModal(true);
-                    }}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-red-400 dark:hover:bg-white/[0.05]"
-                  >
-                    Delete
-                  </button>
+                {/* Action Buttons */}
+                <div className="mt-6 flex justify-end gap-3">
+                  {assessment.status !== 'completed' && assessment.competencyRatings.length > 0 && (
+                    <button
+                      onClick={() => setShowSummaryModal(true)}
+                      className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
+                    >
+                      Complete Assessment
+                    </button>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
 
-          {/* Assessment Details Modal */}
-          {showDetailsModal && selectedAssessment && (
-            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm pt-24 pb-8">
-              <div className="w-full max-w-2xl rounded-xl bg-white p-6 dark:bg-gray-900">
-                <div className="flex items-start justify-between">
+          {/* Rating Modal */}
+          {showRatingModal && assessment && activeCompetencyIndex < competencies.length && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 backdrop-blur-sm p-4">
+              <div className="w-full max-w-xl rounded-xl bg-white dark:bg-gray-900 max-h-[90vh] flex flex-col">
+                <div className="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                      Assessment Details
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      Rate Your Competency
                     </h2>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      {selectedAssessment.employee.name} - {formatDate(selectedAssessment.assessment_date)}
+                      {activeCompetencyIndex + 1} of {competencies.length}
                     </p>
                   </div>
                   <button
-                    onClick={() => setShowDetailsModal(false)}
+                    onClick={() => setShowRatingModal(false)}
                     className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      <path
+                        fillRule="evenodd"
+                        d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                   </button>
                 </div>
 
-                <div className="mt-6 space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg mb-4">
+                    <h3 className="font-medium text-gray-900 dark:text-white mb-2">
+                      {competencies[activeCompetencyIndex].name}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
+                      {competencies[activeCompetencyIndex].description}
+                    </p>
+                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-500">
+                      Category: {competencies[activeCompetencyIndex].category}
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Your Rating
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((rating) => {
+                        // Find if this competency already has a rating
+                        const existingRating = assessment.competencyRatings.find(
+                          r => r.competencyId === competencies[activeCompetencyIndex].id
+                        );
+                        const isSelected = existingRating?.rating === rating || currentRating === rating;
+
+                        return (
+                          <button
+                            key={rating}
+                            type="button"
+                            onClick={() => setCurrentRating(rating)}
+                            className={`w-10 h-10 flex items-center justify-center rounded-full ${
+                              isSelected
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                            } hover:bg-blue-500 hover:text-white transition-colors`}
+                          >
+                            {rating}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Comments
+                    </label>
+                    <textarea
+                      value={currentComments}
+                      onChange={(e) => setCurrentComments(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      rows={4}
+                      placeholder="Add your comments about this competency..."
+                    ></textarea>
+                  </div>
+                </div>
+
+                <div className="flex justify-between p-6 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeCompetencyIndex > 0) {
+                        setActiveCompetencyIndex(activeCompetencyIndex - 1);
+                        setCurrentRating(0);
+                        setCurrentComments('');
+                      }
+                    }}
+                    disabled={activeCompetencyIndex === 0}
+                    className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05] disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCompetencyRating(currentRating, currentComments);
+                      setCurrentRating(0);
+                      setCurrentComments('');
+                    }}
+                    disabled={currentRating === 0}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
+                  >
+                    {activeCompetencyIndex === competencies.length - 1 ? 'Finish' : 'Next'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Summary Modal */}
+          {showSummaryModal && assessment && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 backdrop-blur-sm p-4">
+              <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-900 max-h-[90vh] flex flex-col">
+                <div className="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      Assessment Summary
+                    </h2>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Review your assessment before submitting
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowSummaryModal(false)}
+                    className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path
+                        fillRule="evenodd"
+                        d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                       <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Employee</h3>
-                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedAssessment.employee.name}</p>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{assessment.employeeName}</p>
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Department</h3>
-                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedAssessment.employee.department.map(dept => dept.name).join(', ')}</p>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Start Date</h3>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{formatDate(assessment.startDate)}</p>
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Assessor</h3>
-                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedAssessment.assessor_name}</p>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Progress</h3>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{assessment.progress}%</p>
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Overall Rating</h3>
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="flex items-center">
-                          {[...Array(5)].map((_, i) => (
-                            <ChatIcon
-                              key={i}
-                              className={`h-5 w-5 ${
-                                i < Math.floor(selectedAssessment.overall_rating)
-                                  ? 'text-yellow-400'
-                                  : i < selectedAssessment.overall_rating
-                                  ? 'text-yellow-400'
-                                  : 'text-gray-300 dark:text-gray-600'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          {selectedAssessment.overall_rating.toFixed(1)}
-                        </span>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h3>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white capitalize">{assessment.status.replace('_', ' ')}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          Once you submit this assessment, it will be marked as completed and can no longer be edited.
+                        </p>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Competency Ratings</h3>
-                    <div className="mt-4 space-y-4">
-                      {selectedAssessment.competencies.map((competency, index) => (
-                        <div key={index} className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                              {competency.competency.name}
-                            </h4>
-                            <div className="flex items-center gap-1">
-                              <ChatIcon className="h-4 w-4 text-yellow-400" />
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                {competency.rating}
-                              </span>
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Competency Ratings</h3>
+                    <div className="space-y-4">
+                      {assessment.competencyRatings.map((rating) => {
+                        const competency = competencies.find(c => c.id === rating.competencyId);
+                        return (
+                          <div key={rating.competencyId} className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <h4 className="font-medium text-gray-900 dark:text-white">{competency?.name || 'Unknown Competency'}</h4>
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Rating:</span>
+                                <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-2 py-1 rounded text-sm font-medium">
+                                  {rating.rating}/5
+                                </span>
+                              </div>
                             </div>
+                            <p className="text-gray-600 dark:text-gray-400 text-sm">{rating.comments}</p>
                           </div>
-                          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                            {competency.comments}
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-6 flex justify-end gap-3">
+                <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
                   <button
-                    onClick={() => setShowDetailsModal(false)}
-                    className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
-                  >
-                    Close
-                  </button>
-                  <button
-                    onClick={() => handleExportPDF(selectedAssessment!)}
-                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
-                  >
-                    Export PDF
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* New Assessment Modal */}
-          {showNewAssessmentModal && (
-            <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm pt-24 pb-8">
-              <div className="w-full max-w-2xl rounded-xl bg-white p-6 dark:bg-gray-900">
-                <div className="flex items-start justify-between">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                    New Assessment
-                  </h2>
-                  <button
-                    onClick={() => setShowNewAssessmentModal(false)}
-                    className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-                  >
-                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-
-                <form 
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (selectedAssessment) {
-                      handleEditAssessment();
-                    } else {
-                      handleCreateAssessment(e);
-                    }
-                  }}
-                  className="space-y-4"
-                >
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Employee Name
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.employee_name}
-                        onChange={(e) => setFormData({ ...formData, employee_name: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        placeholder="Enter employee name"
-                      />
-                    </div>
-
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Department
-                      </label>
-                      <select
-                        value={formData.department_id}
-                        onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      >
-                        <option value="">Select a department</option>
-                        {departments.map((dept) => (
-                          <option key={dept.id} value={dept.id}>{dept.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Assessor Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.assessor_name}
-                      onChange={(e) => setFormData({ ...formData, assessor_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      placeholder="Enter assessor name"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Assessment Date
-                    </label>
-                    <input
-                      type="datetime-local"
-                      id="date"
-                      value={formData.assessment_date}
-                      onChange={(e) => setFormData({ ...formData, assessment_date: e.target.value })}
-                      className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-                    />
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Status
-                    </label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'In Progress' | 'Approved' })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    >
-                      <option value="In Progress">In Progress</option>
-                      <option value="Approved">Approved</option>
-                    </select>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Overall Rating
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="5"
-                      step="0.1"
-                      value={formData.overall_rating}
-                      onChange={(e) => setFormData({ ...formData, overall_rating: Number(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      placeholder="Enter overall rating (0-5)"
-                    />
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Competencies</h3>
-                    <div className="mt-4 space-y-4">
-                      {formData.competencies.map((formCompetency) => (
-                        <div key={formCompetency.id} className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium text-gray-900 dark:text-white">
-                              {formCompetency.competency.name}
-                            </label>
-                            <select 
-                              value={formCompetency.rating}
-                              onChange={(e) => handleCompetencyRatingChange(formCompetency.id, Number(e.target.value))}
-                              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-                            >
-                              <option value="">Select rating</option>
-                              <option value="1">Basic - Needs Improvement</option>
-                              <option value="2">Intermidiate - Developing</option>
-                              <option value="3">Advanced - Proficient</option>
-                              <option value="4">Expert - Mastery Demonstrated</option>
-                            </select>
-                          </div>
-                          <textarea
-                            placeholder="Add comments..."
-                            className="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-                            rows={2}
-                            value={formCompetency.comments}
-                            onChange={(e) => {
-                              const updatedCompetencies = formData.competencies.map(comp => 
-                                comp.id === formCompetency.id ? { ...comp, comments: e.target.value } : comp
-                              );
-                              setFormData({ ...formData, competencies: updatedCompetencies });
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowNewAssessmentModal(false);
-                        setSelectedAssessment(null);
-                      }}
-                      className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
-                    >
-                      {loading ? 'Saving...' : selectedAssessment ? 'Update Assessment' : 'Add Assessment'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* Delete Confirmation Modal */}
-          {showDeleteModal && assessmentToDelete && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-              <div className="w-full max-w-md rounded-xl bg-white p-6 dark:bg-gray-900">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Delete Assessment</h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Are you sure you want to delete this assessment? This action cannot be undone.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setShowDeleteModal(false);
-                      setAssessmentToDelete(null);
-                    }}
-                    className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-                  >
-                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    onClick={() => {
-                      setShowDeleteModal(false);
-                      setAssessmentToDelete(null);
-                    }}
+                    type="button"
+                    onClick={() => setShowSummaryModal(false)}
                     className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={() => handleDeleteAssessment(assessmentToDelete.id)}
-                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
+                    type="button"
+                    onClick={submitAssessment}
+                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
                   >
-                    Delete
+                    Submit Assessment
                   </button>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Success Modal */}
+          {showSuccessModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 backdrop-blur-sm p-4">
+              <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-900 text-center p-6">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                  <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">Assessment Completed!</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Your competency assessment has been successfully submitted. Thank you for your participation.
+                </p>
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowSuccessModal(false)}
+                    className="inline-flex w-full justify-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+
+
         </>
       )}
     </div>

@@ -127,6 +127,7 @@ const assessorNavItems: NavItem[] = [
     icon: <PlugInIcon />,
     name: "Assessment Mgt",
     subItems: [
+      { name: "View Employee Assessments", path: "/assessor/employee-assessment" },
       { name: "Assessor Assessment", path: "/assessor/assessment" },
       { name: "Consensus Assessment", path: "/assessor/consensus-assessment" },
     ],
@@ -182,7 +183,7 @@ const hrNavItems: NavItem[] = [
     icon: <PlugInIcon />,
     name: "Assessment Mgt",
     subItems: [
-      { name: "Employee Assessment", path: "/hr/employee-assessment" },
+      { name: "View Employee Assessments", path: "/hr/employee-assessment" },
       { name: "Assessor Assessment", path: "/hr/assessor-assessment" },
       { name: "Consensus Assessment", path: "/hr/consensus-assessment" },
     ],
