@@ -22,8 +22,11 @@ interface Assessment {
   id?: string;
   employeeId: string | null;
   employeeName: string;
+  employeeFullName: string;
   departmentId: string | null;
   departmentName: string;
+  jobRoleId: string | null;
+  jobRoleName: string;
   startDate: string;
   lastUpdated: string;
   status: 'not_started' | 'in_progress' | 'completed' | 'reviewed';
@@ -59,6 +62,10 @@ export default function EmployeeAssessment() {
   // Assessment data
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [jobRoles, setJobRoles] = useState<{ id: string; name: string }[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [selectedJobRoleId, setSelectedJobRoleId] = useState<string>('');
 
   // UI state
   const [activeCompetencyIndex, setActiveCompetencyIndex] = useState<number>(0);
@@ -68,24 +75,122 @@ export default function EmployeeAssessment() {
   const [currentRating, setCurrentRating] = useState<number>(0);
   const [currentComments, setCurrentComments] = useState<string>('');
 
-  // Function to start a new assessment
-  const startNewAssessment = () => {
-    // Create a new assessment without department selection
-    const newAssessment: Assessment = {
-      employeeId: user?.id || null,
-      employeeName: user?.email?.split('@')[0] || 'Current User',
-      departmentId: null,
-      departmentName: '',
-      startDate: new Date().toISOString().split('T')[0],
-      lastUpdated: new Date().toISOString().split('T')[0],
-      status: 'in_progress',
-      progress: 0,
-      competencyRatings: []
-    };
+  // State for employee full name input
+  const [employeeFullName, setEmployeeFullName] = useState<string>('');
 
-    setAssessment(newAssessment);
-    setShowRatingModal(true);
-    setActiveCompetencyIndex(0);
+  // Function to start a new assessment
+  const startNewAssessment = async () => {
+    if (!employeeFullName.trim()) {
+      setError('Please enter your full name to continue');
+      return;
+    }
+
+    if (!selectedDepartmentId) {
+      setError('Please select a department to continue');
+      return;
+    }
+
+    if (!selectedJobRoleId) {
+      setError('Please select a job role to continue');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Create a new assessment with department and job role selection
+      const newAssessment: Assessment = {
+        employeeId: user?.id || null,
+        employeeName: user?.email?.split('@')[0] || 'Current User',
+        employeeFullName: employeeFullName || '',
+        departmentId: selectedDepartmentId || null,
+        departmentName: departments.find(d => d.id === selectedDepartmentId)?.name || '',
+        jobRoleId: selectedJobRoleId || null,
+        jobRoleName: jobRoles.find(r => r.id === selectedJobRoleId)?.name || '',
+        startDate: new Date().toISOString().split('T')[0],
+        lastUpdated: new Date().toISOString().split('T')[0],
+        status: 'in_progress',
+        progress: 0,
+        competencyRatings: []
+      };
+
+      // Save to localStorage
+      localStorage.setItem('assessment_form_data', JSON.stringify({
+        employeeFullName,
+        departmentId: selectedDepartmentId,
+        jobRoleId: selectedJobRoleId
+      }));
+
+      // Create metadata object
+      const metadata = {
+        employee_full_name: employeeFullName
+      };
+
+      // Get department and job role information
+      const selectedDepartment = departments.find(d => d.id === selectedDepartmentId);
+      const selectedJobRole = jobRoles.find(r => r.id === selectedJobRoleId);
+
+      console.log("Selected department:", selectedDepartment);
+      console.log("Selected job role:", selectedJobRole);
+
+      // Create the base assessment object
+      const assessmentData: any = {
+        employee_id: user?.id || null,
+        employee_name: user?.email || 'Current User',
+        employee_email: user?.email || '',
+        department_id: selectedDepartmentId || null,
+        department_name: selectedDepartment?.name || '',
+        job_role_id: selectedJobRoleId || null,
+        job_role_name: selectedJobRole?.name || '',
+        start_date: newAssessment.startDate,
+        last_updated: newAssessment.lastUpdated,
+        status: 'in_progress',
+        progress: 0,
+        created_at: new Date().toISOString(),
+        competency_ratings: [],
+        // Store all the data in metadata as a fallback
+        metadata: {
+          ...metadata,
+          employee_full_name: employeeFullName,
+          job_role_id: selectedJobRoleId,
+          job_role_name: selectedJobRole?.name
+        }
+      };
+
+      // Add the new columns directly
+      assessmentData.employee_full_name = employeeFullName;
+      assessmentData.job_role_id = selectedJobRoleId || null;
+      assessmentData.job_role_name = selectedJobRole?.name || '';
+
+      console.log("Saving assessment with data:", assessmentData);
+
+      const { data, error } = await supabase
+        .from('employee_assessments')
+        .insert(assessmentData)
+        .select();
+
+      if (error) {
+        console.error("Error inserting assessment:", error);
+        throw error;
+      }
+
+      console.log("Assessment created successfully:", data);
+
+      // Update the assessment with the ID from Supabase
+      if (data && data.length > 0) {
+        newAssessment.id = data[0].id;
+      }
+
+      setAssessment(newAssessment);
+      setShowRatingModal(true);
+      setActiveCompetencyIndex(0);
+
+    } catch (err) {
+      console.error('Error starting assessment:', err);
+      setError('Failed to start assessment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Function to check if assessment is locked (created more than 24 hours ago)
@@ -143,12 +248,26 @@ export default function EmployeeAssessment() {
       try {
         // If the assessment has an ID, update it in Supabase
         if (assessment.id) {
+          // Get the current assessment to preserve metadata
+          const { data: currentAssessment, error: fetchError } = await supabase
+            .from('employee_assessments')
+            .select('metadata')
+            .eq('id', assessment.id)
+            .single();
+
+          if (fetchError) throw fetchError;
+
+          // Update or create metadata
+          const metadata = currentAssessment?.metadata || {};
+          metadata.employee_full_name = updatedAssessment.employeeFullName || '';
+
           // Update the assessment
           const { error: updateError } = await supabase
             .from('employee_assessments')
             .update({
               progress: updatedAssessment.progress,
-              last_updated: updatedAssessment.lastUpdated
+              last_updated: updatedAssessment.lastUpdated,
+              metadata: metadata
             })
             .eq('id', assessment.id);
 
@@ -254,6 +373,19 @@ export default function EmployeeAssessment() {
 
       // If assessment already exists in Supabase, update it
       if (assessment.id) {
+        // Get the current assessment to preserve metadata
+        const { data: currentAssessment, error: fetchError } = await supabase
+          .from('employee_assessments')
+          .select('metadata')
+          .eq('id', assessment.id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        // Update or create metadata
+        const metadata = currentAssessment?.metadata || {};
+        metadata.employee_full_name = finalAssessment.employeeFullName || '';
+
         // Update the assessment with all data in a single record
         const { error: updateError } = await supabase
           .from('employee_assessments')
@@ -261,7 +393,8 @@ export default function EmployeeAssessment() {
             status: 'completed',
             last_updated: now,
             progress: finalAssessment.progress,
-            competency_ratings: validCompetencyRatings
+            competency_ratings: validCompetencyRatings,
+            metadata: metadata
           })
           .eq('id', assessment.id);
 
@@ -284,21 +417,37 @@ export default function EmployeeAssessment() {
           throw profileError;
         }
 
+        // Create metadata object to store additional information
+        const metadata = {
+          employee_full_name: finalAssessment.employeeFullName || ''
+        };
+
+        // Get department and job role information
+        const selectedDepartment = departments.find(d => d.id === finalAssessment.departmentId);
+        const selectedJobRole = jobRoles.find(r => r.id === finalAssessment.jobRoleId);
+
+        console.log("Selected department for submission:", selectedDepartment);
+        console.log("Selected job role for submission:", selectedJobRole);
+
         // Save new assessment to Supabase with all data in a single record
         const { data, error } = await supabase
           .from('employee_assessments')
           .insert({
             employee_id: user?.id || null,
-            employee_name: user?.email?.split('@')[0] || 'Employee',
+            employee_name: user?.email || 'Employee',
             employee_email: user?.email || '',
-            department_id: profileData?.department_id || null,
-            department_name: profileData?.department_name || '',
+            employee_full_name: finalAssessment.employeeFullName,
+            department_id: finalAssessment.departmentId || profileData?.department_id || null,
+            department_name: finalAssessment.departmentName || profileData?.department_name || '',
+            job_role_id: finalAssessment.jobRoleId || null,
+            job_role_name: finalAssessment.jobRoleName || selectedJobRole?.name || '',
             start_date: finalAssessment.startDate || now.split('T')[0],
             last_updated: now,
             status: 'completed',
             progress: finalAssessment.progress,
             created_at: now,
-            competency_ratings: validCompetencyRatings
+            competency_ratings: validCompetencyRatings,
+            metadata: metadata // Store the full name in the metadata field
           })
           .select()
           .single();
@@ -314,6 +463,9 @@ export default function EmployeeAssessment() {
         setAssessment(finalAssessment);
         setShowSummaryModal(false);
         setShowSuccessModal(true);
+
+        // Clear localStorage
+        localStorage.removeItem('assessment_form_data');
       }
 
     } catch (err) {
@@ -321,6 +473,50 @@ export default function EmployeeAssessment() {
       setError('Failed to submit assessment. Please try again or contact support.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Function to fetch departments from the departments table
+  const fetchDepartments = async () => {
+    try {
+      console.log("Fetching departments...");
+
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .order('id', { ascending: true }); // Order by ID to match HR Role Management
+
+      if (error) {
+        console.error("Error fetching departments:", error);
+        throw error;
+      }
+
+      console.log("Fetched departments:", data);
+      setDepartments(data || []);
+    } catch (err) {
+      console.error("Error fetching departments:", err);
+    }
+  };
+
+  // Function to fetch job roles from the job_roles table
+  const fetchJobRoles = async () => {
+    try {
+      console.log("Fetching job roles...");
+
+      const { data, error } = await supabase
+        .from('job_roles')
+        .select('*')
+        .order('id', { ascending: true }); // Order by ID to match HR Role Management
+
+      if (error) {
+        console.error("Error fetching job roles:", error);
+        throw error;
+      }
+
+      console.log("Fetched job roles:", data);
+      setJobRoles(data || []);
+    } catch (err) {
+      console.error("Error fetching job roles:", err);
     }
   };
 
@@ -366,6 +562,39 @@ export default function EmployeeAssessment() {
       try {
         setLoading(true);
 
+        // Fetch departments and job roles first to ensure they're available
+        console.log("Loading departments and job roles...");
+        await Promise.all([
+          fetchDepartments(),
+          fetchJobRoles()
+        ]);
+
+        // Load saved form data from localStorage if available
+        if (typeof window !== 'undefined') {
+          const savedFormData = localStorage.getItem('assessment_form_data');
+          if (savedFormData) {
+            try {
+              const parsedData = JSON.parse(savedFormData);
+              console.log('Loaded form data from localStorage:', parsedData);
+
+              // Set the department and job role IDs from localStorage
+              if (parsedData.departmentId) {
+                setSelectedDepartmentId(parsedData.departmentId);
+              }
+
+              if (parsedData.jobRoleId) {
+                setSelectedJobRoleId(parsedData.jobRoleId);
+              }
+
+              if (parsedData.employeeFullName) {
+                setEmployeeFullName(parsedData.employeeFullName);
+              }
+            } catch (error) {
+              console.error('Error parsing saved form data:', error);
+            }
+          }
+        }
+
         // Use mock competencies for now since we're using a single table approach
         // In a real implementation, you would store competency data in the employee_assessments table
         // or fetch it from another source
@@ -394,9 +623,26 @@ export default function EmployeeAssessment() {
           setMockCompetencies();
         }
 
-        // Check if the user already has an assessment
+        // Check if the user already has an assessment (either in-progress or completed)
         if (user?.id) {
-          const { data: assessmentData, error: assessmentError } = await supabase
+          console.log("Checking for existing assessments for user:", user.id);
+
+          // First, try to find a completed assessment
+          const { data: completedAssessmentData, error: completedAssessmentError } = await supabase
+            .from('employee_assessments')
+            .select('*')
+            .eq('employee_id', user.id)
+            .eq('status', 'completed')
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (completedAssessmentError) {
+            console.error("Error fetching completed assessment:", completedAssessmentError);
+            throw completedAssessmentError;
+          }
+
+          // If no completed assessment, look for in-progress assessment
+          const { data: inProgressAssessmentData, error: inProgressAssessmentError } = await supabase
             .from('employee_assessments')
             .select('*')
             .eq('employee_id', user.id)
@@ -404,22 +650,70 @@ export default function EmployeeAssessment() {
             .order('created_at', { ascending: false })
             .limit(1);
 
-          if (assessmentError) throw assessmentError;
+          if (inProgressAssessmentError) {
+            console.error("Error fetching in-progress assessment:", inProgressAssessmentError);
+            throw inProgressAssessmentError;
+          }
+
+          // Prioritize completed assessment over in-progress
+          const assessmentData = completedAssessmentData && completedAssessmentData.length > 0
+            ? completedAssessmentData
+            : inProgressAssessmentData;
+
+          console.log("Found assessment data:", assessmentData);
 
           if (assessmentData && assessmentData.length > 0) {
-            // User has an existing in-progress assessment
+            // User has an existing assessment
             const existingAssessment = assessmentData[0];
 
             // Get competency ratings from the assessment data
             const competencyRatings = existingAssessment.competency_ratings || [];
+
+            // Extract metadata if it exists
+            const metadata = existingAssessment.metadata || {};
+            const fullName = metadata.employee_full_name || '';
+
+            // Get job role information from metadata if not in the main record
+            let jobRoleId = existingAssessment.job_role_id || null;
+            let jobRoleName = existingAssessment.job_role_name || '';
+
+            // If job role info is in metadata, use it
+            if (!jobRoleId && metadata.job_role_id) {
+              jobRoleId = metadata.job_role_id;
+              console.log("Using job role ID from metadata:", jobRoleId);
+            }
+
+            if (!jobRoleName && metadata.job_role_name) {
+              jobRoleName = metadata.job_role_name;
+              console.log("Using job role name from metadata:", jobRoleName);
+            }
+
+            // If we have job role ID but no name, try to get it from jobRoles
+            if (jobRoleId && !jobRoleName) {
+              // Fetch job roles first if not already loaded
+              if (jobRoles.length === 0) {
+                await fetchJobRoles();
+              }
+
+              const jobRole = jobRoles.find(r => r.id === jobRoleId);
+              if (jobRole) {
+                jobRoleName = jobRole.name;
+                console.log("Found job role name from jobRoles:", jobRoleName);
+              }
+            }
+
+            console.log("Final job role info:", { jobRoleId, jobRoleName });
 
             // Convert the Supabase data to our Assessment type
             const assessment: Assessment = {
               id: existingAssessment.id,
               employeeId: existingAssessment.employee_id,
               employeeName: existingAssessment.employee_name,
+              employeeFullName: fullName,
               departmentId: existingAssessment.department_id || null,
               departmentName: existingAssessment.department_name || '',
+              jobRoleId: jobRoleId,
+              jobRoleName: jobRoleName,
               startDate: existingAssessment.start_date,
               lastUpdated: existingAssessment.last_updated,
               status: existingAssessment.status,
@@ -432,6 +726,36 @@ export default function EmployeeAssessment() {
               }))
             };
 
+            // Set the department and job role IDs from the assessment
+            if (existingAssessment.department_id) {
+              setSelectedDepartmentId(existingAssessment.department_id);
+            }
+
+            if (jobRoleId) {
+              setSelectedJobRoleId(jobRoleId);
+            }
+
+            // Update the full name state if it exists in the metadata
+            if (fullName) {
+              setEmployeeFullName(fullName);
+            }
+
+            // Make sure job roles are loaded before setting the assessment
+            if (jobRoles.length === 0) {
+              console.log("Fetching job roles before setting assessment...");
+              await fetchJobRoles();
+
+              // Try to update job role name if we have the ID but not the name
+              if (jobRoleId && !jobRoleName) {
+                const jobRole = jobRoles.find(r => r.id === jobRoleId);
+                if (jobRole) {
+                  assessment.jobRoleName = jobRole.name;
+                  console.log("Updated job role name from fetched job roles:", jobRole.name);
+                }
+              }
+            }
+
+            console.log("Setting assessment with job role:", assessment.jobRoleName);
             setAssessment(assessment);
           }
         }
@@ -461,8 +785,9 @@ export default function EmployeeAssessment() {
         </div>
       )}
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading your assessment data...</p>
         </div>
       ) : (
         <>
@@ -490,9 +815,137 @@ export default function EmployeeAssessment() {
                   This assessment will help you evaluate your skills and competencies across different areas.
                   Your responses will be used to create a personalized development plan.
                 </p>
+
+                <div className="w-full max-w-md space-y-4">
+                  <div>
+                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-left mb-1">
+                      Your Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        id="fullName"
+                        value={employeeFullName}
+                        onChange={(e) => {
+                          setEmployeeFullName(e.target.value);
+
+                          // Save to localStorage
+                          const formData = {
+                            employeeFullName: e.target.value,
+                            departmentId: selectedDepartmentId,
+                            jobRoleId: selectedJobRoleId
+                          };
+                          localStorage.setItem('assessment_form_data', JSON.stringify(formData));
+
+                          if (error) setError(null); // Clear any error when user types
+                        }}
+                        placeholder="Enter your full name"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        required
+                      />
+                      {employeeFullName && (
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 text-green-500">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-left mb-1">
+                      Department <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        id="department"
+                        value={selectedDepartmentId}
+                        onChange={(e) => {
+                          setSelectedDepartmentId(e.target.value);
+
+                          // Save to localStorage
+                          const formData = {
+                            employeeFullName,
+                            departmentId: e.target.value,
+                            jobRoleId: selectedJobRoleId
+                          };
+                          localStorage.setItem('assessment_form_data', JSON.stringify(formData));
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white appearance-none"
+                        required
+                      >
+                        <option value="">Select a department</option>
+                        {departments.length > 0 ? (
+                          departments.map((dept) => (
+                            <option key={dept.id} value={dept.id}>{dept.name}</option>
+                          ))
+                        ) : (
+                          <option value="" disabled>Loading departments...</option>
+                        )}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                        </svg>
+                      </div>
+                    </div>
+                    {departments.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        No departments found. Please contact HR to add departments.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="jobRole" className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-left mb-1">
+                      Job Role <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        id="jobRole"
+                        value={selectedJobRoleId}
+                        onChange={(e) => {
+                          setSelectedJobRoleId(e.target.value);
+
+                          // Save to localStorage
+                          const formData = {
+                            employeeFullName,
+                            departmentId: selectedDepartmentId,
+                            jobRoleId: e.target.value
+                          };
+                          localStorage.setItem('assessment_form_data', JSON.stringify(formData));
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white appearance-none"
+                        required
+                      >
+                        <option value="">Select a job role</option>
+                        {jobRoles.length > 0 ? (
+                          jobRoles.map((role) => (
+                            <option key={role.id} value={role.id}>{role.name}</option>
+                          ))
+                        ) : (
+                          <option value="" disabled>Loading job roles...</option>
+                        )}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                        </svg>
+                      </div>
+                    </div>
+                    {jobRoles.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        No job roles found. Please contact HR to add job roles.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 <button
                   onClick={startNewAssessment}
-                  className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                  disabled={!employeeFullName.trim() || !selectedDepartmentId || !selectedJobRoleId}
+                  className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Start Assessment
                 </button>
@@ -528,12 +981,50 @@ export default function EmployeeAssessment() {
                 </div>
 
                 {/* Assessment Info */}
-                <div className="mb-6">
+                <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</h3>
+                    <p className="mt-1 text-gray-900 dark:text-white">
+                      {assessment.employeeFullName || 'Not specified'}
+                    </p>
+                  </div>
                   <div>
                     <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h3>
                     <p className="mt-1 text-gray-900 dark:text-white capitalize">
                       {assessment.status.replace('_', ' ')}
                     </p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Department</h3>
+                    <p className="mt-1 text-gray-900 dark:text-white">
+                      {assessment.departmentName || 'Not specified'}
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Job Role</h3>
+                    <p className="mt-1 text-gray-900 dark:text-white">
+                      {assessment.jobRoleName ||
+                       (assessment.jobRoleId && jobRoles.find(r => r.id === assessment.jobRoleId)?.name) ||
+                       'Not specified'}
+                    </p>
+                    {!assessment.jobRoleName && assessment.jobRoleId && (
+                      <button
+                        onClick={async () => {
+                          // Try to refresh job roles and update the assessment
+                          await fetchJobRoles();
+                          const jobRole = jobRoles.find(r => r.id === assessment.jobRoleId);
+                          if (jobRole && assessment) {
+                            setAssessment({
+                              ...assessment,
+                              jobRoleName: jobRole.name
+                            });
+                          }
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mt-1"
+                      >
+                        Refresh job role
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -570,6 +1061,11 @@ export default function EmployeeAssessment() {
                         Continue Assessment
                       </button>
                     )}
+                    {assessment.status === 'completed' && (
+                      <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                        Assessment is completed and locked
+                      </div>
+                    )}
                   </div>
 
                   {assessment.competencyRatings.length === 0 ? (
@@ -603,7 +1099,14 @@ export default function EmployeeAssessment() {
 
                 {/* Action Buttons */}
                 <div className="mt-6 flex justify-end gap-3">
-                  {assessment.status !== 'completed' && assessment.competencyRatings.length > 0 && (
+                  {assessment.status === 'completed' ? (
+                    <div className="flex items-center text-green-600 dark:text-green-400">
+                      <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                      <span>Assessment completed on {formatDate(assessment.lastUpdated)}</span>
+                    </div>
+                  ) : assessment.competencyRatings.length > 0 && (
                     <button
                       onClick={() => setShowSummaryModal(true)}
                       className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
@@ -722,10 +1225,20 @@ export default function EmployeeAssessment() {
                       setCurrentRating(0);
                       setCurrentComments('');
                     }}
-                    disabled={currentRating === 0}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
+                    disabled={currentRating === 0 || loading}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {activeCompetencyIndex === competencies.length - 1 ? 'Finish' : 'Next'}
+                    {loading ? (
+                      <span className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                      </span>
+                    ) : (
+                      activeCompetencyIndex === competencies.length - 1 ? 'Finish' : 'Next'
+                    )}
                   </button>
                 </div>
               </div>
@@ -761,13 +1274,29 @@ export default function EmployeeAssessment() {
 
                 <div className="flex-1 overflow-y-auto p-6">
                   <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="col-span-2">
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Full Name</h3>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{assessment.employeeFullName || 'Not specified'}</p>
+                    </div>
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Employee</h3>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</h3>
                       <p className="mt-1 text-sm text-gray-900 dark:text-white">{assessment.employeeName}</p>
                     </div>
                     <div>
                       <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Start Date</h3>
                       <p className="mt-1 text-sm text-gray-900 dark:text-white">{formatDate(assessment.startDate)}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Department</h3>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{assessment.departmentName || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Job Role</h3>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                        {assessment.jobRoleName ||
+                         (assessment.jobRoleId && jobRoles.find(r => r.id === assessment.jobRoleId)?.name) ||
+                         'Not specified'}
+                      </p>
                     </div>
                     <div>
                       <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Progress</h3>
@@ -829,9 +1358,20 @@ export default function EmployeeAssessment() {
                   <button
                     type="button"
                     onClick={submitAssessment}
-                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
+                    disabled={loading}
+                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Submit Assessment
+                    {loading ? (
+                      <span className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Submitting...
+                      </span>
+                    ) : (
+                      "Submit Assessment"
+                    )}
                   </button>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { 
+import {
   UserIcon,
   FileIcon,
   ChatIcon
@@ -7,6 +7,7 @@ import {
 import { supabase } from "../../lib/supabase";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable'; // Ensure proper import of the plugin
+import { useAuth } from "../../context/AuthContext";
 
 
 interface Employee {
@@ -54,6 +55,7 @@ const formatDate = (dateString: string) => {
 };
 
 export default function EmployeeAssessment() {
+  const { user } = useAuth(); // Get the current user from auth context
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
@@ -63,6 +65,7 @@ export default function EmployeeAssessment() {
   const [error, setError] = useState<string | null>(null);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [employeeProfile, setEmployeeProfile] = useState<any>(null);
   const [formData, setFormData] = useState<{
     employee_name: string;
     assessor_name: string;
@@ -70,9 +73,9 @@ export default function EmployeeAssessment() {
     status: 'In Progress' | 'Approved';
     overall_rating: number;
     department_id: string;
-    competencies: { 
-      id: string; 
-      rating: number; 
+    competencies: {
+      id: string;
+      rating: number;
       comments: string;
       competency: Competency;
     }[];
@@ -92,6 +95,8 @@ export default function EmployeeAssessment() {
     const loadData = async () => {
       try {
         setLoading(true);
+        console.log('Loading assessment data for user:', user?.id);
+
         // First load departments
         const { data: deptData, error: deptError } = await supabase
           .from('departments')
@@ -108,8 +113,35 @@ export default function EmployeeAssessment() {
         if (compError) throw compError;
         setCompetencies(compData);
 
-        // Then load assessments
-        const { data: assessmentData, error: assessmentError } = await supabase
+        // Load employee profile data if user is logged in
+        if (user?.id) {
+          const { data: empData, error: empError } = await supabase
+            .from('employees')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+          if (!empError && empData) {
+            console.log('Found employee profile:', empData);
+            setEmployeeProfile(empData);
+          } else {
+            console.log('No employee profile found, trying with email');
+            // Try with email as fallback
+            const { data: emailData, error: emailError } = await supabase
+              .from('employees')
+              .select('*')
+              .eq('email', user.email)
+              .single();
+
+            if (!emailError && emailData) {
+              console.log('Found employee profile by email:', emailData);
+              setEmployeeProfile(emailData);
+            }
+          }
+        }
+
+        // Then load assessments - filter by employee_id if user is logged in
+        let query = supabase
           .from('employee_assessments')
           .select(`
             *,
@@ -120,7 +152,17 @@ export default function EmployeeAssessment() {
           `)
           .order('created_at', { ascending: true });
 
+        // If user is logged in, filter assessments by their ID
+        if (user?.id) {
+          console.log('Filtering assessments by employee_id:', user.id);
+          query = query.eq('employee_id', user.id);
+        }
+
+        const { data: assessmentData, error: assessmentError } = await query;
+
         if (assessmentError) throw assessmentError;
+
+        console.log('Found assessments:', assessmentData?.length || 0);
 
         const transformedData = assessmentData.map(item => {
           const department = deptData.find(d => d.id === item.department_id);
@@ -157,14 +199,16 @@ export default function EmployeeAssessment() {
     };
 
     loadData();
-  }, []);
+  }, [user]); // Add user to dependency array to reload data when user changes
 
   const fetchAssessments = async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const { data, error } = await supabase
+      console.log('Fetching assessments for user:', user?.id);
+
+      // Build the query
+      let query = supabase
         .from('employee_assessments')
         .select(`
           *,
@@ -175,7 +219,17 @@ export default function EmployeeAssessment() {
         `)
         .order('created_at', { ascending: true });
 
+      // If user is logged in, filter assessments by their ID
+      if (user?.id) {
+        console.log('Filtering assessments by employee_id:', user.id);
+        query = query.eq('employee_id', user.id);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
+
+      console.log('Found assessments:', data?.length || 0);
 
       const transformedData = data.map(item => {
         const department = departments.find(d => d.id === item.department_id);
@@ -230,17 +284,23 @@ export default function EmployeeAssessment() {
 
       const department = departments.find(d => d.id === formData.department_id);
 
+      console.log('Creating assessment for user:', user?.id);
+
       // Start a transaction
       const { data: assessment, error: assessmentError } = await supabase
         .from('employee_assessments')
         .insert({
-          employee_name: formData.employee_name,
+          employee_id: user?.id || null, // Associate with current user
+          employee_name: formData.employee_name, // This is the full email
+          employee_email: user?.email || '',
           assessor_name: formData.assessor_name,
           assessment_date: formData.assessment_date,
           status: 'In Progress',
           overall_rating: Number(formData.overall_rating) || 0,
           is_edited: false,
-          department_id: formData.department_id
+          department_id: formData.department_id,
+          created_at: new Date().toISOString(),
+          last_updated: new Date().toISOString()
         })
         .select()
         .single();
@@ -307,13 +367,20 @@ export default function EmployeeAssessment() {
     setSelectedAssessment(null);
     const now = new Date();
     const formattedDate = now.toISOString().slice(0, 16); // This will give us YYYY-MM-DDTHH:mm
+
+    // Use full email address if available
+    const userEmail = user?.email || '';
+
+    // Get department ID from employee profile if available
+    const departmentId = employeeProfile?.department_id || '';
+
     setFormData({
-      employee_name: '',
+      employee_name: userEmail, // Use full email address
       assessor_name: '',
       assessment_date: formattedDate,
       status: 'In Progress',
       overall_rating: 0,
-      department_id: '',
+      department_id: departmentId,
       competencies: competencies.map(comp => ({
         id: comp.id,
         rating: 0,
@@ -363,16 +430,21 @@ export default function EmployeeAssessment() {
       setLoading(true);
       setError(null);
 
+      console.log('Updating assessment for user:', user?.id);
+
       // Update the existing assessment
       const { error: updateError } = await supabase
         .from('employee_assessments')
         .update({
-          employee_name: formData.employee_name,
+          employee_id: user?.id || null, // Ensure user ID is maintained
+          employee_name: formData.employee_name, // This is the full email
+          employee_email: user?.email || '',
           assessor_name: formData.assessor_name,
           assessment_date: formData.assessment_date,
           status: formData.status,
           overall_rating: Number(formData.overall_rating) || 0,
-          department_id: formData.department_id
+          department_id: formData.department_id,
+          last_updated: new Date().toISOString()
         })
         .eq('id', selectedAssessment.id);
 
@@ -441,8 +513,8 @@ export default function EmployeeAssessment() {
       };
 
       // Update the state with the transformed assessment
-      setAssessments(prevAssessments => 
-        prevAssessments.map(assessment => 
+      setAssessments(prevAssessments =>
+        prevAssessments.map(assessment =>
           assessment.id === selectedAssessment.id ? transformedAssessment : assessment
         )
       );
@@ -460,14 +532,14 @@ export default function EmployeeAssessment() {
   const handleDeleteAssessment = async (id: string) => {
     try {
       setLoading(true);
-      
+
       const { error } = await supabase
         .from('employee_assessments')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
-      
+
       await fetchAssessments();
       setShowDeleteModal(false);
       setAssessmentToDelete(null);
@@ -531,7 +603,7 @@ export default function EmployeeAssessment() {
   };
 
   const handleCompetencyRatingChange = (id: string, rating: number) => {
-    const updatedCompetencies = formData.competencies.map(comp => 
+    const updatedCompetencies = formData.competencies.map(comp =>
       comp.id === id ? { ...comp, rating } : comp
     );
     setFormData({
@@ -560,7 +632,7 @@ export default function EmployeeAssessment() {
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Employee Competency Assessment</h1>
               <p className="mt-1 text-gray-600 dark:text-gray-400">Manage and track employee competency assessments</p>
             </div>
-            <button 
+            <button
               onClick={handleNewAssessmentClick}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
@@ -593,12 +665,12 @@ export default function EmployeeAssessment() {
           {/* Assessment Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredAssessments.map((assessment) => (
-              <div 
+              <div
                 key={assessment.id}
                 className="group relative rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-blue-200 hover:shadow-lg dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-800/50"
               >
                 <div className="absolute inset-x-0 top-0 h-1 rounded-t-xl bg-gradient-to-r from-blue-600 to-purple-600" />
-                
+
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -638,7 +710,7 @@ export default function EmployeeAssessment() {
                     </div>
                   </div>
                   <div className="mt-2 h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                    <div 
+                    <div
                       className="h-1.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600"
                       style={{ width: `${((assessment.overall_rating || 0) / 5) * 100}%` }}
                     />
@@ -666,7 +738,7 @@ export default function EmployeeAssessment() {
                   >
                     Edit
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       setAssessmentToDelete(assessment);
                       setShowDeleteModal(true);
@@ -802,7 +874,7 @@ export default function EmployeeAssessment() {
                   </button>
                 </div>
 
-                <form 
+                <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (selectedAssessment) {
@@ -816,14 +888,14 @@ export default function EmployeeAssessment() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Employee Name
+                        Employee Email
                       </label>
                       <input
                         type="text"
                         value={formData.employee_name}
-                        onChange={(e) => setFormData({ ...formData, employee_name: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        placeholder="Enter employee name"
+                        readOnly={true} // Always make it read-only
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white bg-gray-100"
+                        placeholder="Employee email"
                       />
                     </div>
 
@@ -909,7 +981,7 @@ export default function EmployeeAssessment() {
                             <label className="text-sm font-medium text-gray-900 dark:text-white">
                               {formCompetency.competency.name}
                             </label>
-                            <select 
+                            <select
                               value={formCompetency.rating}
                               onChange={(e) => handleCompetencyRatingChange(formCompetency.id, Number(e.target.value))}
                               className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
@@ -928,7 +1000,7 @@ export default function EmployeeAssessment() {
                             rows={2}
                             value={formCompetency.comments}
                             onChange={(e) => {
-                              const updatedCompetencies = formData.competencies.map(comp => 
+                              const updatedCompetencies = formData.competencies.map(comp =>
                                 comp.id === formCompetency.id ? { ...comp, comments: e.target.value } : comp
                               );
                               setFormData({ ...formData, competencies: updatedCompetencies });

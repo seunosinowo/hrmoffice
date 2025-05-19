@@ -37,7 +37,7 @@ interface Assessment {
   employee: Employee;
   assessor_name: string;
   assessment_date: string;
-  status: 'In Progress' | 'Approved';
+  status: 'In Progress' | 'Approved' | 'Completed'; // Added 'Completed' as a valid status
   overall_rating: number;
   isEdited: boolean;
   competencies: AssessmentCompetency[];
@@ -67,7 +67,7 @@ export default function EmployeeAssessment() {
     employee_name: string;
     assessor_name: string;
     assessment_date: string;
-    status: 'In Progress' | 'Approved';
+    status: 'In Progress' | 'Approved' | 'Completed'; // Added 'Completed' as a valid status
     overall_rating: number;
     department_id: string;
     competencies: {
@@ -186,19 +186,23 @@ export default function EmployeeAssessment() {
           ? mappedCompetencies.reduce((sum: number, comp: any) => sum + (comp.rating || 0), 0) / mappedCompetencies.length
           : 0;
 
+        // Get employee full name from metadata or employee_full_name field
+        const metadata = assessment.metadata || {};
+        const fullName = assessment.employee_full_name || metadata.employee_full_name || assessment.employee_name;
+
         // Map to Assessment type
         return {
           id: assessment.id,
           employee: {
-            name: assessment.employee_name,
+            name: fullName, // Use full name instead of email
             department: assessment.department_id ? [{
               id: assessment.department_id,
-              name: department?.name || 'Unknown Department'
+              name: department?.name || assessment.department_name || 'Unknown Department'
             }] : []
           },
           assessor_name: assessment.assessor_name || '',
           assessment_date: assessment.start_date || assessment.created_at,
-          status: assessment.status === 'completed' ? 'Approved' as const : 'In Progress' as const,
+          status: assessment.status === 'completed' ? 'Completed' as const : 'In Progress' as const, // Changed from 'Approved' to 'Completed'
           overall_rating: Number(overallRating.toFixed(1)),
           isEdited: false,
           competencies: mappedCompetencies
@@ -233,7 +237,7 @@ export default function EmployeeAssessment() {
 
       const department = departments.find(d => d.id === formData.department_id);
       const now = new Date().toISOString();
-      const status = formData.status === 'Approved' ? 'completed' : 'in_progress';
+      const status = formData.status === 'Completed' ? 'completed' : 'in_progress';
 
       // Filter competencies with ratings
       const competencyRatings = formData.competencies
@@ -323,58 +327,27 @@ export default function EmployeeAssessment() {
     }
   };
 
-  const handleNewAssessmentClick = () => {
-    setSelectedAssessment(null);
-    const now = new Date();
-    const formattedDate = now.toISOString().slice(0, 16); // This will give us YYYY-MM-DDTHH:mm
-    setFormData({
-      employee_name: '',
-      assessor_name: '',
-      assessment_date: formattedDate,
-      status: 'In Progress',
-      overall_rating: 0,
-      department_id: '',
-      competencies: competencies.map(comp => ({
-        id: comp.id,
-        rating: 0,
-        comments: '',
-        competency: comp
-      }))
-    });
-    setShowNewAssessmentModal(true);
-  };
+  // const handleNewAssessmentClick = () => {
+  //   setSelectedAssessment(null);
+  //   const now = new Date();
+  //   const formattedDate = now.toISOString().slice(0, 16); // This will give us YYYY-MM-DDTHH:mm
+  //   setFormData({
+  //     employee_name: '',
+  //     assessor_name: '',
+  //     assessment_date: formattedDate,
+  //     status: 'In Progress',
+  //     overall_rating: 0,
+  //     department_id: '',
+  //     competencies: competencies.map(comp => ({
+  //       id: comp.id,
+  //       rating: 0,
+  //       comments: '',
+  //       competency: comp
+  //     }))
+  //   });
+  //   setShowNewAssessmentModal(true);
+  // };
 
-  const handleEditClick = (assessment: Assessment) => {
-    setSelectedAssessment(assessment);
-    const mappedCompetencies = assessment.competencies.map(comp => ({
-      id: comp.competency.id,
-      rating: comp.rating,
-      comments: comp.comments || '',
-      competency: comp.competency
-    }));
-
-    // Add any missing competencies
-    const allCompetencies = competencies.map(comp => {
-      const existingComp = mappedCompetencies.find(c => c.id === comp.id);
-      return existingComp || {
-        id: comp.id,
-        rating: 0,
-        comments: '',
-        competency: comp
-      };
-    });
-
-    setFormData({
-      employee_name: assessment.employee.name,
-      assessor_name: assessment.assessor_name,
-      assessment_date: assessment.assessment_date,
-      status: assessment.status,
-      overall_rating: assessment.overall_rating,
-      department_id: assessment.employee.department[0]?.id || '',
-      competencies: allCompetencies
-    });
-    setShowNewAssessmentModal(true);
-  };
 
   const handleEditAssessment = async () => {
     if (!selectedAssessment) return;
@@ -385,7 +358,7 @@ export default function EmployeeAssessment() {
 
       const department = departments.find(d => d.id === formData.department_id);
       const now = new Date().toISOString();
-      const status = formData.status === 'Approved' ? 'completed' : 'in_progress';
+      const status = formData.status === 'Completed' ? 'completed' : 'in_progress';
 
       // Filter competencies with ratings
       const competencyRatings = formData.competencies
@@ -496,16 +469,22 @@ export default function EmployeeAssessment() {
     const doc = new jsPDF();
 
     // Add title
-    doc.setFontSize(16);
-    doc.text('Employee Assessment Report', 14, 15);
+    doc.setFontSize(18);
+    doc.setTextColor(41, 128, 185); // Blue color for title
+    doc.text('Employee Competency Self-Assessment', 14, 15);
+
+    // Add subtitle
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0); // Reset to black
+    doc.text('Assessment Report', 14, 25);
 
     // Add assessment details
     doc.setFontSize(12);
-    doc.text(`Employee: ${assessment.employee.name}`, 14, 30);
-    doc.text(`Department: ${assessment.employee.department[0]?.name || 'N/A'}`, 14, 40);
-    doc.text(`Assessor: ${assessment.assessor_name}`, 14, 50);
-    doc.text(`Date: ${formatDate(assessment.assessment_date)}`, 14, 60);
-    doc.text(`Overall Rating: ${assessment.overall_rating}`, 14, 70);
+    doc.text(`Employee: ${assessment.employee.name}`, 14, 40);
+    doc.text(`Department: ${assessment.employee.department[0]?.name || 'N/A'}`, 14, 50);
+    doc.text(`Assessment Date: ${formatDate(assessment.assessment_date)}`, 14, 60);
+    doc.text(`Status: ${assessment.status}`, 14, 70);
+    doc.text(`Overall Rating: ${assessment.overall_rating.toFixed(1)} / 5.0`, 14, 80);
 
     // Add competencies table
     const tableData = assessment.competencies.map(comp => [
@@ -515,7 +494,7 @@ export default function EmployeeAssessment() {
     ]);
 
     autoTable(doc, {
-        startY: 80,
+        startY: 90,
         head: [['Competency', 'Rating', 'Comments']],
         body: tableData,
         theme: 'grid',
@@ -523,8 +502,22 @@ export default function EmployeeAssessment() {
         styles: { fontSize: 10 }
     });
 
+    // Add footer
+    const pageCount = (doc as any).internal.pages.length - 1;
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(10);
+      doc.setTextColor(150);
+      doc.text(
+        `Generated on ${new Date().toLocaleDateString()}`,
+        doc.internal.pageSize.getWidth() / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      );
+    }
+
     // Save the PDF
-    doc.save(`Assessment_${assessment.employee.name}_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`Competency_Assessment_${assessment.employee.name}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const filteredAssessments = assessments.filter(assessment =>
@@ -532,16 +525,7 @@ export default function EmployeeAssessment() {
     assessment.employee.department.some(dept => dept.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Approved':
-        return { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', icon: '✓' };
-      case 'In Progress':
-        return { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-800 dark:text-yellow-300', icon: '⏳' };
-      default:
-        return { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-800 dark:text-gray-300', icon: '•' };
-    }
-  };
+  // Status colors are now defined inline in the JSX
 
   const handleCompetencyRatingChange = (id: string, rating: number) => {
     const updatedCompetencies = formData.competencies.map(comp =>
@@ -562,8 +546,9 @@ export default function EmployeeAssessment() {
         </div>
       )}
       {loading ? (
-        <div className="flex justify-center items-center h-64">
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading assessment data...</p>
         </div>
       ) : (
         <>
@@ -571,14 +556,8 @@ export default function EmployeeAssessment() {
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Employee Competency Assessment</h1>
-              <p className="mt-1 text-gray-600 dark:text-gray-400">Manage and track employee competency assessments</p>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">View employee competency self-assessments</p>
             </div>
-            <button
-              onClick={handleNewAssessmentClick}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-            >
-              New Assessment
-            </button>
           </div>
 
           {/* Search and Filter Section */}
@@ -613,16 +592,30 @@ export default function EmployeeAssessment() {
                 <div className="absolute inset-x-0 top-0 h-1 rounded-t-xl bg-gradient-to-r from-blue-600 to-purple-600" />
 
                 <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <div className="flex-1 min-w-0 mr-2"> {/* Added margin-right for spacing */}
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white break-words">
                       {assessment.employee.name}
                     </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
                       {assessment.employee.department.map(dept => dept.name).join(', ')}
                     </p>
                   </div>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(assessment.status).bg} ${getStatusColor(assessment.status).text} whitespace-nowrap`}>
-                    <span>{getStatusColor(assessment.status).icon}</span>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap ${
+                    assessment.status === 'Completed'
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                  }`}>
+                    <span>
+                      {assessment.status === 'Completed' ? (
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                      ) : (
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      )}
+                    </span>
                     {assessment.status}
                   </span>
                 </div>
@@ -660,33 +653,17 @@ export default function EmployeeAssessment() {
 
                 <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
                   <p>Assessment Date: {formatDate(assessment.assessment_date)}</p>
-                  <p>Assessor: {assessment.assessor_name}</p>
                 </div>
 
-                <div className="mt-6 flex justify-end gap-2">
+                <div className="mt-6 flex justify-end">
                   <button
                     onClick={() => {
                       setSelectedAssessment(assessment);
                       setShowDetailsModal(true);
                     }}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                    className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
                   >
                     View Details
-                  </button>
-                  <button
-                    onClick={() => handleEditClick(assessment)}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAssessmentToDelete(assessment);
-                      setShowDeleteModal(true);
-                    }}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-red-400 dark:hover:bg-white/[0.05]"
-                  >
-                    Delete
                   </button>
                 </div>
               </div>
@@ -727,8 +704,8 @@ export default function EmployeeAssessment() {
                       <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedAssessment.employee.department.map(dept => dept.name).join(', ')}</p>
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Assessor</h3>
-                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedAssessment.assessor_name}</p>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Assessment Date</h3>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">{formatDate(selectedAssessment.assessment_date)}</p>
                     </div>
                     <div>
                       <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Overall Rating</h3>
@@ -889,11 +866,11 @@ export default function EmployeeAssessment() {
                     </label>
                     <select
                       value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'In Progress' | 'Approved' })}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'In Progress' | 'Completed' })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     >
                       <option value="In Progress">In Progress</option>
-                      <option value="Approved">Approved</option>
+                      <option value="Completed">Completed</option>
                     </select>
                   </div>
 
