@@ -46,6 +46,7 @@ const AssessorAnalytics = lazy(() => import("./pages/Assessor/Analytics/Individu
 const AssessorIndividualGap = lazy(() => import("./pages/Assessor/Analytics/IndividualGap"));
 const AssessorOrganizationGap = lazy(() => import("./pages/Assessor/Analytics/OrganizationGap"));
 const AssessorEmployeeAssessment = lazy(() => import("./pages/Assessor/Assessment_management/EmployeeAssessment"));
+const AssessorAssessment = lazy(() => import("./pages/Assessor/Assessment_management/AssessorAssessment"));
 const AssessorCompetency = lazy(() => import("./pages/Assessor/Competency_framework/Competency"));
 const AssessorCompetencyCategory = lazy(() => import("./pages/Assessor/Competency_framework/CompetencyCategory"));
 const AssessorCompetencyDescription = lazy(() => import("./pages/Assessor/Competency_framework/CompetencyDescription"));
@@ -166,6 +167,7 @@ export default function App() {
                 <Route path="/assessor/job" element={<AssessorJob />} />
                 <Route path="/assessor/job-competency-profile" element={<AssessorJobCompetencyProfile />} />
                 <Route path="/assessor/employee-assessment" element={<AssessorEmployeeAssessment />} />
+                <Route path="/assessor/assessment" element={<AssessorAssessment />} />
                 <Route path="/assessor/individual-gap" element={<AssessorIndividualGap />} />
                 <Route path="/assessor/organization-gap" element={<AssessorOrganizationGap />} />
                 <Route path="/assessor/analytics" element={<AssessorAnalytics />} />

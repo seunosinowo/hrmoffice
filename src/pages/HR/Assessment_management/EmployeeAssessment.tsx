@@ -114,15 +114,15 @@ export default function EmployeeAssessment() {
           setDepartments(mockDepartments);
         }
 
-        // Use mock competencies since we're using a single table approach
-        const mockCompetencies = [
+        // Use the standard competencies that match what employees fill out
+        const standardCompetencies = [
           { id: '1', name: 'Communication' },
           { id: '2', name: 'Problem Solving' },
           { id: '3', name: 'Leadership' },
           { id: '4', name: 'Technical Skills' },
           { id: '5', name: 'Teamwork' }
         ];
-        setCompetencies(mockCompetencies);
+        setCompetencies(standardCompetencies);
 
         // Fetch assessments from Supabase
         await fetchAssessments();
@@ -157,18 +157,51 @@ export default function EmployeeAssessment() {
       }
 
       // Process assessments
+      console.log('Competencies available:', competencies);
+      console.log('Raw assessment data:', data);
+
       const processedAssessments = data.map(assessment => {
         // Get department info
         const department = departments.find(d => d.id === assessment.department_id);
 
         // Get competency ratings from the assessment data
         const competencyRatings = assessment.competency_ratings || [];
+        console.log('Competency ratings for assessment:', assessment.id, competencyRatings);
 
         // Map competency ratings to the expected format
         const mappedCompetencies = competencyRatings.map((rating: any) => {
-          // Find competency details
-          const competency = competencies.find(c => c.id === rating.competency_id);
-          const competencyName = competency ? competency.name : `Competency ${rating.competency_id}`;
+          console.log('Processing rating:', rating);
+
+          // Find competency details by ID or try to match by position
+          let competency = competencies.find(c => c.id === rating.competency_id);
+          console.log('Found competency by ID:', competency);
+
+          // If not found by ID, try to match by position (1-based index)
+          if (!competency && !isNaN(Number(rating.competency_id))) {
+            const index = Number(rating.competency_id) - 1;
+            if (index >= 0 && index < competencies.length) {
+              competency = competencies[index];
+              console.log('Found competency by position:', competency);
+            }
+          }
+
+          // Hard-code the competency name based on the ID
+          let competencyName;
+          if (rating.competency_id === '1' || rating.competency_id === 1) {
+            competencyName = 'Communication';
+          } else if (rating.competency_id === '2' || rating.competency_id === 2) {
+            competencyName = 'Problem Solving';
+          } else if (rating.competency_id === '3' || rating.competency_id === 3) {
+            competencyName = 'Leadership';
+          } else if (rating.competency_id === '4' || rating.competency_id === 4) {
+            competencyName = 'Technical Skills';
+          } else if (rating.competency_id === '5' || rating.competency_id === 5) {
+            competencyName = 'Teamwork';
+          } else {
+            competencyName = competency ? competency.name : `Competency ${rating.competency_id}`;
+          }
+
+          console.log('Final competency name:', competencyName);
 
           return {
             id: rating.id,
