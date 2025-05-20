@@ -128,7 +128,6 @@ const assessorNavItems: NavItem[] = [
     name: "Assessment Mgt",
     subItems: [
       { name: "Assessor Assessment", path: "/assessor/assessment" },
-      { name: "Consensus Assessment", path: "/assessor/consensus-assessment" },
     ],
   },
   {

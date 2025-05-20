@@ -41,7 +41,6 @@ const EmployeeConsensusAssessment = lazy(() => import("./pages/Employee/Assessme
 const EmployeeAnalytics = lazy(() => import("./pages/Employee/Analytics/IndividualGap"));
 
 // Assessor Components
-const AssessorConsensusAssessment = lazy(() => import("./pages/Assessor/Assessment_management/ConsensusAssessment"));
 const AssessorAnalytics = lazy(() => import("./pages/Assessor/Analytics/IndividualGap"));
 const AssessorIndividualGap = lazy(() => import("./pages/Assessor/Analytics/IndividualGap"));
 const AssessorOrganizationGap = lazy(() => import("./pages/Assessor/Analytics/OrganizationGap"));
@@ -173,7 +172,6 @@ export default function App() {
                 <Route path="/assessor/individual-gap" element={<AssessorIndividualGap />} />
                 <Route path="/assessor/organization-gap" element={<AssessorOrganizationGap />} />
                 <Route path="/assessor/analytics" element={<AssessorAnalytics />} />
-                <Route path="/assessor/consensus-assessment" element={<AssessorConsensusAssessment />} />
               </Route>
 
               {/* HR Routes */}

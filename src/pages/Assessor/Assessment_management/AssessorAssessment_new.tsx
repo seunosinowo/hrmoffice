@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   UserIcon,
-  ChartBarIcon,
-  DocumentCheckIcon,
   StarIcon,
-  PencilIcon,
   CheckCircleIcon,
   XCircleIcon,
   DocumentTextIcon,
@@ -134,7 +131,7 @@ export default function AssessorAssessment() {
             assessor_status,
             created_at
           `)
-          .eq('status', 'completed')
+          .in('status', ['completed', 'reviewed'])
           .order('created_at', { ascending: false });
 
         if (assessmentsError) throw assessmentsError;
@@ -148,7 +145,14 @@ export default function AssessorAssessment() {
             assessor_rating: assessment.assessor_rating || null,
             assessor_comments: assessment.assessor_comments || null,
             assessor_status: assessment.assessor_status || 'pending',
-            competency_ratings: assessment.competency_ratings.map(rating => ({
+            competency_ratings: assessment.competency_ratings.map((rating: {
+              id: string;
+              competency_id: string;
+              rating: number;
+              comments?: string;
+              assessor_comments?: string;
+              assessor_rating?: number;
+            }) => ({
               ...rating,
               assessor_comments: rating.assessor_comments || '',
               assessor_rating: rating.assessor_rating || 0
