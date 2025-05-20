@@ -82,7 +82,7 @@ const employeeNavItems: NavItem[] = [
     name: "Analytics",
     subItems: [
       { name: "Individual Gap", path: "/individual-gap" },
-      { name: "Organization Gap", path: "/organization-gap" },
+      // { name: "Organization Gap", path: "/organization-gap" }, // Removed as employees don't need organization gap analysis
     ],
   },
 ];
