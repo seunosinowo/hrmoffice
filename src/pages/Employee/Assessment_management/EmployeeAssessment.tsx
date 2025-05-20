@@ -29,7 +29,7 @@ interface Assessment {
   jobRoleName: string;
   startDate: string;
   lastUpdated: string;
-  status: 'not_started' | 'in_progress' | 'completed' | 'reviewed';
+  status: 'not_started' | 'in_progress' | 'completed' | 'reviewed' | 'Reviewed';
   progress: number;
   competencyRatings: CompetencyRating[];
 }
@@ -98,15 +98,21 @@ export default function EmployeeAssessment() {
     try {
       setLoading(true);
 
+      // Get the selected job role and department objects
+      const selectedDept = departments.find(d => d.id === selectedDepartmentId);
+      const selectedRole = jobRoles.find(r => r.id === selectedJobRoleId);
+
+      console.log("Selected job role for new assessment:", selectedRole);
+
       // Create a new assessment with department and job role selection
       const newAssessment: Assessment = {
         employeeId: user?.id || null,
         employeeName: user?.email?.split('@')[0] || 'Current User',
         employeeFullName: employeeFullName || '',
         departmentId: selectedDepartmentId || null,
-        departmentName: departments.find(d => d.id === selectedDepartmentId)?.name || '',
+        departmentName: selectedDept?.name || '',
         jobRoleId: selectedJobRoleId || null,
-        jobRoleName: jobRoles.find(r => r.id === selectedJobRoleId)?.name || '',
+        jobRoleName: selectedRole?.name || '',
         startDate: new Date().toISOString().split('T')[0],
         lastUpdated: new Date().toISOString().split('T')[0],
         status: 'in_progress',
@@ -126,12 +132,9 @@ export default function EmployeeAssessment() {
         employee_full_name: employeeFullName
       };
 
-      // Get department and job role information
-      const selectedDepartment = departments.find(d => d.id === selectedDepartmentId);
-      const selectedJobRole = jobRoles.find(r => r.id === selectedJobRoleId);
-
-      console.log("Selected department:", selectedDepartment);
-      console.log("Selected job role:", selectedJobRole);
+      // We already have the department and job role information from above
+      console.log("Selected department for assessment data:", selectedDept);
+      console.log("Selected job role for assessment data:", selectedRole);
 
       // Create the base assessment object
       const assessmentData: any = {
@@ -139,9 +142,9 @@ export default function EmployeeAssessment() {
         employee_name: user?.email || 'Current User',
         employee_email: user?.email || '',
         department_id: selectedDepartmentId || null,
-        department_name: selectedDepartment?.name || '',
+        department_name: selectedDept?.name || '',
         job_role_id: selectedJobRoleId || null,
-        job_role_name: selectedJobRole?.name || '',
+        job_role_name: selectedRole?.name || '',
         start_date: newAssessment.startDate,
         last_updated: newAssessment.lastUpdated,
         status: 'in_progress',
@@ -153,14 +156,14 @@ export default function EmployeeAssessment() {
           ...metadata,
           employee_full_name: employeeFullName,
           job_role_id: selectedJobRoleId,
-          job_role_name: selectedJobRole?.name
+          job_role_name: selectedRole?.name
         }
       };
 
       // Add the new columns directly
       assessmentData.employee_full_name = employeeFullName;
       assessmentData.job_role_id = selectedJobRoleId || null;
-      assessmentData.job_role_name = selectedJobRole?.name || '';
+      assessmentData.job_role_name = selectedRole?.name || '';
 
       console.log("Saving assessment with data:", assessmentData);
 
@@ -181,7 +184,16 @@ export default function EmployeeAssessment() {
         newAssessment.id = data[0].id;
       }
 
+      // Update the assessment state with the new assessment
       setAssessment(newAssessment);
+
+      // Log the job role information for debugging
+      console.log("Setting assessment with job role:", {
+        jobRoleId: selectedJobRoleId,
+        jobRoleName: selectedRole?.name
+      });
+
+      // Show the rating modal and set the active competency index
       setShowRatingModal(true);
       setActiveCompetencyIndex(0);
 
@@ -198,7 +210,7 @@ export default function EmployeeAssessment() {
     const creationDate = new Date(assessment.startDate);
     const now = new Date();
     const hoursDifference = (now.getTime() - creationDate.getTime()) / (1000 * 60 * 60);
-    return hoursDifference > 24 || assessment.status === 'completed' || assessment.status === 'reviewed';
+    return hoursDifference > 24 || assessment.status === 'completed' || assessment.status === 'reviewed' || assessment.status === 'Reviewed';
   };
 
   // Function to handle competency rating
@@ -219,11 +231,11 @@ export default function EmployeeAssessment() {
     const existingRatingIndex = updatedRatings.findIndex(r => r.competencyId === competency.id);
 
     if (existingRatingIndex >= 0) {
-      updatedRatings[existingRatingIndex] = {
-        ...updatedRatings[existingRatingIndex],
+      // Use Object.assign to avoid TypeScript spread operator issues
+      updatedRatings[existingRatingIndex] = Object.assign({}, updatedRatings[existingRatingIndex], {
         rating,
         comments
-      };
+      });
     } else {
       updatedRatings.push({
         competencyId: competency.id,
@@ -236,22 +248,43 @@ export default function EmployeeAssessment() {
     const progress = calculateProgress(updatedRatings, competencies.length);
 
     // Update the assessment
-    const updatedAssessment: Assessment = {
-      ...assessment,
-      competencyRatings: updatedRatings,
-      progress,
-      lastUpdated: new Date().toISOString().split('T')[0]
-    };
+    // Make sure assessment is not null before updating
+    let updatedAssessment: Assessment;
+
+    if (assessment) {
+      // Use Object.assign to avoid TypeScript spread operator issues
+      updatedAssessment = Object.assign({}, assessment, {
+        competencyRatings: updatedRatings,
+        progress,
+        lastUpdated: new Date().toISOString().split('T')[0]
+      });
+    } else {
+      // This should never happen due to the check at the beginning of the function
+      updatedAssessment = {
+        employeeId: null,
+        employeeName: '',
+        employeeFullName: '',
+        departmentId: null,
+        departmentName: '',
+        jobRoleId: null,
+        jobRoleName: '',
+        startDate: new Date().toISOString().split('T')[0],
+        lastUpdated: new Date().toISOString().split('T')[0],
+        status: 'in_progress',
+        progress,
+        competencyRatings: updatedRatings
+      };
+    }
 
     // Save the updated assessment to Supabase
     const saveRating = async () => {
       try {
         // If the assessment has an ID, update it in Supabase
         if (assessment.id) {
-          // Get the current assessment to preserve metadata
+          // Get the current assessment to preserve metadata and existing ratings
           const { data: currentAssessment, error: fetchError } = await supabase
             .from('employee_assessments')
-            .select('metadata')
+            .select('metadata, competency_ratings')
             .eq('id', assessment.id)
             .single();
 
@@ -261,45 +294,38 @@ export default function EmployeeAssessment() {
           const metadata = currentAssessment?.metadata || {};
           metadata.employee_full_name = updatedAssessment.employeeFullName || '';
 
-          // Update the assessment
+          // Format the competency ratings for storage in the employee_assessments table
+          const formattedRatings = updatedRatings.map(rating => ({
+            id: rating.id || crypto.randomUUID(),
+            competency_id: rating.competencyId,
+            rating: rating.rating,
+            comments: rating.comments || '',
+            created_at: new Date().toISOString()
+          }));
+
+          console.log("Saving competency ratings to employee_assessments table:", formattedRatings);
+
+          // Make sure we preserve job role information
+          console.log("Preserving job role in competency rating update:", {
+            jobRoleId: assessment.jobRoleId,
+            jobRoleName: assessment.jobRoleName
+          });
+
+          // Update the assessment with the new competency ratings
           const { error: updateError } = await supabase
             .from('employee_assessments')
             .update({
               progress: updatedAssessment.progress,
               last_updated: updatedAssessment.lastUpdated,
-              metadata: metadata
+              metadata: metadata,
+              competency_ratings: formattedRatings,
+              // Explicitly preserve job role information
+              job_role_id: assessment.jobRoleId,
+              job_role_name: assessment.jobRoleName
             })
             .eq('id', assessment.id);
 
           if (updateError) throw updateError;
-
-          // Update or insert the competency rating
-          if (existingRatingIndex >= 0 && updatedRatings[existingRatingIndex].id) {
-            // Update existing rating
-            const { error: ratingError } = await supabase
-              .from('employee_competency_ratings')
-              .update({
-                rating: rating,
-                comments: comments,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', updatedRatings[existingRatingIndex].id);
-
-            if (ratingError) throw ratingError;
-          } else {
-            // Insert new rating
-            const { error: ratingError } = await supabase
-              .from('employee_competency_ratings')
-              .insert({
-                assessment_id: assessment.id,
-                competency_id: competency.id,
-                rating: rating,
-                comments: comments,
-                created_at: new Date().toISOString()
-              });
-
-            if (ratingError) throw ratingError;
-          }
         }
       } catch (err) {
         console.error('Error saving rating:', err);
@@ -352,11 +378,11 @@ export default function EmployeeAssessment() {
       setLoading(true);
 
       // Update the assessment status
-      const finalAssessment: Assessment = {
-        ...assessment,
+      // Use Object.assign to avoid TypeScript spread operator issues
+      const finalAssessment: Assessment = Object.assign({}, assessment, {
         status: 'completed',
         lastUpdated: new Date().toISOString().split('T')[0]
-      };
+      });
 
       const now = new Date().toISOString();
 
@@ -386,6 +412,12 @@ export default function EmployeeAssessment() {
         const metadata = currentAssessment?.metadata || {};
         metadata.employee_full_name = finalAssessment.employeeFullName || '';
 
+        // Make sure we preserve job role information
+        console.log("Preserving job role in assessment completion:", {
+          jobRoleId: finalAssessment.jobRoleId,
+          jobRoleName: finalAssessment.jobRoleName
+        });
+
         // Update the assessment with all data in a single record
         const { error: updateError } = await supabase
           .from('employee_assessments')
@@ -394,7 +426,10 @@ export default function EmployeeAssessment() {
             last_updated: now,
             progress: finalAssessment.progress,
             competency_ratings: validCompetencyRatings,
-            metadata: metadata
+            metadata: metadata,
+            // Explicitly preserve job role information
+            job_role_id: finalAssessment.jobRoleId,
+            job_role_name: finalAssessment.jobRoleName
           })
           .eq('id', assessment.id);
 
@@ -423,11 +458,11 @@ export default function EmployeeAssessment() {
         };
 
         // Get department and job role information
-        const selectedDepartment = departments.find(d => d.id === finalAssessment.departmentId);
-        const selectedJobRole = jobRoles.find(r => r.id === finalAssessment.jobRoleId);
+        const submissionDept = departments.find(d => d.id === finalAssessment.departmentId);
+        const submissionRole = jobRoles.find(r => r.id === finalAssessment.jobRoleId);
 
-        console.log("Selected department for submission:", selectedDepartment);
-        console.log("Selected job role for submission:", selectedJobRole);
+        console.log("Selected department for submission:", submissionDept);
+        console.log("Selected job role for submission:", submissionRole);
 
         // Save new assessment to Supabase with all data in a single record
         const { data, error } = await supabase
@@ -440,7 +475,7 @@ export default function EmployeeAssessment() {
             department_id: finalAssessment.departmentId || profileData?.department_id || null,
             department_name: finalAssessment.departmentName || profileData?.department_name || '',
             job_role_id: finalAssessment.jobRoleId || null,
-            job_role_name: finalAssessment.jobRoleName || selectedJobRole?.name || '',
+            job_role_name: finalAssessment.jobRoleName || submissionRole?.name || '',
             start_date: finalAssessment.startDate || now.split('T')[0],
             last_updated: now,
             status: 'completed',
@@ -627,10 +662,69 @@ export default function EmployeeAssessment() {
         if (user?.id) {
           console.log("Checking for existing assessments for user:", user.id);
 
-          // First, try to find a completed assessment
+          // First, try to find a reviewed assessment (highest priority)
+          // Note: We need to check for both 'reviewed' and 'Reviewed' to handle case sensitivity issues
+          const { data: reviewedAssessmentData, error: reviewedAssessmentError } = await supabase
+            .from('employee_assessments')
+            .select(`
+              *,
+              id,
+              employee_id,
+              employee_name,
+              employee_full_name,
+              department_id,
+              department_name,
+              job_role_id,
+              job_role_name,
+              start_date,
+              last_updated,
+              status,
+              progress,
+              competency_ratings,
+              assessor_id,
+              assessor_name,
+              assessor_rating,
+              assessor_comments,
+              assessor_status,
+              created_at,
+              metadata
+            `)
+            .eq('employee_id', user.id)
+            .or('status.eq.reviewed,status.eq.Reviewed')
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (reviewedAssessmentError) {
+            console.error("Error fetching reviewed assessment:", reviewedAssessmentError);
+            throw reviewedAssessmentError;
+          }
+
+          // If no reviewed assessment, look for completed assessment
           const { data: completedAssessmentData, error: completedAssessmentError } = await supabase
             .from('employee_assessments')
-            .select('*')
+            .select(`
+              *,
+              id,
+              employee_id,
+              employee_name,
+              employee_full_name,
+              department_id,
+              department_name,
+              job_role_id,
+              job_role_name,
+              start_date,
+              last_updated,
+              status,
+              progress,
+              competency_ratings,
+              assessor_id,
+              assessor_name,
+              assessor_rating,
+              assessor_comments,
+              assessor_status,
+              created_at,
+              metadata
+            `)
             .eq('employee_id', user.id)
             .eq('status', 'completed')
             .order('created_at', { ascending: false })
@@ -644,7 +738,29 @@ export default function EmployeeAssessment() {
           // If no completed assessment, look for in-progress assessment
           const { data: inProgressAssessmentData, error: inProgressAssessmentError } = await supabase
             .from('employee_assessments')
-            .select('*')
+            .select(`
+              *,
+              id,
+              employee_id,
+              employee_name,
+              employee_full_name,
+              department_id,
+              department_name,
+              job_role_id,
+              job_role_name,
+              start_date,
+              last_updated,
+              status,
+              progress,
+              competency_ratings,
+              assessor_id,
+              assessor_name,
+              assessor_rating,
+              assessor_comments,
+              assessor_status,
+              created_at,
+              metadata
+            `)
             .eq('employee_id', user.id)
             .eq('status', 'in_progress')
             .order('created_at', { ascending: false })
@@ -655,12 +771,59 @@ export default function EmployeeAssessment() {
             throw inProgressAssessmentError;
           }
 
-          // Prioritize completed assessment over in-progress
-          const assessmentData = completedAssessmentData && completedAssessmentData.length > 0
-            ? completedAssessmentData
-            : inProgressAssessmentData;
+          // Check for assessments with assessor_status = 'reviewed'
+          const { data: assessorReviewedData, error: assessorReviewedError } = await supabase
+            .from('employee_assessments')
+            .select(`
+              *,
+              id,
+              employee_id,
+              employee_name,
+              employee_full_name,
+              department_id,
+              department_name,
+              job_role_id,
+              job_role_name,
+              start_date,
+              last_updated,
+              status,
+              progress,
+              competency_ratings,
+              assessor_id,
+              assessor_name,
+              assessor_rating,
+              assessor_comments,
+              assessor_status,
+              created_at,
+              metadata
+            `)
+            .eq('employee_id', user.id)
+            .eq('assessor_status', 'reviewed')
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (assessorReviewedError) {
+            console.error("Error fetching assessor reviewed assessment:", assessorReviewedError);
+            throw assessorReviewedError;
+          }
+
+          // Prioritize reviewed > assessor_reviewed > completed > in-progress
+          const assessmentData = reviewedAssessmentData && reviewedAssessmentData.length > 0
+            ? reviewedAssessmentData
+            : assessorReviewedData && assessorReviewedData.length > 0
+              ? assessorReviewedData
+              : completedAssessmentData && completedAssessmentData.length > 0
+                ? completedAssessmentData
+                : inProgressAssessmentData;
 
           console.log("Found assessment data:", assessmentData);
+
+          // Debug the status
+          if (assessmentData && assessmentData.length > 0) {
+            console.log("Assessment status from database:", assessmentData[0].status);
+            console.log("Assessor status from database:", assessmentData[0].assessor_status);
+            console.log("Full assessment data:", assessmentData[0]);
+          }
 
           if (assessmentData && assessmentData.length > 0) {
             // User has an existing assessment
@@ -704,6 +867,15 @@ export default function EmployeeAssessment() {
 
             console.log("Final job role info:", { jobRoleId, jobRoleName });
 
+            // Check if assessor has reviewed the assessment
+            let status = existingAssessment.status;
+
+            // If the main status is 'completed' but assessor_status is 'reviewed', use 'reviewed' status
+            if (status === 'completed' && existingAssessment.assessor_status === 'reviewed') {
+              status = 'reviewed';
+              console.log("Assessor has reviewed this assessment. Updating status to 'reviewed'");
+            }
+
             // Convert the Supabase data to our Assessment type
             const assessment: Assessment = {
               id: existingAssessment.id,
@@ -716,7 +888,7 @@ export default function EmployeeAssessment() {
               jobRoleName: jobRoleName,
               startDate: existingAssessment.start_date,
               lastUpdated: existingAssessment.last_updated,
-              status: existingAssessment.status,
+              status: status,
               progress: existingAssessment.progress,
               competencyRatings: competencyRatings.map((rating: any) => ({
                 id: rating.id,
@@ -801,6 +973,21 @@ export default function EmployeeAssessment() {
                   : "Create your competency self-assessment"}
               </p>
             </div>
+            {assessment && assessment.status === 'completed' && (
+              <button
+                onClick={() => {
+                  setLoading(true);
+                  // Reload the page to check for updated assessment status
+                  window.location.reload();
+                }}
+                className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+              >
+                <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Check for Updates
+              </button>
+            )}
           </div>
 
           {/* Start Assessment Section */}
@@ -906,15 +1093,32 @@ export default function EmployeeAssessment() {
                         id="jobRole"
                         value={selectedJobRoleId}
                         onChange={(e) => {
-                          setSelectedJobRoleId(e.target.value);
+                          const newJobRoleId = e.target.value;
+                          setSelectedJobRoleId(newJobRoleId);
 
                           // Save to localStorage
                           const formData = {
                             employeeFullName,
                             departmentId: selectedDepartmentId,
-                            jobRoleId: e.target.value
+                            jobRoleId: newJobRoleId
                           };
                           localStorage.setItem('assessment_form_data', JSON.stringify(formData));
+
+                          // If we already have an assessment, update its job role
+                          if (assessment) {
+                            const selectedRole = jobRoles.find(r => r.id === newJobRoleId);
+                            console.log("Updating assessment job role on selection:", selectedRole);
+
+                            if (selectedRole && assessment) {
+                              // Create a new assessment object with the updated job role information
+                              // Use Object.assign to avoid TypeScript spread operator issues
+                              const updatedAssessment = Object.assign({}, assessment, {
+                                jobRoleId: newJobRoleId,
+                                jobRoleName: selectedRole.name
+                              });
+                              setAssessment(updatedAssessment);
+                            }
+                          }
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white appearance-none"
                         required
@@ -967,16 +1171,32 @@ export default function EmployeeAssessment() {
                       Started on {formatDate(assessment.startDate)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                      <div
-                        className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full"
-                        style={{ width: `${assessment.progress}%` }}
-                      ></div>
+                  <div className="flex items-center gap-4">
+                    {assessment.status === 'completed' && (
+                      <button
+                        onClick={() => {
+                          setLoading(true);
+                          window.location.reload();
+                        }}
+                        className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        title="Check for updates"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                      </button>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                        <div
+                          className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full"
+                          style={{ width: `${assessment.progress}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                        {assessment.progress}%
+                      </span>
                     </div>
-                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {assessment.progress}%
-                    </span>
                   </div>
                 </div>
 
@@ -990,9 +1210,25 @@ export default function EmployeeAssessment() {
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h3>
-                    <p className="mt-1 text-gray-900 dark:text-white capitalize">
-                      {assessment.status.replace('_', ' ')}
-                    </p>
+                    <div className="mt-1 flex items-center">
+                      {(assessment.status === 'reviewed' || assessment.status === 'Reviewed') ? (
+                        <>
+                          <svg className="h-4 w-4 mr-1 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                          </svg>
+                          <span className="text-gray-900 dark:text-white">Completed</span>
+                        </>
+                      ) : assessment.status === 'completed' ? (
+                        <>
+                          <svg className="h-4 w-4 mr-1 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                          </svg>
+                          <span className="text-gray-900 dark:text-white">Pending</span>
+                        </>
+                      ) : (
+                        <span className="text-gray-900 dark:text-white capitalize">{assessment.status.replace('_', ' ')}</span>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Department</h3>
@@ -1005,19 +1241,35 @@ export default function EmployeeAssessment() {
                     <p className="mt-1 text-gray-900 dark:text-white">
                       {assessment.jobRoleName ||
                        (assessment.jobRoleId && jobRoles.find(r => r.id === assessment.jobRoleId)?.name) ||
-                       'Not specified'}
+                       (jobRoles.length === 0 ? 'Loading...' :
+                        (selectedJobRoleId && jobRoles.find(r => r.id === selectedJobRoleId)?.name) ||
+                        'Not specified')}
                     </p>
-                    {!assessment.jobRoleName && assessment.jobRoleId && (
+
+                    {(!assessment.jobRoleName || assessment.jobRoleName === '') && (
                       <button
                         onClick={async () => {
                           // Try to refresh job roles and update the assessment
                           await fetchJobRoles();
-                          const jobRole = jobRoles.find(r => r.id === assessment.jobRoleId);
+
+                          // First try to get the job role from the assessment's jobRoleId
+                          let jobRole = assessment.jobRoleId ?
+                            jobRoles.find(r => r.id === assessment.jobRoleId) : null;
+
+                          // If that fails, try to use the selectedJobRoleId
+                          if (!jobRole && selectedJobRoleId) {
+                            jobRole = jobRoles.find(r => r.id === selectedJobRoleId);
+                          }
+
+                          console.log("Found job role for refresh:", jobRole);
+
                           if (jobRole && assessment) {
-                            setAssessment({
-                              ...assessment,
+                            console.log("Updating assessment with job role name:", jobRole.name);
+                            // Use Object.assign to avoid TypeScript spread operator issues
+                            const updatedAssessment = Object.assign({}, assessment, {
                               jobRoleName: jobRole.name
                             });
+                            setAssessment(updatedAssessment);
                           }
                         }}
                         className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mt-1"
@@ -1029,19 +1281,48 @@ export default function EmployeeAssessment() {
                 </div>
 
                 {/* Status Message */}
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
+                <div className={`${
+                  assessment.status === 'reviewed'
+                    ? 'bg-green-50 dark:bg-green-900/20'
+                    : assessment.status === 'completed'
+                      ? 'bg-yellow-50 dark:bg-yellow-900/20'
+                      : 'bg-blue-50 dark:bg-blue-900/20'
+                } rounded-lg p-4 mb-6`}>
                   <div className="flex">
                     <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
+                      {(assessment.status === 'reviewed' || assessment.status === 'Reviewed') ? (
+                        <svg className="h-5 w-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                      ) : assessment.status === 'completed' ? (
+                        <svg className="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                      )}
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm text-blue-700 dark:text-blue-300">
-                        {assessment.status === 'completed'
-                          ? "Your assessment has been completed. Thank you for your participation."
-                          : "Continue your assessment by rating your competencies. Your progress is automatically saved."}
+                      <p className={`text-sm ${
+                        assessment.status === 'reviewed' || assessment.status === 'Reviewed'
+                          ? 'text-green-700 dark:text-green-300'
+                          : assessment.status === 'completed'
+                            ? 'text-yellow-700 dark:text-yellow-300'
+                            : 'text-blue-700 dark:text-blue-300'
+                      }`}>
+                        {(assessment.status === 'reviewed' || assessment.status === 'Reviewed')
+                          ? "Your assessment has been reviewed and completed. Thank you for your participation."
+                          : assessment.status === 'completed'
+                            ? "Your assessment is pending review by your assessor. You'll see updated status once it's reviewed. Thank you for your participation."
+                            : "Continue your assessment by rating your competencies. Your progress is automatically saved."}
                       </p>
+                      {assessment.status === 'completed' && (
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
+                          Click the "Check for Updates" button above to refresh and see if your assessment has been reviewed.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1050,7 +1331,7 @@ export default function EmployeeAssessment() {
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white">Competency Ratings</h3>
-                    {assessment.status !== 'completed' && (
+                    {assessment.status !== 'completed' && assessment.status !== 'reviewed' && assessment.status !== 'Reviewed' && (
                       <button
                         onClick={() => {
                           setActiveCompetencyIndex(0);
@@ -1061,9 +1342,9 @@ export default function EmployeeAssessment() {
                         Continue Assessment
                       </button>
                     )}
-                    {assessment.status === 'completed' && (
+                    {(assessment.status === 'completed' || assessment.status === 'reviewed' || assessment.status === 'Reviewed') && (
                       <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                        Assessment is completed and locked
+                        Assessment is {assessment.status === 'reviewed' || assessment.status === 'Reviewed' ? 'completed' : 'pending review'} and locked
                       </div>
                     )}
                   </div>
@@ -1099,12 +1380,19 @@ export default function EmployeeAssessment() {
 
                 {/* Action Buttons */}
                 <div className="mt-6 flex justify-end gap-3">
-                  {assessment.status === 'completed' ? (
+                  {(assessment.status === 'reviewed' || assessment.status === 'Reviewed') ? (
                     <div className="flex items-center text-green-600 dark:text-green-400">
                       <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                       </svg>
-                      <span>Assessment completed on {formatDate(assessment.lastUpdated)}</span>
+                      <span>Assessment completed and reviewed on {formatDate(assessment.lastUpdated)}</span>
+                    </div>
+                  ) : assessment.status === 'completed' ? (
+                    <div className="flex items-center text-yellow-600 dark:text-yellow-400">
+                      <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      <span>Assessment pending review since {formatDate(assessment.lastUpdated)}</span>
                     </div>
                   ) : assessment.competencyRatings.length > 0 && (
                     <button
@@ -1295,7 +1583,7 @@ export default function EmployeeAssessment() {
                       <p className="mt-1 text-sm text-gray-900 dark:text-white">
                         {assessment.jobRoleName ||
                          (assessment.jobRoleId && jobRoles.find(r => r.id === assessment.jobRoleId)?.name) ||
-                         'Not specified'}
+                         (jobRoles.length === 0 ? 'Loading...' : 'Not specified')}
                       </p>
                     </div>
                     <div>
@@ -1304,7 +1592,25 @@ export default function EmployeeAssessment() {
                     </div>
                     <div>
                       <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h3>
-                      <p className="mt-1 text-sm text-gray-900 dark:text-white capitalize">{assessment.status.replace('_', ' ')}</p>
+                      <div className="mt-1 flex items-center">
+                        {(assessment.status === 'reviewed' || assessment.status === 'Reviewed') ? (
+                          <>
+                            <svg className="h-4 w-4 mr-1 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span className="text-sm text-gray-900 dark:text-white">Completed</span>
+                          </>
+                        ) : assessment.status === 'completed' ? (
+                          <>
+                            <svg className="h-4 w-4 mr-1 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span className="text-sm text-gray-900 dark:text-white">Pending</span>
+                          </>
+                        ) : (
+                          <span className="text-sm text-gray-900 dark:text-white capitalize">{assessment.status.replace('_', ' ')}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1389,7 +1695,7 @@ export default function EmployeeAssessment() {
                 </div>
                 <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">Assessment Completed!</h3>
                 <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  Your competency assessment has been successfully submitted. Thank you for your participation.
+                  Your competency assessment has been successfully submitted and is now pending review by your assessor. Thank you for your participation.
                 </p>
                 <div className="mt-6">
                   <button

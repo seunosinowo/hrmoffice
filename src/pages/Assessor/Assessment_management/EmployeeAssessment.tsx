@@ -37,7 +37,7 @@ interface Assessment {
   employee: Employee;
   assessor_name: string;
   assessment_date: string;
-  status: 'In Progress' | 'Approved' | 'Completed'; // Added 'Completed' as a valid status
+  status: 'In Progress' | 'Approved' | 'Completed' | 'Reviewed'; // Added 'Reviewed' as a valid status
   overall_rating: number;
   isEdited: boolean;
   competencies: AssessmentCompetency[];
@@ -67,7 +67,7 @@ export default function EmployeeAssessment() {
     employee_name: string;
     assessor_name: string;
     assessment_date: string;
-    status: 'In Progress' | 'Approved' | 'Completed'; // Added 'Completed' as a valid status
+    status: 'In Progress' | 'Approved' | 'Completed' | 'Reviewed'; // Added 'Reviewed' as a valid status
     overall_rating: number;
     department_id: string;
     competencies: {
@@ -235,7 +235,11 @@ export default function EmployeeAssessment() {
           },
           assessor_name: assessment.assessor_name || '',
           assessment_date: assessment.start_date || assessment.created_at,
-          status: assessment.status === 'completed' ? 'Completed' as const : 'In Progress' as const, // Changed from 'Approved' to 'Completed'
+          status: assessment.status === 'reviewed'
+            ? 'Reviewed' as const
+            : assessment.status === 'completed'
+              ? 'Completed' as const
+              : 'In Progress' as const, // Added 'Reviewed' status
           overall_rating: Number(overallRating.toFixed(1)),
           isEdited: false,
           competencies: mappedCompetencies
@@ -270,7 +274,15 @@ export default function EmployeeAssessment() {
 
       const department = departments.find(d => d.id === formData.department_id);
       const now = new Date().toISOString();
-      const status = formData.status === 'Completed' ? 'completed' : 'in_progress';
+      // Map UI status to database status
+      let status;
+      if (formData.status === 'Reviewed') {
+        status = 'reviewed';
+      } else if (formData.status === 'Completed') {
+        status = 'completed';
+      } else {
+        status = 'in_progress';
+      }
 
       // Filter competencies with ratings
       const competencyRatings = formData.competencies
@@ -391,7 +403,18 @@ export default function EmployeeAssessment() {
 
       const department = departments.find(d => d.id === formData.department_id);
       const now = new Date().toISOString();
-      const status = formData.status === 'Completed' ? 'completed' : 'in_progress';
+      // Map UI status to database status
+      let status;
+      if (formData.status === 'Reviewed') {
+        status = 'reviewed';
+        console.log("Setting assessment status to 'reviewed'");
+      } else if (formData.status === 'Completed') {
+        status = 'completed';
+        console.log("Setting assessment status to 'completed'");
+      } else {
+        status = 'in_progress';
+        console.log("Setting assessment status to 'in_progress'");
+      }
 
       // Filter competencies with ratings
       const competencyRatings = formData.competencies
@@ -404,21 +427,40 @@ export default function EmployeeAssessment() {
           updated_at: now
         }));
 
+      // Calculate overall rating from competency ratings
+      const validRatings = competencyRatings.filter(comp => comp.rating > 0);
+      const overallRating = validRatings.length > 0
+        ? validRatings.reduce((sum, comp) => sum + comp.rating, 0) / validRatings.length
+        : formData.overall_rating || 0;
+
+      console.log("Calculated overall rating:", overallRating);
+
+      // Prepare update data
+      const updateData = {
+        employee_name: formData.employee_name,
+        assessor_name: formData.assessor_name,
+        department_id: formData.department_id,
+        department_name: department?.name || '',
+        start_date: formData.assessment_date.split('T')[0],
+        last_updated: now,
+        status: status,
+        assessor_status: status, // Also update assessor_status to match status
+        progress: 100, // Since HR is updating a complete assessment
+        overall_rating: overallRating, // Add the overall rating
+        competency_ratings: competencyRatings
+      };
+
+      console.log("Updating assessment with ID:", selectedAssessment.id);
+      console.log("Update data:", updateData);
+
       // Update the existing assessment with all data in a single record
-      const { error: updateError } = await supabase
+      const { data: updatedData, error: updateError } = await supabase
         .from('employee_assessments')
-        .update({
-          employee_name: formData.employee_name,
-          assessor_name: formData.assessor_name,
-          department_id: formData.department_id,
-          department_name: department?.name || '',
-          start_date: formData.assessment_date.split('T')[0],
-          last_updated: now,
-          status: status,
-          progress: 100, // Since HR is updating a complete assessment
-          competency_ratings: competencyRatings
-        })
-        .eq('id', selectedAssessment.id);
+        .update(updateData)
+        .eq('id', selectedAssessment.id)
+        .select();
+
+      console.log("Update response:", { updatedData, updateError });
 
       if (updateError) throw updateError;
 
@@ -634,12 +676,18 @@ export default function EmployeeAssessment() {
                     </p>
                   </div>
                   <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap ${
-                    assessment.status === 'Completed'
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                    assessment.status === 'Reviewed'
+                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+                      : assessment.status === 'Completed'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
                   }`}>
                     <span>
-                      {assessment.status === 'Completed' ? (
+                      {assessment.status === 'Reviewed' ? (
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      ) : assessment.status === 'Completed' ? (
                         <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                         </svg>
@@ -796,6 +844,55 @@ export default function EmployeeAssessment() {
                   >
                     Close
                   </button>
+                  {selectedAssessment.status === 'Completed' && (
+                    <button
+                      onClick={() => {
+                        // Calculate overall rating from competency ratings
+                        const validRatings = selectedAssessment.competencies.filter(comp => comp.rating > 0);
+                        const overallRating = validRatings.length > 0
+                          ? validRatings.reduce((sum, comp) => sum + comp.rating, 0) / validRatings.length
+                          : selectedAssessment.overall_rating || 0;
+
+                        console.log("Calculated overall rating for review:", overallRating);
+
+                        // Mark as reviewed
+                        const updatedAssessment = {
+                          ...selectedAssessment,
+                          status: 'Reviewed' as const,
+                          overall_rating: overallRating // Ensure overall_rating is set
+                        };
+                        setSelectedAssessment(updatedAssessment);
+
+                        // Prepare form data for update
+                        const updatedFormData = {
+                          employee_name: updatedAssessment.employee.name,
+                          assessor_name: updatedAssessment.assessor_name,
+                          assessment_date: updatedAssessment.assessment_date,
+                          status: 'Reviewed' as const, // This will update both status and assessor_status
+                          overall_rating: overallRating, // Use the calculated overall rating
+                          department_id: updatedAssessment.employee.department[0]?.id || '',
+                          competencies: updatedAssessment.competencies.map(comp => ({
+                            id: comp.id,
+                            rating: comp.rating,
+                            comments: comp.comments,
+                            competency: comp.competency
+                          }))
+                        };
+
+                        console.log("Marking assessment as reviewed:", updatedAssessment.id);
+
+                        // Update form data and call edit function
+                        setFormData(updatedFormData);
+                        setTimeout(() => {
+                          handleEditAssessment();
+                          setShowDetailsModal(false);
+                        }, 100);
+                      }}
+                      className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
+                    >
+                      Mark as Reviewed
+                    </button>
+                  )}
                   <button
                     onClick={() => handleExportPDF(selectedAssessment!)}
                     className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
@@ -899,11 +996,12 @@ export default function EmployeeAssessment() {
                     </label>
                     <select
                       value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'In Progress' | 'Completed' })}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'In Progress' | 'Completed' | 'Reviewed' })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     >
                       <option value="In Progress">In Progress</option>
                       <option value="Completed">Completed</option>
+                      <option value="Reviewed">Reviewed</option>
                     </select>
                   </div>
 

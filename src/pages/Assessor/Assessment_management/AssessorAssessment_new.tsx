@@ -190,15 +190,15 @@ export default function AssessorAssessment() {
     doc.setFontSize(12);
     doc.text(`Employee: ${assessment.employee_full_name || assessment.employee_name}`, 14, 35);
     doc.text(`Department: ${assessment.department_name || 'N/A'}`, 14, 42);
-    doc.text(`Job Role: ${assessment.job_role_name || 'N/A'}`, 14, 49);
-    doc.text(`Assessment Date: ${formatDate(assessment.last_updated)}`, 14, 56);
-    doc.text(`Status: ${assessment.status}`, 14, 63);
+    // Job role removed from PDF as requested
+    doc.text(`Assessment Date: ${formatDate(assessment.last_updated)}`, 14, 49);
+    doc.text(`Status: ${assessment.status}`, 14, 56);
 
     // Add assessor info if available
     if (assessment.assessor_name) {
-      doc.text(`Assessor: ${assessment.assessor_name}`, 14, 70);
-      doc.text(`Assessor Rating: ${assessment.assessor_rating || 'Not rated'}`, 14, 77);
-      doc.text(`Assessor Comments: ${assessment.assessor_comments || 'No comments'}`, 14, 84);
+      doc.text(`Assessor: ${assessment.assessor_name}`, 14, 63);
+      doc.text(`Assessor Rating: ${assessment.assessor_rating || 'Not rated'}`, 14, 70);
+      doc.text(`Assessor Comments: ${assessment.assessor_comments || 'No comments'}`, 14, 77);
     }
 
     // Add competency ratings table
@@ -219,7 +219,7 @@ export default function AssessorAssessment() {
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 90,
+      startY: 83, // Adjusted position after removing job role
       theme: 'striped',
       headStyles: { fillColor: [66, 139, 202] }
     });
@@ -268,6 +268,30 @@ export default function AssessorAssessment() {
     try {
       setLoading(true);
 
+      // Calculate the overall rating from competency ratings
+      const competencyRatings = formData.competency_ratings || [];
+      const validRatings = competencyRatings.filter(rating => rating.assessor_rating > 0);
+      const overallRating = validRatings.length > 0
+        ? validRatings.reduce((sum, rating) => sum + rating.assessor_rating, 0) / validRatings.length
+        : formData.assessor_rating || 0;
+
+      console.log("Calculated overall rating:", overallRating);
+
+      // First, get the current assessment to preserve job role and other information
+      const { data: currentAssessment, error: fetchError } = await supabase
+        .from('employee_assessments')
+        .select('*')
+        .eq('id', selectedAssessment.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Preserve job role information
+      const jobRoleId = currentAssessment?.job_role_id || null;
+      const jobRoleName = currentAssessment?.job_role_name || '';
+
+      console.log("Preserving job role information:", { jobRoleId, jobRoleName });
+
       // Update the assessment with assessor ratings
       const { error: updateError } = await supabase
         .from('employee_assessments')
@@ -277,8 +301,13 @@ export default function AssessorAssessment() {
           assessor_rating: formData.assessor_rating,
           assessor_comments: formData.assessor_comments,
           assessor_status: 'reviewed',
+          status: 'reviewed', // Update the main status field as well
+          overall_rating: overallRating, // Add the overall rating
           competency_ratings: formData.competency_ratings,
-          last_updated: new Date().toISOString()
+          last_updated: new Date().toISOString(),
+          // Explicitly preserve job role information
+          job_role_id: jobRoleId,
+          job_role_name: jobRoleName
         })
         .eq('id', selectedAssessment.id);
 
@@ -292,8 +321,13 @@ export default function AssessorAssessment() {
         assessor_rating: formData.assessor_rating,
         assessor_comments: formData.assessor_comments,
         assessor_status: 'reviewed',
+        status: 'reviewed', // Update the main status field as well
+        overall_rating: overallRating, // Add the overall rating
         competency_ratings: formData.competency_ratings,
-        last_updated: new Date().toISOString()
+        last_updated: new Date().toISOString(),
+        // Preserve job role information in local state
+        job_role_id: jobRoleId,
+        job_role_name: jobRoleName
       };
 
       setAssessments(prevAssessments =>
@@ -386,38 +420,43 @@ export default function AssessorAssessment() {
                 >
                   <div className="p-6">
                     {/* Header with status badge */}
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {assessment.employee_full_name || assessment.employee_name}
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {assessment.department_name || 'No Department'} {assessment.job_role_name ? `- ${assessment.job_role_name}` : ''}
-                        </p>
+                    <div className="mb-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 min-w-0 mr-2">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                            {assessment.employee_full_name || assessment.employee_name}
+                          </h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap overflow-hidden text-ellipsis">
+                            {assessment.department_name || 'No Department'} {assessment.job_role_name ? `- ${assessment.job_role_name}` : ''}
+                          </p>
+                        </div>
                       </div>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full flex items-center justify-center gap-1 ${
-                        assessment.assessor_status === 'reviewed'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-                      }`}>
-                        {assessment.assessor_status === 'reviewed'
-                          ? (
-                            <>
-                              <CheckCircleIcon className="h-3.5 w-3.5" />
-                              <span>Reviewed</span>
-                            </>
-                          )
-                          : (
-                            <>
-                              <ClockIcon className="h-3.5 w-3.5" />
-                              <span>Pending</span>
-                            </>
-                          )
-                        }
-                      </span>
+                      {/* Status badge moved below name/department for better fit */}
+                      <div className="flex items-center">
+                        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full gap-1 ${
+                          assessment.assessor_status === 'reviewed'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                        }`}>
+                          {assessment.assessor_status === 'reviewed'
+                            ? (
+                              <>
+                                <CheckCircleIcon className="h-3 w-3" />
+                                <span>Reviewed</span>
+                              </>
+                            )
+                            : (
+                              <>
+                                <ClockIcon className="h-3 w-3" />
+                                <span>Pending</span>
+                              </>
+                            )
+                          }
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Assessment Info Grid */}
+                    {/* Assessment Info Grid - Modified to have email take full width */}
                     <div className="grid grid-cols-2 gap-4 mb-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
                       <div>
                         <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Completed On</h4>
@@ -431,14 +470,16 @@ export default function AssessorAssessment() {
                           {assessment.competency_ratings?.length || 0} rated
                         </p>
                       </div>
-                      <div>
+                      {/* Email takes full width */}
+                      <div className="col-span-2">
                         <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Email</h4>
-                        <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white truncate max-w-[180px]">
+                        <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white break-words">
                           {assessment.employee_email || 'No email'}
                         </p>
                       </div>
+                      {/* Your Rating takes one column */}
                       {assessment.assessor_rating ? (
-                        <div>
+                        <div className="col-span-2">
                           <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Your Rating</h4>
                           <div className="mt-1 flex items-center">
                             <span className="text-sm font-medium text-gray-900 dark:text-white mr-1">
@@ -448,7 +489,7 @@ export default function AssessorAssessment() {
                           </div>
                         </div>
                       ) : (
-                        <div>
+                        <div className="col-span-2">
                           <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Your Rating</h4>
                           <p className="mt-1 text-sm font-medium text-gray-400 dark:text-gray-500 italic">
                             Not rated yet
@@ -457,22 +498,16 @@ export default function AssessorAssessment() {
                       )}
                     </div>
 
-                    {/* Status Message */}
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
-                      <div className="flex">
-                        <div className="flex-shrink-0">
-                          <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                        <div className="ml-3">
-                          <p className="text-sm text-blue-700 dark:text-blue-300">
-                            {assessment.assessor_status === 'reviewed'
-                              ? "You have reviewed this assessment. You can edit your ratings or export to PDF."
-                              : "This assessment needs your review. Rate the employee's competencies and provide feedback."}
-                          </p>
-                        </div>
-                      </div>
+                    {/* Status Message - Smaller and more compact */}
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mb-3">
+                      <p className="text-xs text-blue-700 dark:text-blue-300 flex items-center">
+                        <svg className="h-3.5 w-3.5 text-blue-400 mr-1 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        {assessment.assessor_status === 'reviewed'
+                          ? "You have reviewed this assessment. You can edit your ratings or export to PDF."
+                          : "This assessment needs your review. Rate the employee's competencies and provide feedback."}
+                      </p>
                     </div>
 
                     {/* Action Buttons */}
@@ -566,7 +601,14 @@ export default function AssessorAssessment() {
                     Competency Ratings
                   </h3>
                   <div className="space-y-4">
-                    {formData.competency_ratings.map((rating) => {
+                    {formData.competency_ratings.map((rating: {
+                      id: string;
+                      competency_id: string;
+                      rating: number;
+                      comments: string;
+                      assessor_comments: string;
+                      assessor_rating: number;
+                    }) => {
                       const competencyName = competencies.find(c => c.id === rating.competency_id)?.name || `Competency ${rating.competency_id}`;
 
                       return (
