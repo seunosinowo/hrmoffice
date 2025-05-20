@@ -82,7 +82,7 @@ const employeeNavItems: NavItem[] = [
     name: "Analytics",
     subItems: [
       { name: "Individual Gap", path: "/individual-gap" },
-      { name: "Organization Gap", path: "/organization-gap" },
+      // { name: "Organization Gap", path: "/organization-gap" }, // Removed as employees don't need organization gap analysis
     ],
   },
 ];
@@ -128,7 +128,6 @@ const assessorNavItems: NavItem[] = [
     name: "Assessment Mgt",
     subItems: [
       { name: "Assessor Assessment", path: "/assessor/assessment" },
-      { name: "Consensus Assessment", path: "/assessor/consensus-assessment" },
     ],
   },
   {
@@ -182,7 +181,6 @@ const hrNavItems: NavItem[] = [
     icon: <PlugInIcon />,
     name: "Assessment Mgt",
     subItems: [
-      { name: "Employee Assessment", path: "/hr/employee-assessment" },
       { name: "Assessor Assessment", path: "/hr/assessor-assessment" },
       { name: "Consensus Assessment", path: "/hr/consensus-assessment" },
     ],
@@ -191,7 +189,7 @@ const hrNavItems: NavItem[] = [
     icon: <BoxCubeIcon />,
     name: "Analytics",
     subItems: [
-      { name: "Individual Gap", path: "/hr/individual-gap" },
+      // { name: "Individual Gap", path: "/hr/individual-gap" }, // Removed as HR doesn't need individual gap analysis
       { name: "Organization Gap", path: "/hr/organization-gap" },
     ],
   },
@@ -229,10 +227,13 @@ const AppSidebar: React.FC = () => {
     // Get all prefixes this user can access
     const accessiblePrefixes = roleHierarchy[highestRole].map(role => getRolePrefix(role));
 
-    // Check if the current path matches any of the accessible paths
+    // Check if the current path exactly matches the given path
     for (const prefix of accessiblePrefixes) {
       const fullPath = path.startsWith(prefix) ? path : `${prefix}${path}`;
-      if (location.pathname.startsWith(fullPath)) {
+
+      // Use exact path matching instead of startsWith
+      // This ensures only the exact path is considered active
+      if (location.pathname === fullPath) {
         return true;
       }
     }
@@ -261,15 +262,16 @@ const AppSidebar: React.FC = () => {
       const items = navItems;
       items.forEach((nav, index) => {
         if (nav.subItems) {
-          nav.subItems.forEach((subItem) => {
-            if (isActive(subItem.path)) {
-              setOpenSubmenu({
-                type: menuType as "main",
-                index,
-              });
-              submenuMatched = true;
-            }
-          });
+          // Check if any subItem is active
+          const hasActiveSubItem = nav.subItems.some(subItem => isActive(subItem.path));
+
+          if (hasActiveSubItem) {
+            setOpenSubmenu({
+              type: menuType as "main",
+              index,
+            });
+            submenuMatched = true;
+          }
         }
       });
     });
@@ -313,7 +315,7 @@ const AppSidebar: React.FC = () => {
               onClick={() => handleSubmenuToggle(index, menuType)}
               className={`menu-item group ${
                 openSubmenu?.type === menuType && openSubmenu?.index === index
-                  ? "menu-item-active"
+                  ? "menu-item-expanded"
                   : "menu-item-inactive"
               } cursor-pointer ${
                 !isExpanded && !isHovered
@@ -324,7 +326,7 @@ const AppSidebar: React.FC = () => {
               <span
                 className={`menu-item-icon-size  ${
                   openSubmenu?.type === menuType && openSubmenu?.index === index
-                    ? "menu-item-icon-active"
+                    ? "menu-item-icon-expanded"
                     : "menu-item-icon-inactive"
                 }`}
               >
@@ -338,7 +340,7 @@ const AppSidebar: React.FC = () => {
                   className={`ml-auto w-5 h-5 transition-transform duration-200 ${
                     openSubmenu?.type === menuType &&
                     openSubmenu?.index === index
-                      ? "rotate-180 text-brand-500"
+                      ? "rotate-180 text-gray-700 dark:text-gray-300"
                       : ""
                   }`}
                 />

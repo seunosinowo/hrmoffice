@@ -106,7 +106,7 @@ export default function AssessorAssessment() {
           return;
         }
 
-        // HR should only see assessments that have been reviewed by assessors
+        // Get assessments for employees assigned to this assessor
         const { data, error: assessmentsError } = await supabase
           .from('employee_assessments')
           .select(`
@@ -131,7 +131,7 @@ export default function AssessorAssessment() {
             assessor_status,
             created_at
           `)
-          .or('status.eq.reviewed,assessor_status.eq.reviewed') // Show assessments with either status or assessor_status as 'reviewed'
+          .in('status', ['completed', 'reviewed'])
           .order('created_at', { ascending: false });
 
         if (assessmentsError) throw assessmentsError;
@@ -145,7 +145,14 @@ export default function AssessorAssessment() {
             assessor_rating: assessment.assessor_rating || null,
             assessor_comments: assessment.assessor_comments || null,
             assessor_status: assessment.assessor_status || 'pending',
-            competency_ratings: assessment.competency_ratings.map((rating: any) => ({
+            competency_ratings: assessment.competency_ratings.map((rating: {
+              id: string;
+              competency_id: string;
+              rating: number;
+              comments?: string;
+              assessor_comments?: string;
+              assessor_rating?: number;
+            }) => ({
               ...rating,
               assessor_comments: rating.assessor_comments || '',
               assessor_rating: rating.assessor_rating || 0
@@ -187,7 +194,6 @@ export default function AssessorAssessment() {
     doc.setFontSize(12);
     doc.text(`Employee: ${assessment.employee_full_name || assessment.employee_name}`, 14, 35);
     doc.text(`Department: ${assessment.department_name || 'N/A'}`, 14, 42);
-
     // Job role removed from PDF as requested
     doc.text(`Assessment Date: ${formatDate(assessment.last_updated)}`, 14, 49);
     doc.text(`Status: ${assessment.status}`, 14, 56);
@@ -201,7 +207,7 @@ export default function AssessorAssessment() {
 
     // Add competency ratings table
     const tableColumn = ["Competency", "Employee Rating", "Employee Comments", "Assessor Rating", "Assessor Comments"];
-    const tableRows = assessment.competency_ratings?.map((rating: CompetencyRating) => {
+    const tableRows = assessment.competency_ratings?.map(rating => {
       // Map competency ID to name
       const competencyName = competencies.find(c => c.id === rating.competency_id)?.name || `Competency ${rating.competency_id}`;
 
@@ -239,7 +245,7 @@ export default function AssessorAssessment() {
     setSelectedAssessment(assessment);
 
     // Initialize form data with existing ratings
-    const mappedRatings = assessment.competency_ratings.map((rating: CompetencyRating) => ({
+    const mappedRatings = assessment.competency_ratings.map(rating => ({
       id: rating.id,
       competency_id: rating.competency_id,
       rating: rating.rating,
@@ -259,24 +265,103 @@ export default function AssessorAssessment() {
 
 
 
-  // HR doesn't need to save ratings, they only view assessor ratings
-  // const handleSaveRatings = () => {
-  //   // No-op function since HR only views assessments
-  //   setShowRatingModal(false);
-  //   setSelectedAssessment(null);
-  // };
+  // Handle saving assessor ratings
+  const handleSaveRatings = async () => {
+    if (!selectedAssessment) return;
+
+    try {
+      setLoading(true);
+
+      // Calculate the overall rating from competency ratings
+      const competencyRatings = formData.competency_ratings || [];
+      const validRatings = competencyRatings.filter(rating => rating.assessor_rating > 0);
+      const overallRating = validRatings.length > 0
+        ? validRatings.reduce((sum, rating) => sum + rating.assessor_rating, 0) / validRatings.length
+        : formData.assessor_rating || 0;
+
+      console.log("Calculated overall rating:", overallRating);
+
+      // First, get the current assessment to preserve job role and other information
+      const { data: currentAssessment, error: fetchError } = await supabase
+        .from('employee_assessments')
+        .select('*')
+        .eq('id', selectedAssessment.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Preserve job role information
+      const jobRoleId = currentAssessment?.job_role_id || null;
+      const jobRoleName = currentAssessment?.job_role_name || '';
+
+      console.log("Preserving job role information:", { jobRoleId, jobRoleName });
+
+      // Update the assessment with assessor ratings
+      const { error: updateError } = await supabase
+        .from('employee_assessments')
+        .update({
+          assessor_id: user?.id,
+          assessor_name: user?.email,
+          assessor_rating: formData.assessor_rating,
+          assessor_comments: formData.assessor_comments,
+          assessor_status: 'reviewed',
+          status: 'reviewed', // Update the main status field as well
+          overall_rating: overallRating, // Add the overall rating
+          competency_ratings: formData.competency_ratings,
+          last_updated: new Date().toISOString(),
+          // Explicitly preserve job role information
+          job_role_id: jobRoleId,
+          job_role_name: jobRoleName
+        })
+        .eq('id', selectedAssessment.id);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      const updatedAssessment = {
+        ...selectedAssessment,
+        assessor_id: user?.id,
+        assessor_name: user?.email,
+        assessor_rating: formData.assessor_rating,
+        assessor_comments: formData.assessor_comments,
+        assessor_status: 'reviewed',
+        status: 'reviewed', // Update the main status field as well
+        overall_rating: overallRating, // Add the overall rating
+        competency_ratings: formData.competency_ratings,
+        last_updated: new Date().toISOString(),
+        // Preserve job role information in local state
+        job_role_id: jobRoleId,
+        job_role_name: jobRoleName
+      };
+
+      setAssessments(prevAssessments =>
+        prevAssessments.map(assessment =>
+          assessment.id === selectedAssessment.id ? updatedAssessment : assessment
+        )
+      );
+
+      setShowRatingModal(false);
+      setSelectedAssessment(null);
+
+    } catch (err) {
+      console.error('Error saving ratings:', err);
+      setError('Failed to save ratings. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle rating change for a specific competency
-  // const handleRatingChange = (competencyId: string, field: string, value: any) => {
-  //   setFormData({
-  //     ...formData,
-  //     competency_ratings: formData.competency_ratings.map(rating =>
-  //       rating.competency_id === competencyId
-  //         ? { ...rating, [field]: value }
-  //         : rating
-  //     )
-  //   });
-  // };
+  const handleRatingChange = (competencyId: string, field: string, value: any) => {
+    setFormData({
+      ...formData,
+      competency_ratings: formData.competency_ratings.map(rating =>
+        rating.competency_id === competencyId
+          ? { ...rating, [field]: value }
+          : rating
+      )
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
@@ -290,9 +375,9 @@ export default function AssessorAssessment() {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Reviewed Assessments</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Employee Assessments</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            View and manage assessments that have been reviewed by assessors
+            Review and rate employee self-assessments
           </p>
         </div>
 
@@ -310,9 +395,9 @@ export default function AssessorAssessment() {
           </div>
         </div>
 
-        {/* Reviewed Assessments Section */}
+        {/* Employee Assessments Section */}
         <div className="mb-12">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Assessor-Reviewed Assessments</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Completed Assessments</h2>
 
           {loading ? (
             <div className="flex justify-center items-center h-64">
@@ -324,11 +409,9 @@ export default function AssessorAssessment() {
                 <div className="bg-blue-100 dark:bg-blue-900/30 p-4 rounded-full">
                   <UserIcon className="h-10 w-10 text-blue-600 dark:text-blue-400" />
                 </div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">No Reviewed Assessments Available</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">No Assessments Available</h2>
                 <p className="text-gray-600 dark:text-gray-400 max-w-lg">
-                  {searchTerm
-                    ? 'No assessments match your search criteria.'
-                    : 'There are no assessments that have been reviewed by assessors yet. Assessors need to review employee assessments before they appear here.'}
+                  {searchTerm ? 'No assessments match your search criteria.' : 'There are no completed assessments from your assigned employees yet.'}
                 </p>
               </div>
             </div>
@@ -398,10 +481,10 @@ export default function AssessorAssessment() {
                           {assessment.employee_email || 'No email'}
                         </p>
                       </div>
-                      {/* Assessor Rating takes full width */}
+                      {/* Your Rating takes one column */}
                       {assessment.assessor_rating ? (
                         <div className="col-span-2">
-                          <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Assessor Rating</h4>
+                          <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Your Rating</h4>
                           <div className="mt-1 flex items-center">
                             <span className="text-sm font-medium text-gray-900 dark:text-white mr-1">
                               {assessment.assessor_rating.toFixed(1)}
@@ -411,9 +494,9 @@ export default function AssessorAssessment() {
                         </div>
                       ) : (
                         <div className="col-span-2">
-                          <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Assessor Rating</h4>
+                          <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Your Rating</h4>
                           <p className="mt-1 text-sm font-medium text-gray-400 dark:text-gray-500 italic">
-                            Not available
+                            Not rated yet
                           </p>
                         </div>
                       )}
@@ -425,7 +508,9 @@ export default function AssessorAssessment() {
                         <svg className="h-3.5 w-3.5 text-blue-400 mr-1 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
-                        This assessment has been reviewed by an assessor. You can view the details or export to PDF.
+                        {assessment.assessor_status === 'reviewed'
+                          ? "You have reviewed this assessment. You can edit your ratings or export to PDF."
+                          : "This assessment needs your review. Rate the employee's competencies and provide feedback."}
                       </p>
                     </div>
 
@@ -435,7 +520,7 @@ export default function AssessorAssessment() {
                         onClick={() => handleRateAssessment(assessment)}
                         className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                       >
-                        {assessment.assessor_rating ? 'Review Assessment' : 'View Assessment'}
+                        {assessment.assessor_rating ? 'Edit Rating' : 'Rate Assessment'}
                       </button>
                       <button
                         onClick={() => exportToPDF(assessment)}
@@ -460,11 +545,10 @@ export default function AssessorAssessment() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      Review Employee Assessment
+                      Rate Employee Assessment
                     </h2>
                     <p className="mt-1 text-gray-500 dark:text-gray-400">
                       {selectedAssessment.employee_full_name || selectedAssessment.employee_name} - {selectedAssessment.department_name || 'No Department'}
-                      {selectedAssessment.job_role_name ? ` - ${selectedAssessment.job_role_name}` : ''}
                     </p>
                   </div>
                   <button
@@ -483,30 +567,36 @@ export default function AssessorAssessment() {
                   </h3>
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Assessor's Overall Rating (View Only)
+                      Your Overall Rating
                     </label>
                     <div className="flex items-center gap-2">
                       {[1, 2, 3, 4, 5].map((rating) => (
-                        <div
+                        <button
                           key={rating}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center cursor-default ${
+                          type="button"
+                          onClick={() => setFormData({...formData, assessor_rating: rating})}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
                             formData.assessor_rating >= rating
                               ? 'bg-yellow-400 text-white'
                               : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
                           }`}
                         >
                           {rating}
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Assessor's Overall Comments (View Only)
+                      Your Overall Comments
                     </label>
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 dark:bg-gray-600 dark:border-gray-500 dark:text-white min-h-[80px] overflow-auto">
-                      {formData.assessor_comments || 'No comments provided by the assessor.'}
-                    </div>
+                    <textarea
+                      value={formData.assessor_comments}
+                      onChange={(e) => setFormData({...formData, assessor_comments: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                      rows={3}
+                      placeholder="Enter your overall assessment comments..."
+                    ></textarea>
                   </div>
                 </div>
 
@@ -515,7 +605,14 @@ export default function AssessorAssessment() {
                     Competency Ratings
                   </h3>
                   <div className="space-y-4">
-                    {formData.competency_ratings.map((rating) => {
+                    {formData.competency_ratings.map((rating: {
+                      id: string;
+                      competency_id: string;
+                      rating: number;
+                      comments: string;
+                      assessor_comments: string;
+                      assessor_rating: number;
+                    }) => {
                       const competencyName = competencies.find(c => c.id === rating.competency_id)?.name || `Competency ${rating.competency_id}`;
 
                       return (
@@ -534,28 +631,31 @@ export default function AssessorAssessment() {
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Assessor's Rating (View Only)
+                                Your Rating
                               </label>
                               <div className="flex items-center gap-2 mb-2">
                                 {[1, 2, 3, 4, 5].map((r) => (
-                                  <div
+                                  <button
                                     key={r}
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center cursor-default ${
+                                    type="button"
+                                    onClick={() => handleRatingChange(rating.competency_id, 'assessor_rating', r)}
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
                                       rating.assessor_rating >= r
                                         ? 'bg-yellow-400 text-white'
                                         : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
                                     }`}
                                   >
                                     {r}
-                                  </div>
+                                  </button>
                                 ))}
                               </div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Assessor's Comments (View Only)
-                              </label>
-                              <div className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 dark:bg-gray-600 dark:border-gray-500 dark:text-white min-h-[60px] overflow-auto">
-                                {rating.assessor_comments || 'No comments provided by the assessor.'}
-                              </div>
+                              <textarea
+                                value={rating.assessor_comments}
+                                onChange={(e) => handleRatingChange(rating.competency_id, 'assessor_comments', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                                rows={2}
+                                placeholder="Enter your comments for this competency..."
+                              ></textarea>
                             </div>
                           </div>
                         </div>
@@ -570,7 +670,13 @@ export default function AssessorAssessment() {
                   onClick={() => setShowRatingModal(false)}
                   className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                 >
-                  Close
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveRatings}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg"
+                >
+                  Save Ratings
                 </button>
               </div>
             </div>

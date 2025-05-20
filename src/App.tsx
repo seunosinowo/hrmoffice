@@ -41,11 +41,12 @@ const EmployeeConsensusAssessment = lazy(() => import("./pages/Employee/Assessme
 const EmployeeAnalytics = lazy(() => import("./pages/Employee/Analytics/IndividualGap"));
 
 // Assessor Components
-const AssessorConsensusAssessment = lazy(() => import("./pages/Assessor/Assessment_management/ConsensusAssessment"));
 const AssessorAnalytics = lazy(() => import("./pages/Assessor/Analytics/IndividualGap"));
 const AssessorIndividualGap = lazy(() => import("./pages/Assessor/Analytics/IndividualGap"));
 const AssessorOrganizationGap = lazy(() => import("./pages/Assessor/Analytics/OrganizationGap"));
 const AssessorEmployeeAssessment = lazy(() => import("./pages/Assessor/Assessment_management/EmployeeAssessment"));
+// @ts-ignore - TypeScript can't find the module but it exists
+const AssessorAssessment = lazy(() => import("./pages/Assessor/Assessment_management/AssessorAssessment"));
 const AssessorCompetency = lazy(() => import("./pages/Assessor/Competency_framework/Competency"));
 const AssessorCompetencyCategory = lazy(() => import("./pages/Assessor/Competency_framework/CompetencyCategory"));
 const AssessorCompetencyDescription = lazy(() => import("./pages/Assessor/Competency_framework/CompetencyDescription"));
@@ -62,12 +63,13 @@ const AssessorEmployeeJobAssignment = lazy(() => import("./pages/Assessor/User_a
 // HR Components
 const HRPageDescription = lazy(() => import("./pages/HR/PageDescription/PageDescription"));
 const RoleManagement = lazy(() => import("./pages/HR/Role_management/RoleManagement"));
-const HRAnalytics = lazy(() => import("./pages/HR/Analytics/IndividualGap"));
-const HRIndividualGap = lazy(() => import("./pages/HR/Analytics/IndividualGap"));
+// const HRAnalytics = lazy(() => import("./pages/HR/Analytics/IndividualGap")); // Not used
+// const HRIndividualGap = lazy(() => import("./pages/HR/Analytics/IndividualGap")); // Removed as HR doesn't need individual gap analysis
 const HROrganizationGap = lazy(() => import("./pages/HR/Analytics/OrganizationGap"));
+// Import HR AssessorAssessment component
+// @ts-ignore - TypeScript can't find the module but it exists
 const HRAssessorAssessment = lazy(() => import("./pages/HR/Assessment_management/AssessorAssessment"));
 const HRConsensusAssessment = lazy(() => import("./pages/HR/Assessment_management/ConsensusAssessment"));
-const HREmployeeAssessment = lazy(() => import("./pages/HR/Assessment_management/EmployeeAssessment"));
 const HRCompetency = lazy(() => import("./pages/HR/Competency_framework/Competency"));
 const HRCompetencyCategory = lazy(() => import("./pages/HR/Competency_framework/CompetencyCategory"));
 const HRCompetencyDescription = lazy(() => import("./pages/HR/Competency_framework/CompetencyDescription"));
@@ -166,21 +168,22 @@ export default function App() {
                 <Route path="/assessor/job" element={<AssessorJob />} />
                 <Route path="/assessor/job-competency-profile" element={<AssessorJobCompetencyProfile />} />
                 <Route path="/assessor/employee-assessment" element={<AssessorEmployeeAssessment />} />
+                <Route path="/assessor/assessment" element={<AssessorAssessment />} />
                 <Route path="/assessor/individual-gap" element={<AssessorIndividualGap />} />
                 <Route path="/assessor/organization-gap" element={<AssessorOrganizationGap />} />
                 <Route path="/assessor/analytics" element={<AssessorAnalytics />} />
-                <Route path="/assessor/consensus-assessment" element={<AssessorConsensusAssessment />} />
               </Route>
 
               {/* HR Routes */}
               <Route element={<RoleBasedRoute allowedRoles={['hr']} />}>
                 <Route path="/hr/page-description" element={<HRPageDescription />} />
                 <Route path="/hr/role-management" element={<RoleManagement />} />
-                <Route path="/hr/individual-gap" element={<HRIndividualGap />} />
+                {/* Removed Individual Gap route as HR doesn't need individual gap analysis */}
+                {/* <Route path="/hr/individual-gap" element={<HRIndividualGap />} /> */}
                 <Route path="/hr/organization-gap" element={<HROrganizationGap />} />
                 <Route path="/hr/assessor-assessment" element={<HRAssessorAssessment />} />
                 <Route path="/hr/consensus-assessment" element={<HRConsensusAssessment />} />
-                <Route path="/hr/employee-assessment" element={<HREmployeeAssessment />} />
+                <Route path="/hr/employee-assessment" element={<HRAssessorAssessment />} />
                 <Route path="/hr/competency" element={<HRCompetency />} />
                 <Route path="/hr/competency-category" element={<HRCompetencyCategory />} />
                 <Route path="/hr/competency-description" element={<HRCompetencyDescription />} />
@@ -192,7 +195,7 @@ export default function App() {
                 <Route path="/hr/employee-details" element={<HREmployeeDetails />} />
                 <Route path="/hr/employee-job-assignment" element={<HREmployeeJobAssignment />} />
                 {/* <Route path="/hr/user" element={<HRUser />} /> */}
-                <Route path="/hr/analytics" element={<HRAnalytics />} />
+                {/* <Route path="/hr/analytics" element={<HRAnalytics />} /> */}
               </Route>
             </Route>
           )}
