@@ -63,8 +63,8 @@ const AssessorEmployeeJobAssignment = lazy(() => import("./pages/Assessor/User_a
 // HR Components
 const HRPageDescription = lazy(() => import("./pages/HR/PageDescription/PageDescription"));
 const RoleManagement = lazy(() => import("./pages/HR/Role_management/RoleManagement"));
-const HRAnalytics = lazy(() => import("./pages/HR/Analytics/IndividualGap"));
-const HRIndividualGap = lazy(() => import("./pages/HR/Analytics/IndividualGap"));
+// const HRAnalytics = lazy(() => import("./pages/HR/Analytics/IndividualGap")); // Not used
+// const HRIndividualGap = lazy(() => import("./pages/HR/Analytics/IndividualGap")); // Removed as HR doesn't need individual gap analysis
 const HROrganizationGap = lazy(() => import("./pages/HR/Analytics/OrganizationGap"));
 // Import HR AssessorAssessment component
 // @ts-ignore - TypeScript can't find the module but it exists
@@ -178,7 +178,8 @@ export default function App() {
               <Route element={<RoleBasedRoute allowedRoles={['hr']} />}>
                 <Route path="/hr/page-description" element={<HRPageDescription />} />
                 <Route path="/hr/role-management" element={<RoleManagement />} />
-                <Route path="/hr/individual-gap" element={<HRIndividualGap />} />
+                {/* Removed Individual Gap route as HR doesn't need individual gap analysis */}
+                {/* <Route path="/hr/individual-gap" element={<HRIndividualGap />} /> */}
                 <Route path="/hr/organization-gap" element={<HROrganizationGap />} />
                 <Route path="/hr/assessor-assessment" element={<HRAssessorAssessment />} />
                 <Route path="/hr/consensus-assessment" element={<HRConsensusAssessment />} />
@@ -194,7 +195,7 @@ export default function App() {
                 <Route path="/hr/employee-details" element={<HREmployeeDetails />} />
                 <Route path="/hr/employee-job-assignment" element={<HREmployeeJobAssignment />} />
                 {/* <Route path="/hr/user" element={<HRUser />} /> */}
-                <Route path="/hr/analytics" element={<HRAnalytics />} />
+                {/* <Route path="/hr/analytics" element={<HRAnalytics />} /> */}
               </Route>
             </Route>
           )}

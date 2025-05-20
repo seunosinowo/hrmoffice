@@ -189,7 +189,7 @@ const hrNavItems: NavItem[] = [
     icon: <BoxCubeIcon />,
     name: "Analytics",
     subItems: [
-      { name: "Individual Gap", path: "/hr/individual-gap" },
+      // { name: "Individual Gap", path: "/hr/individual-gap" }, // Removed as HR doesn't need individual gap analysis
       { name: "Organization Gap", path: "/hr/organization-gap" },
     ],
   },
