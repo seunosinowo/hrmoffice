@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { 
-  PencilIcon, 
+import {
+  PencilIcon,
   TrashBinIcon,
   ChevronDownIcon,
 } from "../../../icons";
@@ -48,11 +48,55 @@ interface FormData {
   required_proficiency_level_id: number;
 }
 
+// Helper function to get competency name based on ID
+const getCompetencyName = (id: number): string => {
+  const competencyMap: Record<number, string> = {
+    1: 'Communication',
+    2: 'Problem Solving',
+    3: 'Leadership',
+    4: 'Technical Skills',
+    5: 'Teamwork',
+    6: 'Adaptability',
+    7: 'Critical Thinking',
+    8: 'Time Management',
+    9: 'Creativity',
+    10: 'Emotional Intelligence',
+    11: 'Decision Making',
+    12: 'Conflict Resolution',
+    13: 'Project Management',
+    14: 'Customer Service',
+    15: 'Strategic Planning'
+  };
+  return competencyMap[id] || `Competency ${id}`;
+};
+
 export default function JobCompetencyProfile() {
   const [profiles, setProfiles] = useState<JobCompetencyProfile[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [competencies, setCompetencies] = useState<Competency[]>([]);
-  const [proficiencyLevels, setProficiencyLevels] = useState<ProficiencyLevel[]>([]);
+  // We'll create these arrays on the fly for the form dropdowns
+  const [competencies] = useState<Competency[]>([
+    { id: 1, name: 'Communication' },
+    { id: 2, name: 'Problem Solving' },
+    { id: 3, name: 'Leadership' },
+    { id: 4, name: 'Technical Skills' },
+    { id: 5, name: 'Teamwork' },
+    { id: 6, name: 'Adaptability' },
+    { id: 7, name: 'Critical Thinking' },
+    { id: 8, name: 'Time Management' },
+    { id: 9, name: 'Creativity' },
+    { id: 10, name: 'Emotional Intelligence' },
+    { id: 11, name: 'Decision Making' },
+    { id: 12, name: 'Conflict Resolution' },
+    { id: 13, name: 'Project Management' },
+    { id: 14, name: 'Customer Service' },
+    { id: 15, name: 'Strategic Planning' }
+  ]);
+  const [proficiencyLevels] = useState<ProficiencyLevel[]>([
+    { id: 1, name: 'Basic' },
+    { id: 2, name: 'Intermediate' },
+    { id: 3, name: 'Advanced' },
+    { id: 4, name: 'Expert' }
+  ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -95,46 +139,99 @@ export default function JobCompetencyProfile() {
       setLoading(true);
       setError(null);
 
-      // Fetch profiles
+      // Fetch job competency profiles
       const { data: profilesData, error: profilesError } = await supabase
         .from('job_competency_profile')
-        .select('*');
+        .select('*')
+        .order('id');
 
       if (profilesError) throw profilesError;
 
-      // Fetch jobs
+      // Fetch jobs to get titles
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
-        .select('*');
+        .select('id, title');
 
       if (jobsError) throw jobsError;
 
-      // Fetch competencies
-      const { data: competenciesData, error: competenciesError } = await supabase
-        .from('competencies')
+      // Fetch proficiency levels with competency_id to match the correct descriptions
+      const { data: levelsData, error: levelsError } = await supabase
+        .from('competency_proficiencies')
         .select('*');
 
-      if (competenciesError) throw competenciesError;
+      if (levelsError) throw levelsError;
 
-      // Fetch proficiency levels
-      const { data: proficiencyLevelsData, error: proficiencyLevelsError } = await supabase
-        .from('proficiency_levels')
-        .select('*');
+      // Log some proficiency level data to understand the structure
+      if (levelsData && levelsData.length > 0) {
+        console.log('First proficiency level structure:', levelsData[0]);
+        console.log('All proficiency levels:', levelsData);
+      }
 
-      if (proficiencyLevelsError) throw proficiencyLevelsError;
+      // Join the data manually
+      const enhancedProfiles = profilesData.map(profile => {
+        const job = jobsData?.find(j => j.id === profile.job_id);
 
-      // Join the data
-      const joinedProfiles = profilesData?.map(profile => ({
-        ...profile,
-        jobs: jobsData?.find(job => job.id === profile.job_id) || null,
-        competencies: competenciesData?.find(comp => comp.id === profile.competency_id) || null,
-        proficiency_levels: proficiencyLevelsData?.find(level => level.id === profile.required_proficiency_level_id) || null
-      })) || [];
+        // Find the correct proficiency level description for this competency and level
+        // We need to match both the competency_id and the proficiency level
+        const matchingLevel = levelsData?.find(l =>
+          l.competency_id === profile.competency_id &&
+          l.proficiency_level_id === profile.required_proficiency_level_id
+        );
 
-      setProfiles(joinedProfiles);
+        // Map proficiency level IDs to standard names
+        const levelNames: Record<number, string> = {
+          1: 'Basic',
+          2: 'Intermediate',
+          3: 'Advanced',
+          4: 'Expert'
+        };
+
+        // Start with a default level name
+        let levelName = 'Unknown Level';
+
+        // First try to use the standard level name based on ID
+        const levelId = profile.required_proficiency_level_id;
+        if (levelId in levelNames) {
+          levelName = levelNames[levelId];
+        }
+
+        // If we found a matching level with a description, use that instead
+        if (matchingLevel && matchingLevel.description) {
+          levelName = matchingLevel.description;
+        } else {
+          // If no competency-specific description was found, try to find a generic level
+          const genericLevel = levelsData?.find(l =>
+            l.id === profile.required_proficiency_level_id ||
+            l.proficiency_level_id === profile.required_proficiency_level_id
+          );
+
+          if (genericLevel) {
+            if (genericLevel.name) levelName = genericLevel.name;
+            else if (genericLevel.level_name) levelName = genericLevel.level_name;
+            else if (genericLevel.proficiency_name) levelName = genericLevel.proficiency_name;
+            else if (genericLevel.title) levelName = genericLevel.title;
+          }
+        }
+
+        return {
+          ...profile,
+          jobs: {
+            id: profile.job_id,
+            title: job?.title || 'Unknown Job'
+          },
+          competencies: {
+            id: profile.competency_id,
+            name: getCompetencyName(profile.competency_id)
+          },
+          proficiency_levels: {
+            id: profile.required_proficiency_level_id,
+            name: levelName
+          }
+        };
+      });
+
+      setProfiles(enhancedProfiles);
       setJobs(jobsData || []);
-      setCompetencies(competenciesData || []);
-      setProficiencyLevels(proficiencyLevelsData || []);
     } catch (err) {
       console.error('Error fetching data:', err);
       setError('Failed to load data. Please try again later.');
@@ -259,7 +356,7 @@ export default function JobCompetencyProfile() {
   };
 
   // Filter profiles based on search term
-  const filteredProfiles = profiles.filter(profile => 
+  const filteredProfiles = profiles.filter(profile =>
     profile.jobs.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     profile.competencies.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     profile.proficiency_levels.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -273,7 +370,7 @@ export default function JobCompetencyProfile() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Job Competency Profiles</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">Manage job competency profiles and their required proficiency levels</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowAddModal(true)}
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           disabled={isAdding}
@@ -319,19 +416,19 @@ export default function JobCompetencyProfile() {
       {!loading && !error && (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+            <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-gray-800">
               <thead className="bg-gray-50 dark:bg-gray-800/50">
                 <tr>
-                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  <th scope="col" className="w-1/5 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Job Title
                   </th>
-                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  <th scope="col" className="w-1/5 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Competency
                   </th>
-                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  <th scope="col" className="w-2/5 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Required Proficiency Level
                   </th>
-                  <th scope="col" className="whitespace-nowrap px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  <th scope="col" className="w-1/5 px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Actions
                   </th>
                 </tr>
@@ -339,13 +436,13 @@ export default function JobCompetencyProfile() {
               <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-white/[0.03]">
                 {filteredProfiles.map((profile) => (
                   <tr key={`profile-${profile.id}`} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
+                    <td className="break-words px-4 py-4 text-sm text-gray-900 dark:text-white">
                       {profile.jobs.title}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
+                    <td className="break-words px-4 py-4 text-sm text-gray-900 dark:text-white">
                       {profile.competencies.name}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
+                    <td className="break-words px-4 py-4 text-center text-sm text-gray-900 dark:text-white">
                       {profile.proficiency_levels.name}
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-medium">
@@ -358,7 +455,7 @@ export default function JobCompetencyProfile() {
                           <span className="text-sm">Actions</span>
                           <ChevronDownIcon className="h-4 w-4" />
                         </button>
-                        
+
                         {activeDropdown === profile.id && (
                           <div className={`actions-dropdown absolute right-0 z-[9999] w-36 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 dark:bg-gray-800 ${
                             profile.id === profiles[profiles.length - 1].id ? 'bottom-full mb-1' : 'top-full mt-1'
@@ -445,7 +542,7 @@ export default function JobCompetencyProfile() {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label htmlFor="competency" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Competency
@@ -464,7 +561,7 @@ export default function JobCompetencyProfile() {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label htmlFor="proficiency_level" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Required Proficiency Level
@@ -483,7 +580,7 @@ export default function JobCompetencyProfile() {
                   ))}
                 </select>
               </div>
-              
+
               <div className="flex items-center justify-end gap-3 pt-4">
                 <button
                   type="button"
@@ -537,7 +634,7 @@ export default function JobCompetencyProfile() {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label htmlFor="edit_competency" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Competency
@@ -556,7 +653,7 @@ export default function JobCompetencyProfile() {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label htmlFor="edit_proficiency_level" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Required Proficiency Level
@@ -575,7 +672,7 @@ export default function JobCompetencyProfile() {
                   ))}
                 </select>
               </div>
-              
+
               <div className="flex items-center justify-end gap-3 pt-4">
                 <button
                   type="button"
@@ -613,7 +710,7 @@ export default function JobCompetencyProfile() {
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
               Are you sure you want to delete this job competency profile?
             </p>
-            
+
             <div className="mt-6 flex items-center justify-end gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
