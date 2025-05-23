@@ -68,9 +68,17 @@ export default function AppHeader() {
         <div className="flex h-16 justify-between">
           <div className="flex">
             <div className="flex flex-shrink-0 items-center">
-              <Link to={user ? "/dashboard" : "/"} className="text-xl font-bold text-gray-900 dark:text-white">
-                HRM&nbsp;Office
-              </Link>
+              {user ? (
+                // When user is authenticated, show as plain text (not clickable)
+                <span className="text-xl font-bold text-gray-900 dark:text-white cursor-default">
+                  HRM&nbsp;Office
+                </span>
+              ) : (
+                // When user is not authenticated, show as a link to home page
+                <Link to="/" className="text-xl font-bold text-gray-900 dark:text-white">
+                  HRM&nbsp;Office
+                </Link>
+              )}
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               {user ? (

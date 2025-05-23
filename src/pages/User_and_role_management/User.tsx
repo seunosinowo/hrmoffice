@@ -55,30 +55,30 @@ const UserManagement: React.FC = () => {
     const initialize = async () => {
       await fetchUsers();
       await fetchDepartments();
-      
-      // Check if the profile_pictures bucket exists
-      const bucketExists = await checkBucketExists('profile_pictures');
+
+      // Check if the employee_pictures bucket exists
+      const bucketExists = await checkBucketExists('employee_pictures');
       if (!bucketExists) {
-        console.warn('The profile_pictures bucket does not exist. Please create it in the Supabase dashboard.');
+        console.warn('The employee_pictures bucket does not exist. Please create it in the Supabase dashboard.');
         // We'll continue without the bucket for now
       }
     };
-    
+
     initialize();
   }, []);
 
   // Function to verify if an image URL is valid
   const verifyImageUrl = async (url: string | null): Promise<string | null> => {
     if (!url) return null;
-    
+
     try {
       console.log('Verifying image URL:', url);
-      
+
       // If the URL is from ui-avatars.com, return it as is
       if (url.includes('ui-avatars.com')) {
         return url;
       }
-      
+
       // For Supabase URLs, we don't need to extract the filename
       // Just verify the URL is accessible
       try {
@@ -107,7 +107,7 @@ const UserManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const { data, error } = await supabase
         .from('users')
         .select(`
@@ -125,11 +125,11 @@ const UserManagement: React.FC = () => {
           )
         `)
         .order('created_at', { ascending: true });
-      
+
       if (error) {
         throw error;
       }
-      
+
       // Verify profile picture URLs
       const usersWithVerifiedUrls = await Promise.all(
         data.map(async (user) => {
@@ -142,10 +142,10 @@ const UserManagement: React.FC = () => {
               user.profile_picture_url = null;
             }
           }
-          
+
           // Transform the data to match our User interface
           let departmentData: Department = { id: '', name: 'No Department' };
-          
+
           if (user.departments) {
             if (Array.isArray(user.departments) && user.departments.length > 0) {
               const firstDepartment = user.departments[0] as unknown as Department;
@@ -161,7 +161,7 @@ const UserManagement: React.FC = () => {
               };
             }
           }
-          
+
           return {
             id: user.id || '',
             username: user.username || '',
@@ -175,7 +175,7 @@ const UserManagement: React.FC = () => {
           };
         })
       );
-      
+
       setUsers(usersWithVerifiedUrls);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -247,7 +247,7 @@ const UserManagement: React.FC = () => {
 
       // Upload profile picture if provided
       if (avatarFile && userData) {
-        const uploadedUrl = await uploadImage(avatarFile, 'profile_pictures');
+        const uploadedUrl = await uploadImage(avatarFile, 'employee_pictures');
         if (uploadedUrl) {
           // Update user with new profile picture URL
           const { error: updateError } = await supabase
@@ -322,7 +322,7 @@ const UserManagement: React.FC = () => {
 
       // Handle profile picture update
       if (avatarFile) {
-        const uploadedUrl = await uploadImage(avatarFile, 'profile_pictures');
+        const uploadedUrl = await uploadImage(avatarFile, 'employee_pictures');
         if (uploadedUrl) {
           await supabase
             .from('users')
@@ -345,10 +345,10 @@ const UserManagement: React.FC = () => {
   // Confirm delete function with Supabase integration
   const handleConfirmDelete = async () => {
     if (!selectedUser) return;
-    
+
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
       // Delete user from Supabase
       const { error } = await supabase
@@ -357,7 +357,7 @@ const UserManagement: React.FC = () => {
         .eq('id', selectedUser.id);
 
       if (error) throw error;
-      
+
       // Remove the user from the local state
       const updatedUsers = users.filter(user => user.id !== selectedUser.id);
       setUsers(updatedUsers);
@@ -377,7 +377,7 @@ const UserManagement: React.FC = () => {
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-9">
           User Management
         </h2>
-        <button 
+        <button
           onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
         >
@@ -444,7 +444,7 @@ const UserManagement: React.FC = () => {
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {user.department?.name || 'No Department'}
                 </p>
-                
+
                 {/* Action Buttons */}
                 <div className="flex justify-center gap-2 mt-4">
                   <button
@@ -510,7 +510,7 @@ const UserManagement: React.FC = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -601,9 +601,9 @@ const UserManagement: React.FC = () => {
                       <div className="flex flex-col items-center space-y-2">
                         {avatarFile ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={URL.createObjectURL(avatarFile)} 
-                              alt="Preview" 
+                            <img
+                              src={URL.createObjectURL(avatarFile)}
+                              alt="Preview"
                               className="w-full h-full rounded-full object-cover"
                             />
                             <button
@@ -631,9 +631,9 @@ const UserManagement: React.FC = () => {
                           JPG, JPEG, PNG (max. 2MB)
                         </span>
                       </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        className="hidden"
                         accept="image/jpeg,image/jpg,image/png"
                         onChange={handleFileChange}
                       />
@@ -782,7 +782,7 @@ const UserManagement: React.FC = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -890,9 +890,9 @@ const UserManagement: React.FC = () => {
                       <div className="flex flex-col items-center space-y-2">
                         {avatarFile ? (
                           <div className="relative w-20 h-20">
-                            <img 
-                              src={URL.createObjectURL(avatarFile)} 
-                              alt="Preview" 
+                            <img
+                              src={URL.createObjectURL(avatarFile)}
+                              alt="Preview"
                               className="w-full h-full rounded-full object-cover"
                             />
                             <button
@@ -920,9 +920,9 @@ const UserManagement: React.FC = () => {
                           JPG, JPEG, PNG (max. 2MB)
                         </span>
                       </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        className="hidden"
                         accept="image/jpeg,image/jpg,image/png"
                         onChange={handleFileChange}
                       />
@@ -971,7 +971,7 @@ const UserManagement: React.FC = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <div className="text-center mb-8">
                 <p className="text-base text-gray-600 dark:text-gray-300 mb-2">
                   Are you sure you want to delete this user?

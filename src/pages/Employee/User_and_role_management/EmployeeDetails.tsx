@@ -253,18 +253,18 @@ const EmployeeDetails: React.FC = () => {
     setAvatarFile(file);
   };
 
-  // Check if the profile_pictures bucket exists
+  // Check if the employee_pictures bucket exists
   const checkProfilePicturesBucket = async () => {
     try {
-      const bucketExists = await checkBucketExists('profile_pictures');
+      const bucketExists = await checkBucketExists('employee_pictures');
       if (!bucketExists) {
-        console.warn('The profile_pictures bucket does not exist. Please create it in the Supabase dashboard.');
+        console.warn('The employee_pictures bucket does not exist. Please create it in the Supabase dashboard.');
         setError('Profile picture uploads may not work. Please contact the administrator.');
       } else {
-        console.log('profile_pictures bucket exists and is accessible');
+        console.log('employee_pictures bucket exists and is accessible');
       }
     } catch (error) {
-      console.error('Error checking profile_pictures bucket:', error);
+      console.error('Error checking employee_pictures bucket:', error);
     }
   };
 
@@ -354,11 +354,41 @@ const EmployeeDetails: React.FC = () => {
       // Upload profile picture if provided
       if (avatarFile && newEmployeeData) {
         console.log('Uploading profile picture for new employee...');
-        // Use uploadImage directly like in User.tsx
-        const uploadedUrl = await uploadImage(avatarFile, 'profile_pictures');
+        console.log('Avatar file details:', {
+          name: avatarFile.name,
+          type: avatarFile.type,
+          size: avatarFile.size,
+          lastModified: new Date(avatarFile.lastModified).toISOString()
+        });
+
+        // Check if employee_pictures bucket exists
+        const bucketExists = await checkBucketExists('employee_pictures');
+        console.log('employee_pictures bucket exists:', bucketExists);
+
+        // Use uploadImage with employee_pictures bucket
+        const uploadedUrl = await uploadImage(avatarFile, 'employee_pictures');
+
+        console.log('Upload result:', uploadedUrl ? 'Success' : 'Failed');
 
         if (uploadedUrl) {
           console.log('Profile picture uploaded successfully, updating employee record with URL:', uploadedUrl);
+
+          // Verify the URL structure
+          console.log('URL analysis:');
+          console.log('- Contains "employee_pictures":', uploadedUrl.includes('employee_pictures'));
+          console.log('- Contains "profile_pictures":', uploadedUrl.includes('profile_pictures'));
+
+          // Try to fetch the image directly to check if it's accessible
+          try {
+            const response = await fetch(uploadedUrl, { method: 'HEAD' });
+            console.log('Image accessibility check:', {
+              status: response.status,
+              statusText: response.statusText,
+              ok: response.ok
+            });
+          } catch (fetchError) {
+            console.error('Image accessibility check failed:', fetchError);
+          }
 
           // IMPORTANT: Do NOT add a timestamp to the URL when storing in the database
           // Use the original URL without any query parameters
@@ -511,11 +541,41 @@ const EmployeeDetails: React.FC = () => {
       // Handle profile picture update
       if (avatarFile) {
         console.log('Uploading new profile picture...');
-        // Use uploadImage directly like in User.tsx
-        const uploadedUrl = await uploadImage(avatarFile, 'profile_pictures');
+        console.log('Avatar file details for update:', {
+          name: avatarFile.name,
+          type: avatarFile.type,
+          size: avatarFile.size,
+          lastModified: new Date(avatarFile.lastModified).toISOString()
+        });
+
+        // Check if employee_pictures bucket exists
+        const bucketExists = await checkBucketExists('employee_pictures');
+        console.log('employee_pictures bucket exists (update):', bucketExists);
+
+        // Use uploadImage with employee_pictures bucket
+        const uploadedUrl = await uploadImage(avatarFile, 'employee_pictures');
+
+        console.log('Update upload result:', uploadedUrl ? 'Success' : 'Failed');
 
         if (uploadedUrl) {
           console.log('Profile picture uploaded successfully, updating employee record with new URL:', uploadedUrl);
+
+          // Verify the URL structure
+          console.log('Update URL analysis:');
+          console.log('- Contains "employee_pictures":', uploadedUrl.includes('employee_pictures'));
+          console.log('- Contains "profile_pictures":', uploadedUrl.includes('profile_pictures'));
+
+          // Try to fetch the image directly to check if it's accessible
+          try {
+            const response = await fetch(uploadedUrl, { method: 'HEAD' });
+            console.log('Update image accessibility check:', {
+              status: response.status,
+              statusText: response.statusText,
+              ok: response.ok
+            });
+          } catch (fetchError) {
+            console.error('Update image accessibility check failed:', fetchError);
+          }
 
           // IMPORTANT: Do NOT add a timestamp to the URL when storing in the database
           // Use the original URL without any query parameters
@@ -995,6 +1055,30 @@ const EmployeeDetails: React.FC = () => {
                             crossOrigin="anonymous"
                             onError={(e) => {
                               console.error('Error loading image:', employee.profile_picture_url);
+                              console.error('Image error details:', e);
+
+                              // Log additional information about the image URL
+                              if (employee.profile_picture_url) {
+                                console.log('Image URL analysis:');
+                                console.log('- URL:', employee.profile_picture_url);
+                                console.log('- Contains "employee_pictures":', employee.profile_picture_url.includes('employee_pictures'));
+                                console.log('- Contains "profile_pictures":', employee.profile_picture_url.includes('profile_pictures'));
+
+                                // Try to fetch the image directly to check response
+                                fetch(employee.profile_picture_url, { method: 'HEAD' })
+                                  .then(response => {
+                                    console.log('Image fetch response:', {
+                                      status: response.status,
+                                      statusText: response.statusText,
+                                      ok: response.ok,
+                                      headers: Array.from(response.headers.entries())
+                                    });
+                                  })
+                                  .catch(fetchError => {
+                                    console.error('Image fetch error:', fetchError);
+                                  });
+                              }
+
                               const target = e.target as HTMLImageElement;
                               target.style.display = 'none';
                               const fallback = target.parentElement?.querySelector('.fallback-avatar') as HTMLElement;
@@ -1136,7 +1220,31 @@ const EmployeeDetails: React.FC = () => {
                         className="w-full h-full rounded-full object-cover border-4 border-blue-100 dark:border-blue-900 filter drop-shadow-lg"
                         crossOrigin="anonymous"
                         onError={(e) => {
-                          console.error('Error loading image:', selectedEmployee.profile_picture_url);
+                          console.error('Error loading image in modal view:', selectedEmployee.profile_picture_url);
+                          console.error('Modal image error details:', e);
+
+                          // Log additional information about the image URL
+                          if (selectedEmployee.profile_picture_url) {
+                            console.log('Modal image URL analysis:');
+                            console.log('- URL:', selectedEmployee.profile_picture_url);
+                            console.log('- Contains "employee_pictures":', selectedEmployee.profile_picture_url.includes('employee_pictures'));
+                            console.log('- Contains "profile_pictures":', selectedEmployee.profile_picture_url.includes('profile_pictures'));
+
+                            // Try to fetch the image directly to check response
+                            fetch(selectedEmployee.profile_picture_url, { method: 'HEAD' })
+                              .then(response => {
+                                console.log('Modal image fetch response:', {
+                                  status: response.status,
+                                  statusText: response.statusText,
+                                  ok: response.ok,
+                                  headers: Array.from(response.headers.entries())
+                                });
+                              })
+                              .catch(fetchError => {
+                                console.error('Modal image fetch error:', fetchError);
+                              });
+                          }
+
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
                           const fallback = target.parentElement?.querySelector('.fallback-avatar') as HTMLElement;
@@ -1248,8 +1356,11 @@ const EmployeeDetails: React.FC = () => {
                       {/* Debug info for profile picture URL */}
                       {selectedEmployee.profile_picture_url && (
                         <div className="mt-2 text-xs text-gray-500 break-all">
+                          <p className="font-semibold">Image URL Debug Info:</p>
                           <p>Original URL: {selectedEmployee.profile_picture_url}</p>
                           <p>Cache-busted URL: {selectedEmployee.profile_picture_url + (selectedEmployee.profile_picture_url.includes('?') ? '&' : '?') + 't=' + Date.now()}</p>
+                          <p>Contains "employee_pictures": {selectedEmployee.profile_picture_url.includes('employee_pictures') ? 'Yes' : 'No'}</p>
+                          <p>Contains "profile_pictures": {selectedEmployee.profile_picture_url.includes('profile_pictures') ? 'Yes' : 'No'}</p>
                           <div className="mt-2">
                             <a
                               href={selectedEmployee.profile_picture_url + (selectedEmployee.profile_picture_url.includes('?') ? '&' : '?') + 't=' + Date.now()}
@@ -1260,6 +1371,26 @@ const EmployeeDetails: React.FC = () => {
                               Open image directly (with cache-busting)
                             </a>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Test image accessibility
+                              if (selectedEmployee.profile_picture_url) {
+                                fetch(selectedEmployee.profile_picture_url, { method: 'HEAD' })
+                                  .then(response => {
+                                    alert(`Image accessibility: ${response.ok ? 'OK' : 'Failed'} (${response.status} ${response.statusText})`);
+                                  })
+                                  .catch(error => {
+                                    alert(`Image fetch error: ${error.message}`);
+                                  });
+                              } else {
+                                alert('No image URL available to test');
+                              }
+                            }}
+                            className="mt-2 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
+                          >
+                            Test Image Accessibility
+                          </button>
                         </div>
                       )}
                     </div>
