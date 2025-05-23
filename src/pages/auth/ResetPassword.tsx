@@ -16,7 +16,32 @@ export default function ResetPassword() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // Get the current session
+        // Log the full URL for debugging
+        console.log("Current URL:", window.location.href);
+
+        // Check for hash parameters (Supabase sometimes puts tokens in the hash)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+        const type = hashParams.get("type");
+
+        console.log("Hash params:", { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
+
+        // Check for query parameters
+        const queryParams = new URLSearchParams(window.location.search);
+        const queryType = queryParams.get("type");
+        const queryToken = queryParams.get("token");
+
+        console.log("Query params:", { type: queryType, token: !!queryToken });
+
+        // Check if we have a recovery type in either hash or query params
+        if ((type === "recovery" || queryType === "recovery") && (accessToken || queryToken)) {
+          console.log("Valid recovery parameters found in URL");
+          setHasToken(true);
+          return;
+        }
+
+        // If no token in URL, check if we have an active session
         const { data, error } = await supabase.auth.getSession();
 
         if (error) {
@@ -28,22 +53,12 @@ export default function ResetPassword() {
         if (data && data.session) {
           console.log("Valid session found for password reset");
           setHasToken(true);
-        } else {
-          // Try to get the token from the URL
-          const url = new URL(window.location.href);
-          const fragment = url.hash;
-          const queryParams = url.search;
-
-          console.log("URL fragment:", fragment);
-          console.log("URL query params:", queryParams);
-
-          // Check if we have a type=recovery parameter (indicates password reset)
-          if (queryParams.includes("type=recovery")) {
-            setHasToken(true);
-          } else {
-            setError("No valid reset session found. Please request a new password reset link.");
-          }
+          return;
         }
+
+        // If we get here, no valid token was found
+        console.log("No valid token found");
+        setError("No access token found. Please request a new password reset link. Password reset links are valid for a limited time (usually 24 hours).");
       } catch (err) {
         console.error("Error checking session:", err);
         setError("An error occurred. Please request a new password reset link.");
@@ -112,8 +127,11 @@ export default function ResetPassword() {
         {error && !hasToken && (
           <div className="mt-8 space-y-6">
             <div className="bg-red-50 dark:bg-red-900/50 text-red-600 dark:text-red-400 p-4 rounded-md">
-              <p className="font-medium mb-2">{error}</p>
-              <p className="text-sm">Please go back to the login page and request a new password reset link.</p>
+              <p className="font-medium mb-2">Password Reset Link Invalid or Expired</p>
+              <p className="text-sm mb-2">
+                The password reset link you're using is invalid or has expired. Password reset links are valid for 24 hours after they are created.
+              </p>
+              <p className="text-sm">Please request a new password reset link to continue.</p>
             </div>
 
             <div className="text-center mt-6">

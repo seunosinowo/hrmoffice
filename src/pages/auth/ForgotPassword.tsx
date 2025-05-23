@@ -64,10 +64,8 @@ export default function ForgotPassword() {
 
           {success && (
             <div className="bg-green-50 dark:bg-green-900/50 text-green-600 dark:text-green-400 p-4 rounded-md">
-              <p className="font-medium mb-2">Password reset link sent!</p>
-              <p className="text-sm">
-                If an account exists with the email <span className="font-medium">{email}</span>, you will receive a password reset link shortly.
-                Please check your email inbox and spam folder.
+              <p className="text-sm mt-2 text-green-700 dark:text-green-300">
+                Password reset link sent and will expire after 24 hours. If you don't use it within that time, you'll need to request a new one.
               </p>
             </div>
           )}
