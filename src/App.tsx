@@ -67,7 +67,6 @@ const RoleManagement = lazy(() => import("./pages/HR/Role_management/RoleManagem
 // const HRIndividualGap = lazy(() => import("./pages/HR/Analytics/IndividualGap")); // Removed as HR doesn't need individual gap analysis
 const HROrganizationGap = lazy(() => import("./pages/HR/Analytics/OrganizationGap"));
 // Import HR AssessorAssessment component
-// @ts-ignore - TypeScript can't find the module but it exists
 const HRAssessorAssessment = lazy(() => import("./pages/HR/Assessment_management/AssessorAssessment"));
 const HRConsensusAssessment = lazy(() => import("./pages/HR/Assessment_management/ConsensusAssessment"));
 const HRCompetency = lazy(() => import("./pages/HR/Competency_framework/Competency"));

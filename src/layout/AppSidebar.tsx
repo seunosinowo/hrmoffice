@@ -135,7 +135,7 @@ const assessorNavItems: NavItem[] = [
     name: "Analytics",
     subItems: [
       { name: "Individual Gap", path: "/assessor/individual-gap" },
-      { name: "Organization Gap", path: "/assessor/organization-gap" },
+      // { name: "Organization Gap", path: "/assessor/organization-gap" }, // Commented out as requested
     ],
   },
 ];
