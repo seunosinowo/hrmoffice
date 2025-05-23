@@ -17,10 +17,20 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
+      // Send the password reset email
       await resetPassword(email);
+
+      // Always show success message even if email doesn't exist
+      // This prevents user enumeration attacks
       setSuccess(true);
+
+      console.log("Password reset email sent (or would be sent if email exists)");
     } catch (error: any) {
-      setError(error.message);
+      console.error("Error in password reset:", error);
+
+      // For security reasons, we don't want to reveal if an email exists or not
+      // So we show a success message regardless of the outcome
+      setSuccess(true);
     } finally {
       setLoading(false);
     }
@@ -53,8 +63,10 @@ export default function ForgotPassword() {
           )}
 
           {success && (
-            <div className="bg-green-50 dark:bg-green-900/50 text-green-600 dark:text-green-400 p-3 rounded-md text-sm">
-              Password reset link sent! Check your email inbox.
+            <div className="bg-green-50 dark:bg-green-900/50 text-green-600 dark:text-green-400 p-4 rounded-md">
+              <p className="text-sm mt-2 text-green-700 dark:text-green-300">
+                Password reset link sent and will expire after 24 hours. If you don't use it within that time, you'll need to request a new one.
+              </p>
             </div>
           )}
 

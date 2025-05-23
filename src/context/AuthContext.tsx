@@ -745,6 +745,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ? `${window.location.origin}/auth/reset-password`
         : 'https://hrmoffice.vercel.app/auth/reset-password';
 
+      console.log('Using redirect URL for password reset:', redirectUrl);
+
+      // Send the password reset email
+      // Note: Supabase's resetPasswordForEmail has a default token expiration of 24 hours
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectUrl
       });
@@ -755,6 +759,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log('Password reset email sent successfully');
+      console.log('Note: The reset link will expire in 24 hours');
     } catch (error) {
       console.error('Unexpected error during password reset:', error);
       throw error;
