@@ -290,9 +290,8 @@ export const uploadProfilePicture = async (file: File, employeeId: string): Prom
     console.log(`Starting profile picture upload for employee ${employeeId}`);
     console.log(`File details: name=${file.name}, size=${file.size}bytes, type=${file.type}`);
 
-    // Use the uploadImage function that's working in User.tsx
-    // This will try to use the 'profile_pictures' bucket which seems to be working
-    const uploadedUrl = await uploadImage(file, 'profile_pictures');
+    // Use the uploadImage function with the employee_pictures bucket
+    const uploadedUrl = await uploadImage(file, 'employee_pictures');
 
     if (uploadedUrl) {
       console.log(`Profile picture uploaded successfully. URL: ${uploadedUrl}`);

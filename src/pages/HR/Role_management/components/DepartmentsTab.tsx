@@ -10,6 +10,7 @@ interface Department {
   id: string;
   name: string;
   description: string | null;
+  created_at?: string; // Add created_at field
 }
 
 interface DepartmentFormData {
@@ -49,17 +50,20 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
     }
 
     if (!searchQuery.trim()) {
-      setFilteredDepartments(departments);
+      // Use the departments array as is, maintaining the original order
+      setFilteredDepartments([...departments]);
       return;
     }
 
+    // Filter departments while maintaining the original order
     const filtered = departments.filter(
       dept =>
         dept.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (dept.description && dept.description.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
-    setFilteredDepartments(filtered);
+    // Set filtered departments, maintaining the original order
+    setFilteredDepartments([...filtered]);
   }, [departments, searchQuery]);
 
   // Handle click outside to close dropdown
@@ -106,7 +110,8 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
 
       const newDepartment = {
         name: departmentFormData.name.trim(),
-        description: departmentFormData.description.trim()
+        description: departmentFormData.description.trim(),
+        created_at: new Date().toISOString() // Add timestamp to ensure proper ordering
       };
 
       const { data, error } = await supabase
@@ -310,7 +315,17 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
                   </td>
                 </tr>
               ) : filteredDepartments.length > 0 ? (
-                filteredDepartments.map((department) => (
+                // Sort departments by ID to ensure new departments appear at the bottom
+                [...filteredDepartments]
+                  .sort((a, b) => {
+                    // First try to sort by created_at timestamp if available
+                    if (a.created_at && b.created_at) {
+                      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                    }
+                    // Fall back to sorting by ID if created_at is not available
+                    return a.id.localeCompare(b.id);
+                  })
+                  .map((department) => (
                   <tr key={department.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.05]">
                     <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
                       {department.name}
