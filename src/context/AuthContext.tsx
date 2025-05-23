@@ -18,6 +18,7 @@ type AuthContextType = {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -735,8 +736,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      console.log('Sending password reset email to:', email);
+
+      // Get the correct redirect URL based on environment
+      const redirectUrl = window.location.hostname === 'localhost'
+        ? `${window.location.origin}/auth/reset-password`
+        : 'https://hrmoffice.vercel.app/auth/reset-password';
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl
+      });
+
+      if (error) {
+        console.error('Error sending password reset email:', error);
+        throw error;
+      }
+
+      console.log('Password reset email sent successfully');
+    } catch (error) {
+      console.error('Unexpected error during password reset:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, signIn, signUp, signOut, signInWithGoogle }}>
+    <AuthContext.Provider value={{ user, signIn, signUp, signOut, signInWithGoogle, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

@@ -12,6 +12,8 @@ const Unauthorized = lazy(() => import("./pages/OtherPage/Unauthorized"));
 const Login = lazy(() => import("./pages/auth/Login"));
 const SignUp = lazy(() => import("./pages/auth/SignUp"));
 const EmailConfirmation = lazy(() => import("./pages/auth/EmailConfirmation"));
+const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
 const PageDescription = lazy(() => import("./pages/Employee/PageDescription/PageDescription"));
 const Home = lazy(() => import("./pages/Dashboard/Home"));
 const AboutPage = lazy(() => import("./pages/NavPages/AboutPage"));
@@ -113,6 +115,8 @@ export default function App() {
           <Route path="/auth/email-confirmation" element={<EmailConfirmation />} />
           <Route path="/auth/callback" element={<Callback />} />
           <Route path="/auth/welcome" element={<WelcomePage />} />
+          <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
 
           {/* Public pages with conditional layout */}
           <Route element={<AuthenticatedLayout />}>

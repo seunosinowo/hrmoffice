@@ -4,7 +4,7 @@ import { ThemeToggleButton } from "../../components/common/ThemeToggleButton";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 
-type SignUpType = 'individual' | 'organization' | 'contractor';
+type SignUpType = 'individual' | 'organization';
 
 export default function SignUp() {
   const [email, setEmail] = useState("");
@@ -120,47 +120,21 @@ export default function SignUp() {
 
               <button
                 type="button"
-                onClick={() => setSignUpType('organization')}
-                className={`flex-1 p-4 border-2 rounded-lg text-center transition-all duration-200 ${
-                  signUpType === 'organization'
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-sm'
-                    : 'border-gray-300 dark:border-gray-700 hover:border-blue-500 hover:shadow-sm'
-                }`}
+                onClick={() => navigate('/auth/login')}
+                className={`flex-1 p-4 border-2 rounded-lg text-center transition-all duration-200
+                  border-gray-300 dark:border-gray-700 hover:border-blue-500 hover:shadow-sm
+                `}
               >
                 <div className="flex flex-col items-center">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
-                    signUpType === 'organization'
-                      ? 'bg-blue-100 dark:bg-blue-900/30'
-                      : 'bg-gray-100 dark:bg-gray-800'
-                  }`}>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3
+                    bg-gray-100 dark:bg-gray-800
+                  `}>
                     <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                   </div>
                   <span className="text-sm font-medium text-gray-900 dark:text-white">Organization</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSignUpType('contractor')}
-                className={`flex-1 p-4 border-2 rounded-lg text-center transition-all duration-200 ${
-                  signUpType === 'contractor'
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-sm'
-                    : 'border-gray-300 dark:border-gray-700 hover:border-blue-500 hover:shadow-sm'
-                }`}
-              >
-                <div className="flex flex-col items-center">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
-                    signUpType === 'contractor'
-                      ? 'bg-blue-100 dark:bg-blue-900/30'
-                      : 'bg-gray-100 dark:bg-gray-800'
-                  }`}>
-                    <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Contractor</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Sign in as individual</span>
                 </div>
               </button>
             </div>
@@ -256,6 +230,15 @@ export default function SignUp() {
                     "Create account"
                   )}
                 </button>
+
+                <div className="mt-4 text-center">
+                  <Link
+                    to="/auth/forgot-password"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    Forgot your password?
+                  </Link>
+                </div>
               </div>
 
               <div className="mt-6">
