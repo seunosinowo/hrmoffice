@@ -153,8 +153,8 @@ const hrNavItems: NavItem[] = [
     subItems: [
       // { name: "User", path: "/hr/user" },
       { name: "Employee Details", path: "/hr/employee-details" },
-      { name: "Employee Job Assignment", path: "/hr/employee-job-assignment" },
-      { name: "Employee Assessor Assign", path: "/hr/employee-assessor-assign" },
+      { name: "Assign Job Roles", path: "/hr/employee-job-assignment" },
+      { name: "Assign an Assessor", path: "/hr/employee-assessor-assign" },
       { name: "Role Management", path: "/hr/role-management" },
     ],
   },

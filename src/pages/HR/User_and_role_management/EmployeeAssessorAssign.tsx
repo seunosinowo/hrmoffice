@@ -44,6 +44,7 @@ export default function EmployeeAssessorAssign() {
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [assessors, setAssessors] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -233,7 +234,7 @@ export default function EmployeeAssessorAssign() {
         throw error;
       }
 
-      // We don't need to store departments anymore
+      setDepartments(data || []); // Properly update the state
       console.log("Fetched departments:", data);
     } catch (err) {
       console.error("Error fetching departments:", err);
@@ -394,7 +395,7 @@ export default function EmployeeAssessorAssign() {
       {/* Header Section */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Employee Assessor Assignment</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white/90">Assign an Assessor</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">Manage employee assessor assignments</p>
         </div>
         <div className="flex justify-center sm:justify-end">
@@ -586,16 +587,18 @@ export default function EmployeeAssessorAssign() {
                 <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Department
                 </label>
-                <input
-                  type="text"
+                <select
                   id="department"
                   value={formData.department}
-                  readOnly
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400"
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Department is automatically set based on the selected employee
-                </p>
+                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
+                >
+                  <option value="">Select a department</option>
+                  {departments.map(dept => (
+                    <option key={`dept-${dept.id}`} value={dept.name}>{dept.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -704,16 +707,18 @@ export default function EmployeeAssessorAssign() {
                 <label htmlFor="edit_department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Department
                 </label>
-                <input
-                  type="text"
+                <select
                   id="edit_department"
                   value={formData.department}
-                  readOnly
-                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400"
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Department is automatically set based on the selected employee
-                </p>
+                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                  required
+                  className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white [&>option]:dark:bg-gray-900 [&>option]:dark:text-white"
+                >
+                  <option value="">Select a department</option>
+                  {departments.map(dept => (
+                    <option key={`edit-dept-${dept.id}`} value={dept.name}>{dept.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div>

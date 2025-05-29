@@ -31,3 +31,6 @@ The HR Management System offers a range of features and tools to support HR prof
 ### Installation
 ### Prerequisites
 - To get started with the HR Management System, ensure you have the following prerequisites installed and set up: Node.js 18.x or later (recommended to use Node.js 20.x or later)
+
+
+### 

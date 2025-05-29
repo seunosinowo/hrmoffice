@@ -5,6 +5,7 @@ import {
   PencilIcon,
   ChevronDownIcon,
 } from "../../../../icons";
+import * as XLSX from 'xlsx';
 
 interface Department {
   id: string;
@@ -38,6 +39,7 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
   const [isDeletingDepartment, setIsDeletingDepartment] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredDepartments, setFilteredDepartments] = useState<Department[]>([]);
+  const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
 
   // Create refs for dropdown menus
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -256,9 +258,58 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
     }
   };
 
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target?.files?.[0];
+    if (!file) {
+      setUploadSuccessMessage('Please select an Excel file to upload.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const result = event.target?.result;
+      if (!result || !(result instanceof ArrayBuffer)) {
+        setUploadSuccessMessage('Invalid file format. Please upload a valid Excel file.');
+        return;
+      }
+
+      try {
+        const data = new Uint8Array(result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData: (string | null)[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (jsonData.length > 1) {
+          const departments = jsonData.slice(1).map((row) => ({
+            name: row[0] as string,
+            description: row[1] as string | null,
+          }));
+
+          const { error } = await supabase.from('departments').insert(departments);
+          if (error) throw error;
+
+          setUploadSuccessMessage('Departments uploaded successfully!');
+          fetchDepartments();
+        } else {
+          setUploadSuccessMessage('The uploaded Excel file is empty or has invalid data.');
+        }
+      } catch (error) {
+        console.error('Error processing the Excel file:', error);
+        setUploadSuccessMessage('An error occurred while processing the Excel file.');
+      }
+    };
+
+    reader.onerror = () => {
+      setUploadSuccessMessage('Failed to read the file. Please try again.');
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
         {/* Search Bar */}
         <div className="relative w-full sm:max-w-xs">
           <input
@@ -276,17 +327,28 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
         </div>
 
         {/* Add Department Button */}
-        <button
-          onClick={() => {
-            // Clear form data when opening the modal
-            setDepartmentFormData({ name: '', description: '' });
-            setDepartmentError(null);
-            setShowAddDepartmentModal(true);
-          }}
-          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-        >
-          Add Department
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <button
+            onClick={() => {
+              // Clear form data when opening the modal
+              setDepartmentFormData({ name: '', description: '' });
+              setDepartmentError(null);
+              setShowAddDepartmentModal(true);
+            }}
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            Add Department
+          </button>
+          <label className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 cursor-pointer ml-2">
+            Upload Excel
+            <input
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={handleExcelUpload}
+              className="hidden"
+            />
+          </label>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -584,6 +646,13 @@ export default function DepartmentsTab({ departments, loadingDepartments, fetchD
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Upload Success Message */}
+      {uploadSuccessMessage && (
+        <div className="mt-4 rounded-lg bg-green-100 p-4 text-green-800">
+          {uploadSuccessMessage}
         </div>
       )}
     </div>
