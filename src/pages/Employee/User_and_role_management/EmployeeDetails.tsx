@@ -63,136 +63,39 @@ const EmployeeDetails: React.FC = () => {
   });
 
   // Fetch employee profile for current user
-  const fetchEmployeeProfile = async () => {
-    if (!user) return;
-
+  const fetchEmployees = async () => {
     try {
       setLoading(true);
-
-      // Try to fetch employee profile using user_id first (preferred method)
-      const { data: userIdData, error: userIdError } = await supabase
-        .from('employees')
-        .select(`
-          *,
-          employee_departments (
-            department:departments (
-              id,
-              name
-            )
-          )
-        `)
-        .eq('user_id', user.id)
+      const { data: employeesData, error: employeesError } = await supabase
+        .from('employee_details_view')
+        .select('*')
         .order('employee_number', { ascending: true });
-
-      // If no results or error, try using email as fallback
-      let employeesData;
-      let employeesError;
-
-      if (userIdError || !userIdData || userIdData.length === 0) {
-        console.log('No profile found with user_id, trying email fallback');
-
-        const { data: emailData, error: emailError } = await supabase
-          .from('employees')
-          .select(`
-            *,
-            employee_departments (
-              department:departments (
-                id,
-                name
-              )
-            )
-          `)
-          .eq('email', user.email)
-          .order('employee_number', { ascending: true });
-
-        employeesData = emailData;
-        employeesError = emailError;
-
-        // If we found a profile by email but it doesn't have user_id set,
-        // update it to link to the current user
-        if (emailData && emailData.length > 0 && (!emailData[0].user_id || emailData[0].user_id !== user.id)) {
-          console.log('Updating employee profile to link with user account');
-
-          const { error: updateError } = await supabase
-            .from('employees')
-            .update({ user_id: user.id })
-            .eq('id', emailData[0].id);
-
-          if (updateError) {
-            console.error('Error updating user_id:', updateError);
-          }
-        }
-      } else {
-        employeesData = userIdData;
-        employeesError = userIdError;
-      }
 
       if (employeesError) throw employeesError;
 
-      if (employeesData && employeesData.length > 0) {
-        console.log('Employee profile found:', employeesData);
-        // Log the raw employee data to see what's coming from the database
-        console.log('Raw employee data from database:', employeesData);
-
-        // Process employees with verified image URLs
-        const formattedEmployees = await Promise.all(employeesData.map(async (emp) => {
-          // Log each employee's profile picture URL
-          console.log(`Employee ${emp.id} profile_picture_url:`, emp.profile_picture_url);
-
-          // Verify the profile picture URL
-          if (emp.profile_picture_url) {
-            const verifiedUrl = await verifyImageUrl(emp.profile_picture_url);
-            if (verifiedUrl) {
-              emp.profile_picture_url = verifiedUrl;
-              console.log(`Verified profile picture URL for employee ${emp.id}: ${emp.profile_picture_url}`);
-            } else {
-              // If verification fails, set to null to show fallback avatar
-              emp.profile_picture_url = null;
-              console.warn(`Could not verify profile picture URL for employee ${emp.id}, setting to null`);
-            }
+      // Process employees with verified image URLs
+      const formattedEmployees = await Promise.all(employeesData.map(async (emp) => {
+        // Verify the profile picture URL
+        if (emp.profile_picture_url) {
+          const verifiedUrl = await verifyImageUrl(emp.profile_picture_url);
+          if (verifiedUrl) {
+            emp.profile_picture_url = verifiedUrl;
+          } else {
+            emp.profile_picture_url = null;
           }
-
-          return {
-            ...emp,
-            departments: emp.employee_departments.map((ed: any) => ed.department),
-            department_ids: emp.employee_departments.map((ed: any) => ed.department.id)
-          };
-        }));
-
-        setEmployees(formattedEmployees);
-        setProfileExists(true);
-        console.log('Profile exists set to TRUE');
-
-        // Check if employee can edit their profile (not locked)
-        // Simplified logic - check if profile is older than 12 hours
-        const now = new Date();
-        const creationTime = new Date(formattedEmployees[0].created_at);
-        const twelveHoursAfterCreation = new Date(creationTime.getTime() + 12 * 60 * 60 * 1000);
-
-        // If current time is before the 12-hour window expires
-        if (now < twelveHoursAfterCreation) {
-          setCanEdit(true);
-
-          // Calculate time remaining until profile is locked permanently
-          const timeRemaining = Math.floor((twelveHoursAfterCreation.getTime() - now.getTime()) / 1000);
-          const hours = Math.floor(timeRemaining / 3600);
-          const minutes = Math.floor((timeRemaining % 3600) / 60);
-
-          setTimeUntilEditable(`${hours}h ${minutes}m`);
-        } else {
-          // After 12 hours, profile is permanently locked for employee
-          setCanEdit(false);
-          setTimeUntilEditable(null);
         }
-      } else {
-        console.log('No employee profile found');
-        setProfileExists(false);
-        setCanEdit(true);
-        console.log('Profile exists set to FALSE');
-      }
+
+        return {
+          ...emp,
+          departments: emp.departments || [],
+          department_ids: emp.department_ids || []
+        };
+      }));
+
+      setEmployees(formattedEmployees);
     } catch (error) {
-      console.error('Error fetching employee profile:', error);
-      setError('Failed to load employee profile');
+      console.error('Error fetching employees:', error);
+      setError('Failed to load employees');
     } finally {
       setLoading(false);
     }
@@ -431,7 +334,7 @@ const EmployeeDetails: React.FC = () => {
 
             // Also force a refresh of the employee profile to get the updated URL from the server
             setTimeout(() => {
-              fetchEmployeeProfile();
+              fetchEmployees();
             }, 500);
           }
         } else {
@@ -455,7 +358,7 @@ const EmployeeDetails: React.FC = () => {
       }
 
       // Refresh the employee profile
-      await fetchEmployeeProfile();
+      await fetchEmployees();
       setNewEmployee({
         username: '',
         first_name: '',
@@ -617,7 +520,7 @@ const EmployeeDetails: React.FC = () => {
 
             // Also force a refresh of the employee profile to get the updated URL from the server
             setTimeout(() => {
-              fetchEmployeeProfile();
+              fetchEmployees();
             }, 500);
           }
         } else {
@@ -645,7 +548,7 @@ const EmployeeDetails: React.FC = () => {
         if (deptError) throw deptError;
       }
 
-      await fetchEmployeeProfile();
+      await fetchEmployees();
       setShowEditModal(false);
       setAvatarFile(null);
     } catch (error) {
@@ -692,7 +595,7 @@ const EmployeeDetails: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (user) {
-      fetchEmployeeProfile();
+      fetchEmployees();
       fetchDepartments();
 
       // Check if the profile_pictures bucket exists
@@ -712,7 +615,7 @@ const EmployeeDetails: React.FC = () => {
           (payload) => {
             console.log('Real-time update received for employee:', payload);
             // Refresh the employee profile when changes are detected
-            fetchEmployeeProfile();
+            fetchEmployees();
           }
         )
         .subscribe();

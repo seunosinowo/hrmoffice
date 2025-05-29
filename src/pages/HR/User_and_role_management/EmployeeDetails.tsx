@@ -96,7 +96,7 @@ const EmployeeDetails: React.FC = () => {
         .from('employees')
         .select(`
           *,
-          employee_departments (
+          employee_departments!inner (
             department:departments (
               id,
               name

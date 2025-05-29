@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 type Role = 'employee' | 'assessor' | 'hr' | null;
@@ -37,6 +37,7 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({ allowedRoles }) 
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [cachedRoles, setCachedRoles] = useState<string[]>([]);
+  const location = useLocation();
 
   // On component mount, check for cached roles
   useEffect(() => {
@@ -60,18 +61,14 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({ allowedRoles }) 
     checkCachedRoles();
   }, []);
 
-  console.log('RoleBasedRoute - User:', user);
-  console.log('RoleBasedRoute - Allowed roles:', allowedRoles);
-  console.log('RoleBasedRoute - Cached roles:', cachedRoles);
-
-  // If still loading, show nothing (or could add a loading spinner)
+  // If still loading, show nothing
   if (isLoading) {
     return null;
   }
 
   if (!user) {
     console.log('RoleBasedRoute - No user, redirecting to login');
-    return <Navigate to="/auth/login" />;
+    return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 
   // Access roles directly from the user object, fallback to cached roles if available
@@ -89,71 +86,41 @@ export const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({ allowedRoles }) 
   // Use only the primary role
   let roles = [primaryRole];
 
-  console.log('RoleBasedRoute - All roles:', userRoles);
-  console.log('RoleBasedRoute - Using primary role:', primaryRole);
-
-  // Define role hierarchy - higher roles can access routes requiring lower roles
-  const roleHierarchy: { [key: string]: string[] } = {
-    'hr': ['hr', 'assessor', 'employee'], // HR can access HR, assessor, and employee routes
-    'assessor': ['assessor', 'employee'],  // Assessors can access assessor and employee routes
-    'employee': ['employee']               // Employees can only access employee routes
+  // Define role hierarchy and their default routes
+  const roleHierarchy: { [key: string]: { routes: string[], defaultRoute: string } } = {
+    'hr': {
+      routes: ['hr', 'assessor', 'employee'],
+      defaultRoute: '/hr/page-description'
+    },
+    'assessor': {
+      routes: ['assessor', 'employee'],
+      defaultRoute: '/assessor/page-description'
+    },
+    'employee': {
+      routes: ['employee'],
+      defaultRoute: '/page-description'
+    }
   };
 
-  // Log the role hierarchy for debugging
-  console.log('RoleBasedRoute - Role hierarchy:', roleHierarchy);
-
-  // Special case: if the user has no roles but we're checking for employee access, grant it
-  if (roles.length === 0 && allowedRoles.includes('employee')) {
-    console.log('RoleBasedRoute - No roles but employee access requested, granting access');
-    return <Outlet />;
+  // If user is on root path or home, redirect to their default route
+  if (location.pathname === '/' || location.pathname === '/home') {
+    const defaultRoute = roleHierarchy[primaryRole]?.defaultRoute || '/page-description';
+    return <Navigate to={defaultRoute} replace />;
   }
 
-  // Special case: if the user has the 'hr' role, grant access to everything
-  if (roles.includes('hr')) {
-    console.log('RoleBasedRoute - User has HR role, granting access to all routes');
-    return <Outlet />;
-  }
-
-  // Special case: if the user has the 'assessor' role and is trying to access assessor routes
-  if (roles.includes('assessor') && (allowedRoles.includes('assessor') || allowedRoles.includes('employee'))) {
-    console.log('RoleBasedRoute - User has Assessor role, granting access to assessor/employee routes');
-    return <Outlet />;
-  }
-
-  // Special case: if the user has the 'employee' role and is trying to access employee routes
-  if (roles.includes('employee') && allowedRoles.includes('employee')) {
-    console.log('RoleBasedRoute - User has Employee role, granting access to employee routes');
-    return <Outlet />;
-  }
-
-  // Check if user has any role that grants access to the required roles
+  // Check if user has access to the current route
   const hasAllowedRole = roles.some(userRole => {
-    // Skip empty roles
-    if (!userRole) {
-      console.log('RoleBasedRoute - Empty role found, skipping');
-      return false;
-    }
-
-    // Get all roles this user role has access to
-    const accessibleRoles = roleHierarchy[userRole] || [userRole];
-    console.log(`RoleBasedRoute - User role: ${userRole}, Accessible roles:`, accessibleRoles);
-
-    // Check if any of the allowed roles are in the accessible roles
-    const hasAccess = allowedRoles.some(allowedRole => accessibleRoles.includes(allowedRole));
-    console.log(`RoleBasedRoute - Has access to ${allowedRoles.join(', ')}: ${hasAccess}`);
-
-    return hasAccess;
+    if (!userRole) return false;
+    const accessibleRoles = roleHierarchy[userRole]?.routes || [userRole];
+    return allowedRoles.some(allowedRole => accessibleRoles.includes(allowedRole));
   });
 
   if (!hasAllowedRole) {
     console.warn('Access denied: user roles =', roles, 'allowed roles =', allowedRoles);
-
-    // Store the current URL in session storage so we can redirect back after login
-    sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
-
-    return <Navigate to="/unauthorized" />;
+    // Redirect to unauthorized page
+    return <Navigate to="/unauthorized" replace />;
   }
 
-  console.log('RoleBasedRoute - Access granted');
+  // If user has access, render the route
   return <Outlet />;
 };

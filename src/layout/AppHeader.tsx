@@ -50,15 +50,12 @@ export default function AppHeader() {
       localStorage.removeItem('supabase.auth.token');
       localStorage.removeItem('hrmoffice_user_data');
 
-      // Add a small delay to ensure sign-out completes before navigation
-      setTimeout(() => {
-        // Use React Router navigation instead of window.location for consistent behavior
-        navigate('/');
-      }, 100);
+      // Use window.location.href for a full page refresh to ensure proper layout switch
+      window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
       // Even if there's an error, try to navigate to home page
-      navigate('/');
+      window.location.href = '/';
     }
   };
 

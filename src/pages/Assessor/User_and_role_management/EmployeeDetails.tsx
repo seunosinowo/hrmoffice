@@ -93,11 +93,9 @@ const EmployeeDetails: React.FC = () => {
         .from('employees')
         .select(`
           *,
-          employee_departments (
-            department:departments (
-              id,
-              name
-            )
+          departments!inner (
+            id,
+            name
           )
         `)
         .order('employee_number', { ascending: true });
@@ -122,8 +120,8 @@ const EmployeeDetails: React.FC = () => {
 
         return {
           ...emp,
-          departments: emp.employee_departments.map((ed: any) => ed.department),
-          department_ids: emp.employee_departments.map((ed: any) => ed.department.id)
+          departments: emp.departments || [],
+          department_ids: emp.departments?.map((dept: any) => dept.id) || []
         };
       }));
 

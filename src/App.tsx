@@ -134,19 +134,26 @@ export default function App() {
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
           <Route path="/auth/reset-password" element={<ResetPassword />} />
 
-          {/* Public pages with conditional layout */}
-          <Route element={<AuthenticatedLayout />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/home" element={<Home />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/resources" element={<Resources />} />
-            <Route path="/book-demo" element={<BookDemoPage />} />
-          </Route>
-
-          {/* Protected Routes - Only accessible after login */}
-          {user && (
+          {/* Public pages - accessible to all users */}
+          {!user ? (
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/home" element={<Home />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/resources" element={<Resources />} />
+              <Route path="/book-demo" element={<BookDemoPage />} />
+            </Route>
+          ) : (
             <Route element={<AppLayout />}>
+              {/* Public pages within authenticated layout */}
+              <Route path="/" element={<Home />} />
+              <Route path="/home" element={<Home />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/resources" element={<Resources />} />
+              <Route path="/book-demo" element={<BookDemoPage />} />
+
               {/* Diagnostic Routes - Available to all authenticated users */}
               <Route path="/bucket-diagnostic" element={<BucketDiagnostic />} />
 

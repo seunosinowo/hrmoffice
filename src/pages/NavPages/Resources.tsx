@@ -1,3 +1,5 @@
+import React from 'react';
+import PageMeta from '../../components/common/PageMeta';
 import { 
   BookOpenIcon, 
   PlayCircleIcon, 
@@ -7,6 +9,34 @@ import {
   // UserGroupIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
+
+const ResourceCard: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  link: string;
+}> = ({ icon, title, description, link }) => (
+  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow duration-300">
+    <div className="flex items-center mb-4">
+      <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+        {icon}
+      </div>
+      <h3 className="text-xl font-semibold ml-4 text-gray-900 dark:text-white">{title}</h3>
+    </div>
+    <p className="text-gray-700 dark:text-gray-300 mb-4">{description}</p>
+    <a
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium inline-flex items-center"
+    >
+      Learn More
+      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </a>
+  </div>
+);
 
 export default function ResourcesPage() {
   const resources = [
@@ -71,15 +101,28 @@ export default function ResourcesPage() {
   const categories = [...new Set(resources.map(r => r.category))];
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen py-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Hero Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-            HRM Resource Center
-          </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            Everything you need to optimize your HR operations
+    <>
+      <PageMeta
+        title="Resources - HRM Office"
+        description="Access valuable resources for HR professionals, including guides, webinars, and best practices for employee competency assessment."
+      />
+
+      {/* Hero Section */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="text-4xl font-bold mb-6">HR Resources</h1>
+          <p className="text-xl max-w-3xl">
+            Access our comprehensive collection of resources designed to help you optimize your workforce management and competency assessment processes.
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Introduction */}
+        <div className="prose prose-lg max-w-none mb-16">
+          <p className="text-gray-700 dark:text-gray-300">
+            At HRM Office, we believe in empowering HR professionals with the knowledge and tools they need to succeed. Our curated collection of resources includes guides, webinars, templates, and best practices to help you implement effective competency assessment programs and drive organizational success.
           </p>
         </div>
 
@@ -141,21 +184,23 @@ export default function ResourcesPage() {
           <div className="flex flex-col md:flex-row items-center">
             <div className="md:w-2/3 mb-6 md:mb-0 md:pr-8">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                Can't find what you need?
+                Ready to Transform Your HR Processes?
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
-                Explore our comprehensive knowledge base with hundreds of articles, 
-                troubleshooting guides, and best practices for HR professionals.
+                Get personalized guidance on implementing competency assessments and optimizing your workforce management strategy.
               </p>
             </div>
             <div className="md:w-1/3 flex justify-center md:justify-end">
-              <button className="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition-colors">
-                Browse All Resources
-              </button>
+              <a 
+                href="/book-demo" 
+                className="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition-colors text-center"
+              >
+                Schedule a Consultation
+              </a>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
