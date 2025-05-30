@@ -81,14 +81,16 @@ BEGIN
         RETURNING id INTO v_role_id;
     END IF;
 
-    -- Delete any existing role assignments for this user
-    DELETE FROM public.user_role_assignments
-    WHERE user_id = p_user_id;
-
-    -- Insert the new role assignment
-    INSERT INTO public.user_role_assignments (user_id, role_id)
-    VALUES (p_user_id, v_role_id)
-    RETURNING id INTO v_assignment_id;
+    -- Check if the role assignment already exists
+    IF NOT EXISTS (
+        SELECT 1 FROM public.user_role_assignments
+        WHERE user_id = p_user_id AND role_id = v_role_id
+    ) THEN
+        -- Insert the new role assignment
+        INSERT INTO public.user_role_assignments (user_id, role_id)
+        VALUES (p_user_id, v_role_id)
+        RETURNING id INTO v_assignment_id;
+    END IF;
 
     -- Update user_email_status
     INSERT INTO public.user_email_status (email, user_id, role_name)
@@ -100,12 +102,40 @@ BEGIN
         user_id = p_user_id,
         role_name = p_role_name;
 
-    RETURN v_assignment_id IS NOT NULL;
+    RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Grant execute permission on the function
+-- Create a function to remove a role from a user
+CREATE OR REPLACE FUNCTION public.remove_role(
+    p_user_id UUID,
+    p_role_name TEXT
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_role_id UUID;
+BEGIN
+    -- Get the role ID
+    SELECT id INTO v_role_id
+    FROM public.roles
+    WHERE role_name = p_role_name::public.user_role;
+
+    -- If role doesn't exist, return false
+    IF v_role_id IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Delete the role assignment
+    DELETE FROM public.user_role_assignments
+    WHERE user_id = p_user_id AND role_id = v_role_id;
+
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission on the functions
 GRANT EXECUTE ON FUNCTION public.assign_role TO authenticated;
+GRANT EXECUTE ON FUNCTION public.remove_role TO authenticated;
 
 -- Create a trigger to assign default role to new users
 CREATE OR REPLACE FUNCTION public.handle_new_user()

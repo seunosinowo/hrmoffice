@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
-import { Suspense, lazy, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Suspense, lazy } from "react";
 import { useAuth } from "./context/AuthContext";
 import AppLayout from "./layout/AppLayout";
 import PublicLayout from "./layout/PublicLayout";
@@ -89,33 +89,6 @@ const LoadingFallback = () => (
     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
   </div>
 );
-
-// Authenticated Layout component
-const AuthenticatedLayout = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
-  // If user is authenticated, redirect to their role-specific page
-  useEffect(() => {
-    if (user) {
-      if (user.roles.includes('hr')) {
-        navigate("/hr/page-description", { replace: true });
-      } else if (user.roles.includes('assessor')) {
-        navigate("/assessor/page-description", { replace: true });
-      } else {
-        navigate("/page-description", { replace: true });
-      }
-    }
-  }, [user, navigate]);
-
-  // Only show public layout for non-authenticated users
-  if (!user) {
-    return <PublicLayout />;
-  }
-
-  // This will only render briefly before redirect happens
-  return <PublicLayout />;
-};
 
 export default function App() {
   const { user } = useAuth();
