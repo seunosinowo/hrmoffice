@@ -12,9 +12,9 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 // Profile operations
 export const getProfile = async (userId: string) => {
   const { data, error } = await supabase
-    .from('profiles')
+    .from('user_profiles')
     .select('*')
-    .eq('id', userId)
+    .eq('user_id', userId)
     .single();
   
   if (error) throw error;
@@ -47,9 +47,13 @@ export const getJobAssignments = async (employeeId: string) => {
 // Update profile
 export const updateProfile = async (userId: string, updates: any) => {
   const { data, error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', userId);
+    .rpc('update_user_profile', {
+      p_user_id: userId,
+      p_first_name: updates.first_name,
+      p_last_name: updates.last_name,
+      p_phone_number: updates.phone_number,
+      p_profile_picture_url: updates.profile_picture_url
+    });
   
   if (error) throw error;
   return data;
@@ -184,27 +188,39 @@ export const clearAllData = async () => {
 };
 
 // Function to assign default role to new users
-export const assignDefaultRole = async (userId: string) => {
-  const { error } = await supabase
-    .from('profiles') // Assuming 'profiles' table stores user roles
-    .update({ role: 'employee' })
-    .eq('id', userId);
-
-  if (error) {
-    console.error('Error assigning default role:', error);
-    throw error;
-  }
-};
+export async function assignDefaultRole(userId: string) {
+  const { error } = await supabase.rpc('assign_role', {
+    p_user_id: userId,
+    p_role_name: 'employee'
+  });
+  if (error) throw error;
+}
 
 // Function to update user role
-export const updateUserRole = async (userId: string, newRole: string) => {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ role: newRole })
-    .eq('id', userId);
+export async function updateUserRole(userId: string, newRole: string) {
+  const { error } = await supabase.rpc('assign_role', {
+    p_user_id: userId,
+    p_role_name: newRole
+  });
+  if (error) throw error;
+}
 
-  if (error) {
-    console.error('Error updating user role:', error);
-    throw error;
-  }
+// Get all users with their roles
+export const getUsersWithRoles = async () => {
+  const { data, error } = await supabase
+    .from('users_with_roles')
+    .select('*')
+    .order('user_created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data;
+};
+
+// Get user roles using the function
+export const getUserRoles = async () => {
+  const { data, error } = await supabase
+    .rpc('get_user_roles');
+  
+  if (error) throw error;
+  return data;
 };

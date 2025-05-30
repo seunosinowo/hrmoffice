@@ -101,22 +101,61 @@ BEGIN
 END
 $$;
 
--- Create a function to update user roles
-CREATE OR REPLACE FUNCTION public.update_user_role_status(
-  p_user_id UUID,
-  p_email TEXT,
-  p_role_name TEXT
-) RETURNS VOID AS $$
+-- Create a function to check if a user has HR role without recursion
+CREATE OR REPLACE FUNCTION public.has_hr_role(user_id UUID)
+RETURNS BOOLEAN AS $func$
+DECLARE
+  has_role BOOLEAN;
 BEGIN
-  -- Update or insert into user_email_status
-  INSERT INTO public.user_email_status (email, user_id, role_name)
-  VALUES (p_email, p_user_id, p_role_name)
-  ON CONFLICT (email)
-  DO UPDATE SET
-    user_id = p_user_id,
-    role_name = p_role_name;
+  -- Direct query to the database bypassing RLS
+  -- Use table aliases to avoid ambiguous column references
+  SELECT EXISTS (
+    SELECT 1 
+    FROM public.user_role_assignments ura
+    JOIN public.roles r ON ura.role_id = r.id
+    WHERE ura.user_id = user_id AND r.role_name = 'hr'
+  ) INTO has_role;
+  
+  RETURN has_role;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$func$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permission on the function
-GRANT EXECUTE ON FUNCTION public.update_user_role_status TO authenticated;
+GRANT EXECUTE ON FUNCTION public.has_hr_role TO authenticated;
+
+-- Create a function to update user roles that avoids ambiguous column references
+CREATE OR REPLACE FUNCTION public.update_user_role(
+  p_user_id UUID,
+  p_role_name TEXT
+) RETURNS BOOLEAN AS $func$
+DECLARE
+  v_role_id UUID;
+  v_assignment_id UUID;
+BEGIN
+  -- Get the role ID for the role name
+  SELECT id INTO v_role_id
+  FROM public.roles
+  WHERE role_name = p_role_name;
+  
+  -- If role doesn't exist, create it
+  IF v_role_id IS NULL THEN
+    INSERT INTO public.roles (role_name)
+    VALUES (p_role_name)
+    RETURNING id INTO v_role_id;
+  END IF;
+  
+  -- Delete existing role assignments for this user
+  DELETE FROM public.user_role_assignments
+  WHERE user_id = p_user_id;
+  
+  -- Insert the new role assignment
+  INSERT INTO public.user_role_assignments (user_id, role_id)
+  VALUES (p_user_id, v_role_id)
+  RETURNING id INTO v_assignment_id;
+  
+  RETURN v_assignment_id IS NOT NULL;
+END;
+$func$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission on the function
+GRANT EXECUTE ON FUNCTION public.update_user_role TO authenticated;

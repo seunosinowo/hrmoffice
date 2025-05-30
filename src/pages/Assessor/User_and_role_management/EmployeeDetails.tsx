@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../../../lib/supabase';
-import { uploadImage, getDefaultAvatarUrl, checkBucketExists } from '../../../utils/imageUpload';
 
 // interfaces
 interface Department {
@@ -22,68 +21,14 @@ interface Employee {
   departments: Department[];
 }
 
-interface NewEmployee {
-  username: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone_number: string;
-  department_ids: string[];
-}
-
 const EmployeeDetails: React.FC = () => {
   // State management
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [newEmployee, setNewEmployee] = useState<NewEmployee>({
-    username: '',
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone_number: '',
-    department_ids: []
-  });
-
-  // Function to verify if an image URL is valid
-  const verifyImageUrl = async (url: string | null): Promise<string | null> => {
-    if (!url) return null;
-
-    try {
-      console.log('Verifying image URL:', url);
-
-      // If the URL is from ui-avatars.com, return it as is
-      if (url.includes('ui-avatars.com') || url.includes('default-avatar')) {
-        return url;
-      }
-
-      // For Supabase URLs, just verify the URL is accessible
-      try {
-        // Don't add cache-busting parameter for verification
-        const response = await fetch(url, { method: 'HEAD' });
-        if (response.ok) {
-          console.log(`URL is accessible: ${url}`);
-          return url; // Return the original URL without cache-busting
-        } else {
-          console.warn(`URL is not accessible: ${url}, status: ${response.status}`);
-          return null;
-        }
-      } catch (fetchError) {
-        console.error('Error fetching image for verification:', fetchError);
-        return null;
-      }
-    } catch (error) {
-      console.error('Error verifying image URL:', error);
-      return null;
-    }
-  };
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
 
   // Fetch employees with their departments
   const fetchEmployees = async () => {
@@ -93,35 +38,35 @@ const EmployeeDetails: React.FC = () => {
         .from('employees')
         .select(`
           *,
-          departments!inner (
-            id,
-            name
+          employee_departments (
+            department:departments (
+              id,
+              name
+            )
           )
         `)
         .order('employee_number', { ascending: true });
 
       if (employeesError) throw employeesError;
 
-      // Process employees with verified image URLs
+      // Process employees with verified image URLs more efficiently
       const formattedEmployees = await Promise.all(employeesData.map(async (emp) => {
-        // Verify the profile picture URL
-        if (emp.profile_picture_url) {
-          console.log(`Original profile picture URL for employee ${emp.id}: ${emp.profile_picture_url}`);
-          const verifiedUrl = await verifyImageUrl(emp.profile_picture_url);
-          if (verifiedUrl) {
-            emp.profile_picture_url = verifiedUrl;
-            console.log(`Verified profile picture URL for employee ${emp.id}: ${emp.profile_picture_url}`);
-          } else {
-            // If verification fails, set to null to show fallback avatar
+        // Only verify image URL if it exists and isn't a default avatar
+        if (emp.profile_picture_url && !emp.profile_picture_url.includes('ui-avatars.com') && !emp.profile_picture_url.includes('default-avatar')) {
+          try {
+            const response = await fetch(emp.profile_picture_url, { method: 'HEAD' });
+            if (!response.ok) {
+              emp.profile_picture_url = null;
+            }
+          } catch (error) {
             emp.profile_picture_url = null;
-            console.warn(`Could not verify profile picture URL for employee ${emp.id}, setting to null`);
           }
         }
 
         return {
           ...emp,
-          departments: emp.departments || [],
-          department_ids: emp.departments?.map((dept: any) => dept.id) || []
+          departments: emp.employee_departments.map((ed: any) => ed.department),
+          department_ids: emp.employee_departments.map((ed: any) => ed.department.id)
         };
       }));
 
@@ -137,117 +82,18 @@ const EmployeeDetails: React.FC = () => {
   // Fetch departments
   const fetchDepartments = async () => {
     try {
-      const { data, error } = await supabase
+      setDepartmentsLoading(true);
+      const { error } = await supabase
         .from('departments')
         .select('*')
         .order('name');
 
       if (error) throw error;
-      setDepartments(data);
     } catch (error) {
       console.error('Error fetching departments:', error);
       setError('Failed to load departments');
-    }
-  };
-
-  // Generate employee number
-  const generateEmployeeNumber = () => {
-    const prefix = 'EMP';
-    // Get current time in WAT (UTC+1)
-    const now = new Date();
-    const watTime = new Date(now.getTime() + (1 * 60 * 60 * 1000)); //  WAT
-    const timestamp = watTime.getTime().toString().slice(-6);
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `${prefix}${timestamp}${random}`;
-  };
-
-  // Handle file change
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      setError('File size must be less than 2MB');
-      return;
-    }
-
-    setAvatarFile(file);
-  };
-
-  // Add employee
-  const handleAddEmployee = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const employeeNumber = generateEmployeeNumber();
-
-      // First, create the employee with null profile picture URL
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .insert([{
-          employee_number: employeeNumber,
-          username: newEmployee.username,
-          first_name: newEmployee.first_name,
-          last_name: newEmployee.last_name,
-          email: newEmployee.email,
-          phone_number: newEmployee.phone_number,
-          profile_picture_url: null // Set to null initially, will be updated with the uploaded image URL
-        }])
-        .select()
-        .single();
-
-      if (employeeError) throw employeeError;
-
-      // Upload profile picture if provided
-      if (avatarFile && employeeData) {
-        // Check if the employee_pictures bucket exists
-        await checkBucketExists('employee_pictures');
-
-        const uploadedUrl = await uploadImage(avatarFile, 'employee_pictures');
-        if (uploadedUrl) {
-          // Update employee with new profile picture URL
-          const { error: updateError } = await supabase
-            .from('employees')
-            .update({ profile_picture_url: uploadedUrl })
-            .eq('id', employeeData.id);
-
-          if (updateError) throw updateError;
-        }
-      }
-
-      // Add department associations
-      if (newEmployee.department_ids.length > 0) {
-        const departmentAssociations = newEmployee.department_ids.map(deptId => ({
-          employee_id: employeeData.id,
-          department_id: deptId
-        }));
-
-        const { error: deptError } = await supabase
-          .from('employee_departments')
-          .insert(departmentAssociations);
-
-        if (deptError) throw deptError;
-      }
-
-      // Refresh the employee list
-      await fetchEmployees();
-      setShowAddModal(false);
-      setNewEmployee({
-        username: '',
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone_number: '',
-        department_ids: []
-      });
-      setAvatarFile(null);
-    } catch (error) {
-      console.error('Error adding employee:', error);
-      setError('Failed to add employee');
     } finally {
-      setIsSubmitting(false);
+      setDepartmentsLoading(false);
     }
   };
 
@@ -257,113 +103,6 @@ const EmployeeDetails: React.FC = () => {
     if (employeeToView) {
       setSelectedEmployee(employeeToView);
       setShowViewModal(true);
-    }
-  };
-
-  // Edit employee function
-  const handleEditEmployee = (employeeId: string) => {
-    const employeeToEdit = employees.find(emp => emp.id === employeeId);
-    if (employeeToEdit) {
-      setSelectedEmployee(employeeToEdit);
-      setShowEditModal(true);
-    }
-  };
-
-  // Update employee
-  const handleUpdateEmployee = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedEmployee) return;
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      // Update employee details
-      const { error: updateError } = await supabase
-        .from('employees')
-        .update({
-          username: selectedEmployee.username,
-          first_name: selectedEmployee.first_name,
-          last_name: selectedEmployee.last_name,
-          email: selectedEmployee.email,
-          phone_number: selectedEmployee.phone_number
-        })
-        .eq('id', selectedEmployee.id);
-
-      if (updateError) throw updateError;
-
-      // Handle profile picture update
-      if (avatarFile) {
-        // Check if the employee_pictures bucket exists
-        await checkBucketExists('employee_pictures');
-
-        const uploadedUrl = await uploadImage(avatarFile, 'employee_pictures');
-        if (uploadedUrl) {
-          await supabase
-            .from('employees')
-            .update({ profile_picture_url: uploadedUrl })
-            .eq('id', selectedEmployee.id);
-        }
-      }
-
-      // Update department associations
-      await supabase
-        .from('employee_departments')
-        .delete()
-        .eq('employee_id', selectedEmployee.id);
-
-      if (selectedEmployee.department_ids.length > 0) {
-        const departmentAssociations = selectedEmployee.department_ids.map(deptId => ({
-          employee_id: selectedEmployee.id,
-          department_id: deptId
-        }));
-
-        const { error: deptError } = await supabase
-          .from('employee_departments')
-          .insert(departmentAssociations);
-
-        if (deptError) throw deptError;
-      }
-
-      await fetchEmployees();
-      setShowEditModal(false);
-      setAvatarFile(null);
-    } catch (error) {
-      console.error('Error updating employee:', error);
-      setError('Failed to update employee');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Toggle department selection
-  const toggleDepartment = (departmentId: string, isSelected: boolean) => {
-    if (isSelected) {
-      setNewEmployee(prev => ({
-        ...prev,
-        department_ids: prev.department_ids.filter(id => id !== departmentId)
-      }));
-    } else {
-      setNewEmployee(prev => ({
-        ...prev,
-        department_ids: [...prev.department_ids, departmentId]
-      }));
-    }
-  };
-
-  // Toggle department selection for edit
-  const toggleDepartmentEdit = (departmentId: string, isSelected: boolean) => {
-    if (!selectedEmployee) return;
-
-    if (isSelected) {
-      setSelectedEmployee({
-        ...selectedEmployee,
-        department_ids: selectedEmployee.department_ids.filter(id => id !== departmentId)
-      });
-    } else {
-      setSelectedEmployee({
-        ...selectedEmployee,
-        department_ids: [...selectedEmployee.department_ids, departmentId]
-      });
     }
   };
 
@@ -380,13 +119,6 @@ const EmployeeDetails: React.FC = () => {
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
           Employee Details
         </h2>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-        >
-          <UserIcon className="w-4 h-4" />
-          Add Employee
-        </button>
       </div>
 
       {/* Error message */}
@@ -417,31 +149,6 @@ const EmployeeDetails: React.FC = () => {
                           className="h-full w-full rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                           crossOrigin="anonymous"
                           onError={(e) => {
-                            console.error('Error loading image:', employee.profile_picture_url);
-                            console.error('Image error details:', e);
-
-                            // Log additional information about the image URL
-                            if (employee.profile_picture_url) {
-                              console.log('Image URL analysis:');
-                              console.log('- URL:', employee.profile_picture_url);
-                              console.log('- Contains "employee_pictures":', employee.profile_picture_url.includes('employee_pictures'));
-                              console.log('- Contains "profile_pictures":', employee.profile_picture_url.includes('profile_pictures'));
-
-                              // Try to fetch the image directly to check response
-                              fetch(employee.profile_picture_url, { method: 'HEAD' })
-                                .then(response => {
-                                  console.log('Image fetch response:', {
-                                    status: response.status,
-                                    statusText: response.statusText,
-                                    ok: response.ok,
-                                    headers: Array.from(response.headers.entries())
-                                  });
-                                })
-                                .catch(fetchError => {
-                                  console.error('Image fetch error:', fetchError);
-                                });
-                            }
-
                             const target = e.target as HTMLImageElement;
                             target.style.display = 'none';
                             const fallback = target.parentElement?.querySelector('.fallback-avatar') as HTMLElement;
@@ -490,11 +197,11 @@ const EmployeeDetails: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-sm text-gray-500 dark:text-gray-400">Departments</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
+                        <div className="flex flex-wrap gap-1 mt-1 max-w-[300px]">
                           {employee.departments.map((dept) => (
                             <span
                               key={`employee-dept-${dept.id}-${employee.id}`}
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-normal break-words"
                             >
                               {dept.name}
                             </span>
@@ -510,12 +217,6 @@ const EmployeeDetails: React.FC = () => {
                     >
                       View
                     </button>
-                    <button
-                      onClick={() => handleEditEmployee(employee.id)}
-                      className="text-sm font-medium text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
-                    >
-                      Edit
-                    </button>
                   </div>
                 </div>
               </div>
@@ -524,189 +225,11 @@ const EmployeeDetails: React.FC = () => {
         </div>
       )}
 
-      {/* Add Employee Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Add New Employee</h2>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </button>
-              </div>
-              <form onSubmit={handleAddEmployee} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Username
-                  </label>
-                  <input
-                    name="username"
-                    type="text"
-                    value={newEmployee.username}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, username: e.target.value })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      First Name
-                    </label>
-                    <input
-                      name="first_name"
-                      type="text"
-                      value={newEmployee.first_name}
-                      onChange={(e) => setNewEmployee({ ...newEmployee, first_name: e.target.value })}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Last Name
-                    </label>
-                    <input
-                      name="last_name"
-                      type="text"
-                      value={newEmployee.last_name}
-                      onChange={(e) => setNewEmployee({ ...newEmployee, last_name: e.target.value })}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Email
-                  </label>
-                  <input
-                    name="email"
-                    type="email"
-                    value={newEmployee.email}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Phone Number
-                  </label>
-                  <input
-                    name="phone_number"
-                    type="tel"
-                    value={newEmployee.phone_number}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, phone_number: e.target.value })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Departments
-                  </label>
-                  <div className="mt-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md p-2 max-h-40 overflow-y-auto">
-                    {departments.map((dept) => (
-                      <div key={`dept-checkbox-${dept.id}`} className="flex items-center py-1">
-                        <input
-                          type="checkbox"
-                          id={`dept-${dept.id}`}
-                          checked={newEmployee.department_ids.includes(dept.id)}
-                          onChange={() => toggleDepartment(dept.id, newEmployee.department_ids.includes(dept.id))}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`dept-${dept.id}`} className="ml-2 block text-sm text-gray-900 dark:text-white">
-                          {dept.name}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Profile Picture
-                  </label>
-                  <div className="mt-1 flex items-center">
-                    <label className="flex items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600">
-                      <div className="flex flex-col items-center space-y-2">
-                        {avatarFile ? (
-                          <div className="relative w-20 h-20">
-                            <img
-                              src={URL.createObjectURL(avatarFile)}
-                              alt="Preview"
-                              className="w-full h-full rounded-full object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setAvatarFile(null);
-                              }}
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1"
-                            >
-                              <XMarkIcon className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                          </svg>
-                        )}
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {avatarFile ? 'Change image' : 'Click to upload or drag and drop'}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          JPG, JPEG, PNG (max. 2MB)
-                        </span>
-                      </div>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/jpeg,image/jpg,image/png"
-                        onChange={handleFileChange}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? 'Adding...' : 'Add Employee'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* View Employee Modal */}
       {showViewModal && selectedEmployee && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-700">
-            <div className="p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-700 max-h-[90vh]">
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-2rem)]">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Employee Details
@@ -729,31 +252,6 @@ const EmployeeDetails: React.FC = () => {
                         className="w-full h-full rounded-full object-cover"
                         crossOrigin="anonymous"
                         onError={(e) => {
-                          console.error('Error loading image in modal view:', selectedEmployee.profile_picture_url);
-                          console.error('Modal image error details:', e);
-
-                          // Log additional information about the image URL
-                          if (selectedEmployee.profile_picture_url) {
-                            console.log('Modal image URL analysis:');
-                            console.log('- URL:', selectedEmployee.profile_picture_url);
-                            console.log('- Contains "employee_pictures":', selectedEmployee.profile_picture_url.includes('employee_pictures'));
-                            console.log('- Contains "profile_pictures":', selectedEmployee.profile_picture_url.includes('profile_pictures'));
-
-                            // Try to fetch the image directly to check response
-                            fetch(selectedEmployee.profile_picture_url, { method: 'HEAD' })
-                              .then(response => {
-                                console.log('Modal image fetch response:', {
-                                  status: response.status,
-                                  statusText: response.statusText,
-                                  ok: response.ok,
-                                  headers: Array.from(response.headers.entries())
-                                });
-                              })
-                              .catch(fetchError => {
-                                console.error('Modal image fetch error:', fetchError);
-                              });
-                          }
-
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
                           const fallback = target.parentElement?.querySelector('.fallback-avatar') as HTMLElement;
@@ -829,255 +327,31 @@ const EmployeeDetails: React.FC = () => {
                       {selectedEmployee.phone_number}
                     </p>
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Departments
                     </label>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                      {selectedEmployee.departments.map(dept => dept.name).join(', ')}
-                    </p>
-                  </div>
-
-                  {/* Debug info for profile picture URL */}
-                  {selectedEmployee.profile_picture_url && (
-                    <div className="col-span-2 mt-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-md">
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Image URL Debug Info:</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 break-all">URL: {selectedEmployee.profile_picture_url}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Contains "employee_pictures": {selectedEmployee.profile_picture_url.includes('employee_pictures') ? 'Yes' : 'No'}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Contains "profile_pictures": {selectedEmployee.profile_picture_url.includes('profile_pictures') ? 'Yes' : 'No'}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Test image accessibility
-                          if (selectedEmployee.profile_picture_url) {
-                            fetch(selectedEmployee.profile_picture_url, { method: 'HEAD' })
-                              .then(response => {
-                                alert(`Image accessibility: ${response.ok ? 'OK' : 'Failed'} (${response.status} ${response.statusText})`);
-                              })
-                              .catch(error => {
-                                alert(`Image fetch error: ${error.message}`);
-                              });
-                          }
-                        }}
-                        className="mt-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
-                      >
-                        Test Image Accessibility
-                      </button>
+                    <div className="flex flex-wrap gap-2 max-w-[400px]">
+                      {departmentsLoading ? (
+                        <div className="flex justify-center items-center py-2">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                        </div>
+                      ) : selectedEmployee.departments && selectedEmployee.departments.length > 0 ? (
+                        selectedEmployee.departments.map(dept => (
+                          <span
+                            key={`view-dept-${dept.id}`}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-normal break-words"
+                          >
+                            {dept.name}
+                          </span>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No departments assigned</p>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Employee Modal */}
-      {showEditModal && selectedEmployee && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Edit Employee
-                </h3>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleUpdateEmployee} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Employee Number
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedEmployee.employee_number}
-                    disabled
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Username
-                  </label>
-                  <input
-                    name="username"
-                    type="text"
-                    value={selectedEmployee.username}
-                    onChange={(e) => setSelectedEmployee({ ...selectedEmployee, username: e.target.value })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      First Name
-                    </label>
-                    <input
-                      name="first_name"
-                      type="text"
-                      value={selectedEmployee.first_name}
-                      onChange={(e) => setSelectedEmployee({ ...selectedEmployee, first_name: e.target.value })}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Last Name
-                    </label>
-                    <input
-                      name="last_name"
-                      type="text"
-                      value={selectedEmployee.last_name}
-                      onChange={(e) => setSelectedEmployee({ ...selectedEmployee, last_name: e.target.value })}
-                      className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Email
-                  </label>
-                  <input
-                    name="email"
-                    type="email"
-                    value={selectedEmployee.email}
-                    onChange={(e) => setSelectedEmployee({ ...selectedEmployee, email: e.target.value })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Phone Number
-                  </label>
-                  <input
-                    name="phone_number"
-                    type="tel"
-                    value={selectedEmployee.phone_number}
-                    onChange={(e) => setSelectedEmployee({ ...selectedEmployee, phone_number: e.target.value })}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Departments
-                  </label>
-                  <div className="mt-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md p-2 max-h-40 overflow-y-auto">
-                    {departments.map((dept) => (
-                      <div key={`edit-dept-checkbox-${dept.id}`} className="flex items-center py-1">
-                        <input
-                          type="checkbox"
-                          id={`edit-dept-${dept.id}`}
-                          checked={selectedEmployee.department_ids.includes(dept.id)}
-                          onChange={() => toggleDepartmentEdit(dept.id, selectedEmployee.department_ids.includes(dept.id))}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`edit-dept-${dept.id}`} className="ml-2 block text-sm text-gray-900 dark:text-white">
-                          {dept.name}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Profile Picture
-                  </label>
-                  <div className="mt-1 flex items-center">
-                    <label className="flex items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600">
-                      <div className="flex flex-col items-center space-y-2">
-                        {avatarFile ? (
-                          <div className="relative w-20 h-20">
-                            <img
-                              src={URL.createObjectURL(avatarFile)}
-                              alt="Preview"
-                              className="w-full h-full rounded-full object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setAvatarFile(null);
-                              }}
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1"
-                            >
-                              <XMarkIcon className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ) : selectedEmployee.profile_picture_url ? (
-                          <div className="relative w-20 h-20">
-                            <img
-                              src={`${selectedEmployee.profile_picture_url}?t=${Date.now()}`}
-                              alt="Current"
-                              className="w-full h-full rounded-full object-cover"
-                              crossOrigin="anonymous"
-                              onError={(e) => {
-                                console.error('Error loading image:', selectedEmployee.profile_picture_url);
-                                const target = e.target as HTMLImageElement;
-                                target.src = getDefaultAvatarUrl();
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                          </svg>
-                        )}
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {avatarFile ? 'Change image' : 'Click to upload or drag and drop'}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          JPG, JPEG, PNG (max. 2MB)
-                        </span>
-                      </div>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/jpeg,image/jpg,image/png"
-                        onChange={handleFileChange}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditModal(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? 'Updating...' : 'Update Employee'}
-                  </button>
-                </div>
-              </form>
             </div>
           </div>
         </div>

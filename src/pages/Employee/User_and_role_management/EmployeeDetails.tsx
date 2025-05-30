@@ -47,6 +47,7 @@ const EmployeeDetails: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileExists, setProfileExists] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
@@ -62,40 +63,161 @@ const EmployeeDetails: React.FC = () => {
     department_ids: []
   });
 
+  // Fetch departments and employee profile when component mounts
+  useEffect(() => {
+    const initializeData = async () => {
+      if (user) {
+        setLoading(true);
+        setDepartmentsLoading(true);
+        try {
+          await Promise.all([
+            fetchDepartments(),
+            fetchEmployeeProfile()
+          ]);
+        } catch (error) {
+          console.error('Error initializing data:', error);
+          setError('Failed to load initial data');
+        } finally {
+          setLoading(false);
+          setDepartmentsLoading(false);
+        }
+      }
+    };
+
+    initializeData();
+  }, [user]); // Re-run when user changes
+
   // Fetch employee profile for current user
-  const fetchEmployees = async () => {
+  const fetchEmployeeProfile = async () => {
+    if (!user) return;
+
     try {
       setLoading(true);
-      const { data: employeesData, error: employeesError } = await supabase
-        .from('employee_details_view')
-        .select('*')
+
+      // Try to fetch employee profile using user_id first (preferred method)
+      const { data: userIdData, error: userIdError } = await supabase
+        .from('employees')
+        .select(`
+          *,
+          employee_departments (
+            department:departments (
+              id,
+              name
+            )
+          )
+        `)
+        .eq('user_id', user.id)
         .order('employee_number', { ascending: true });
+
+      // If no results or error, try using email as fallback
+      let employeesData;
+      let employeesError;
+
+      if (userIdError || !userIdData || userIdData.length === 0) {
+        console.log('No profile found with user_id, trying email fallback');
+
+        const { data: emailData, error: emailError } = await supabase
+          .from('employees')
+          .select(`
+            *,
+            employee_departments (
+              department:departments (
+                id,
+                name
+              )
+            )
+          `)
+          .eq('email', user.email)
+          .order('employee_number', { ascending: true });
+
+        employeesData = emailData;
+        employeesError = emailError;
+
+        // If we found a profile by email but it doesn't have user_id set,
+        // update it to link to the current user
+        if (emailData && emailData.length > 0 && (!emailData[0].user_id || emailData[0].user_id !== user.id)) {
+          console.log('Updating employee profile to link with user account');
+
+          const { error: updateError } = await supabase
+            .from('employees')
+            .update({ user_id: user.id })
+            .eq('id', emailData[0].id);
+
+          if (updateError) {
+            console.error('Error updating user_id:', updateError);
+          }
+        }
+      } else {
+        employeesData = userIdData;
+        employeesError = userIdError;
+      }
 
       if (employeesError) throw employeesError;
 
-      // Process employees with verified image URLs
-      const formattedEmployees = await Promise.all(employeesData.map(async (emp) => {
-        // Verify the profile picture URL
-        if (emp.profile_picture_url) {
-          const verifiedUrl = await verifyImageUrl(emp.profile_picture_url);
-          if (verifiedUrl) {
-            emp.profile_picture_url = verifiedUrl;
-          } else {
-            emp.profile_picture_url = null;
+      if (employeesData && employeesData.length > 0) {
+        console.log('Employee profile found:', employeesData);
+        // Log the raw employee data to see what's coming from the database
+        console.log('Raw employee data from database:', employeesData);
+
+        // Process employees with verified image URLs
+        const formattedEmployees = await Promise.all(employeesData.map(async (emp) => {
+          // Log each employee's profile picture URL
+          console.log(`Employee ${emp.id} profile_picture_url:`, emp.profile_picture_url);
+
+          // Verify the profile picture URL
+          if (emp.profile_picture_url) {
+            const verifiedUrl = await verifyImageUrl(emp.profile_picture_url);
+            if (verifiedUrl) {
+              emp.profile_picture_url = verifiedUrl;
+              console.log(`Verified profile picture URL for employee ${emp.id}: ${emp.profile_picture_url}`);
+            } else {
+              // If verification fails, set to null to show fallback avatar
+              emp.profile_picture_url = null;
+              console.warn(`Could not verify profile picture URL for employee ${emp.id}, setting to null`);
+            }
           }
+
+          return {
+            ...emp,
+            departments: emp.employee_departments.map((ed: any) => ed.department),
+            department_ids: emp.employee_departments.map((ed: any) => ed.department.id)
+          };
+        }));
+
+        setEmployees(formattedEmployees);
+        setProfileExists(true);
+        console.log('Profile exists set to TRUE');
+
+        // Check if employee can edit their profile (not locked)
+        // Simplified logic - check if profile is older than 12 hours
+        const now = new Date();
+        const creationTime = new Date(formattedEmployees[0].created_at);
+        const twelveHoursAfterCreation = new Date(creationTime.getTime() + 12 * 60 * 60 * 1000);
+
+        // If current time is before the 12-hour window expires
+        if (now < twelveHoursAfterCreation) {
+          setCanEdit(true);
+
+          // Calculate time remaining until profile is locked permanently
+          const timeRemaining = Math.floor((twelveHoursAfterCreation.getTime() - now.getTime()) / 1000);
+          const hours = Math.floor(timeRemaining / 3600);
+          const minutes = Math.floor((timeRemaining % 3600) / 60);
+
+          setTimeUntilEditable(`${hours}h ${minutes}m`);
+        } else {
+          // After 12 hours, profile is permanently locked for employee
+          setCanEdit(false);
+          setTimeUntilEditable(null);
         }
-
-        return {
-          ...emp,
-          departments: emp.departments || [],
-          department_ids: emp.department_ids || []
-        };
-      }));
-
-      setEmployees(formattedEmployees);
+      } else {
+        console.log('No employee profile found');
+        setProfileExists(false);
+        setCanEdit(true);
+        console.log('Profile exists set to FALSE');
+      }
     } catch (error) {
-      console.error('Error fetching employees:', error);
-      setError('Failed to load employees');
+      console.error('Error fetching employee profile:', error);
+      setError('Failed to load employee profile');
     } finally {
       setLoading(false);
     }
@@ -104,16 +226,25 @@ const EmployeeDetails: React.FC = () => {
   // Fetch departments
   const fetchDepartments = async () => {
     try {
+      setDepartmentsLoading(true);
       const { data, error } = await supabase
         .from('departments')
         .select('*')
         .order('name');
 
       if (error) throw error;
-      setDepartments(data);
+      if (data) {
+        console.log('Fetched departments:', data);
+        setDepartments(data);
+      } else {
+        setDepartments([]);
+      }
     } catch (error) {
       console.error('Error fetching departments:', error);
       setError('Failed to load departments');
+      setDepartments([]);
+    } finally {
+      setDepartmentsLoading(false);
     }
   };
 
@@ -334,7 +465,7 @@ const EmployeeDetails: React.FC = () => {
 
             // Also force a refresh of the employee profile to get the updated URL from the server
             setTimeout(() => {
-              fetchEmployees();
+              fetchEmployeeProfile();
             }, 500);
           }
         } else {
@@ -358,7 +489,7 @@ const EmployeeDetails: React.FC = () => {
       }
 
       // Refresh the employee profile
-      await fetchEmployees();
+      await fetchEmployeeProfile();
       setNewEmployee({
         username: '',
         first_name: '',
@@ -520,7 +651,7 @@ const EmployeeDetails: React.FC = () => {
 
             // Also force a refresh of the employee profile to get the updated URL from the server
             setTimeout(() => {
-              fetchEmployees();
+              fetchEmployeeProfile();
             }, 500);
           }
         } else {
@@ -548,7 +679,7 @@ const EmployeeDetails: React.FC = () => {
         if (deptError) throw deptError;
       }
 
-      await fetchEmployees();
+      await fetchEmployeeProfile();
       setShowEditModal(false);
       setAvatarFile(null);
     } catch (error) {
@@ -595,12 +726,6 @@ const EmployeeDetails: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (user) {
-      fetchEmployees();
-      fetchDepartments();
-
-      // Check if the profile_pictures bucket exists
-      checkProfilePicturesBucket();
-
       // Set up real-time subscription to employee changes
       const employeeSubscription = supabase
         .channel('employee-changes')
@@ -615,7 +740,7 @@ const EmployeeDetails: React.FC = () => {
           (payload) => {
             console.log('Real-time update received for employee:', payload);
             // Refresh the employee profile when changes are detected
-            fetchEmployees();
+            fetchEmployeeProfile();
           }
         )
         .subscribe();
@@ -823,20 +948,28 @@ const EmployeeDetails: React.FC = () => {
                 Departments
               </label>
               <div className="mt-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md p-2 max-h-40 overflow-y-auto">
-                {departments.map((dept) => (
-                  <div key={`dept-checkbox-${dept.id}`} className="flex items-center py-1">
-                    <input
-                      type="checkbox"
-                      id={`dept-${dept.id}`}
-                      checked={newEmployee.department_ids.includes(dept.id)}
-                      onChange={() => toggleDepartment(dept.id, newEmployee.department_ids.includes(dept.id))}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`dept-${dept.id}`} className="ml-2 block text-sm text-gray-900 dark:text-white">
-                      {dept.name}
-                    </label>
+                {departmentsLoading ? (
+                  <div className="flex justify-center items-center py-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
                   </div>
-                ))}
+                ) : departments.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">No departments available</p>
+                ) : (
+                  departments.map((dept) => (
+                    <div key={`dept-checkbox-${dept.id}`} className="flex items-center py-1">
+                      <input
+                        type="checkbox"
+                        id={`dept-${dept.id}`}
+                        checked={newEmployee.department_ids.includes(dept.id)}
+                        onChange={() => toggleDepartment(dept.id, newEmployee.department_ids.includes(dept.id))}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor={`dept-${dept.id}`} className="ml-2 block text-sm text-gray-900 dark:text-white">
+                        {dept.name}
+                      </label>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -1055,11 +1188,11 @@ const EmployeeDetails: React.FC = () => {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Departments</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
+                            <div className="flex flex-wrap gap-1 mt-1 max-w-[300px]">
                               {employee.departments.map((dept) => (
                                 <span
                                   key={`employee-dept-${dept.id}-${employee.id}`}
-                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-normal break-words"
                                 >
                                   {dept.name}
                                 </span>
@@ -1255,47 +1388,6 @@ const EmployeeDetails: React.FC = () => {
                           <span className="text-green-600 dark:text-green-400 font-semibold">Can be edited</span>
                         )}
                       </p>
-
-                      {/* Debug info for profile picture URL */}
-                      {selectedEmployee.profile_picture_url && (
-                        <div className="mt-2 text-xs text-gray-500 break-all">
-                          <p className="font-semibold">Image URL Debug Info:</p>
-                          <p>Original URL: {selectedEmployee.profile_picture_url}</p>
-                          <p>Cache-busted URL: {selectedEmployee.profile_picture_url + (selectedEmployee.profile_picture_url.includes('?') ? '&' : '?') + 't=' + Date.now()}</p>
-                          <p>Contains "employee_pictures": {selectedEmployee.profile_picture_url.includes('employee_pictures') ? 'Yes' : 'No'}</p>
-                          <p>Contains "profile_pictures": {selectedEmployee.profile_picture_url.includes('profile_pictures') ? 'Yes' : 'No'}</p>
-                          <div className="mt-2">
-                            <a
-                              href={selectedEmployee.profile_picture_url + (selectedEmployee.profile_picture_url.includes('?') ? '&' : '?') + 't=' + Date.now()}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-500 underline"
-                            >
-                              Open image directly (with cache-busting)
-                            </a>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              // Test image accessibility
-                              if (selectedEmployee.profile_picture_url) {
-                                fetch(selectedEmployee.profile_picture_url, { method: 'HEAD' })
-                                  .then(response => {
-                                    alert(`Image accessibility: ${response.ok ? 'OK' : 'Failed'} (${response.status} ${response.statusText})`);
-                                  })
-                                  .catch(error => {
-                                    alert(`Image fetch error: ${error.message}`);
-                                  });
-                              } else {
-                                alert('No image URL available to test');
-                              }
-                            }}
-                            className="mt-2 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
-                          >
-                            Test Image Accessibility
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -1304,15 +1396,23 @@ const EmployeeDetails: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Departments
                   </label>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedEmployee.departments.map(dept => (
-                      <span
-                        key={`view-dept-${dept.id}`}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                      >
-                        {dept.name}
-                      </span>
-                    ))}
+                  <div className="flex flex-wrap gap-2 max-w-[400px]">
+                    {departmentsLoading ? (
+                      <div className="flex justify-center items-center py-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                      </div>
+                    ) : selectedEmployee.departments && selectedEmployee.departments.length > 0 ? (
+                      selectedEmployee.departments.map(dept => (
+                        <span
+                          key={`view-dept-${dept.id}`}
+                          className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-normal break-words"
+                        >
+                          {dept.name}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No departments assigned</p>
+                    )}
                   </div>
                 </div>
 

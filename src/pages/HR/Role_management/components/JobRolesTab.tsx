@@ -39,6 +39,8 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles, 
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredJobRoles, setFilteredJobRoles] = useState<JobRole[]>([]);
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Create refs for dropdown menus
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -256,15 +258,38 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles, 
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target?.files?.[0];
     if (!file) {
-      setUploadSuccessMessage('Please select an Excel file to upload.');
+      setUploadError('Please select an Excel file to upload.');
       return;
     }
+
+    // Validate file type
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel' // .xls
+    ];
+    if (!validTypes.includes(file.type)) {
+      setUploadError('Please upload a valid Excel file (.xlsx or .xls)');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setUploadError('File size should not exceed 5MB');
+      return;
+    }
+
+    // Reset messages and set loading state
+    setUploadSuccessMessage(null);
+    setUploadError(null);
+    setIsUploading(true);
 
     const reader = new FileReader();
     reader.onload = async (event) => {
       const result = event.target?.result;
       if (!result || !(result instanceof ArrayBuffer)) {
-        setUploadSuccessMessage('Invalid file format. Please upload a valid Excel file.');
+        setUploadError('Failed to read the file. Please try again.');
+        setIsUploading(false);
         return;
       }
 
@@ -275,28 +300,75 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles, 
         const worksheet = workbook.Sheets[sheetName];
         const jsonData: (string | null)[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-        if (jsonData.length > 1) {
-          const jobRoles = jsonData.slice(1).map((row) => ({
-            name: row[0] as string,
-            description: row[1] as string | null,
-          }));
-
-          const { error } = await supabase.from('job_roles').insert(jobRoles);
-          if (error) throw error;
-
-          setUploadSuccessMessage('Job roles uploaded successfully!');
-          fetchJobRoles();
-        } else {
-          setUploadSuccessMessage('The uploaded Excel file is empty or has invalid data.');
+        // Validate Excel structure
+        if (jsonData.length < 2) {
+          setUploadError('The Excel file must contain at least a header row and one data row.');
+          setIsUploading(false);
+          return;
         }
-      } catch (error) {
+
+        // Validate headers
+        const headers = jsonData[0];
+        if (!headers || headers.length < 1 || headers[0] !== 'Name') {
+          setUploadError('Invalid Excel format. The first column must be named "Name".');
+          setIsUploading(false);
+          return;
+        }
+
+        // Process and validate data rows
+        const jobRoles = jsonData.slice(1).map((row, index) => {
+          if (!row[0] || typeof row[0] !== 'string') {
+            throw new Error(`Invalid job role name in row ${index + 2}`);
+          }
+          return {
+            name: row[0].trim(),
+            description: row[1] ? String(row[1]).trim() : null
+          };
+        });
+
+        // Validate job role names
+        const invalidNames = jobRoles.filter(role => !role.name || role.name.length > 100);
+        if (invalidNames.length > 0) {
+          setUploadError('Job role names must be between 1 and 100 characters.');
+          setIsUploading(false);
+          return;
+        }
+
+        // Check for duplicates in the file
+        const names = jobRoles.map(role => role.name.toLowerCase());
+        const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
+        if (duplicates.length > 0) {
+          setUploadError(`Duplicate job role names found: ${duplicates.join(', ')}`);
+          setIsUploading(false);
+          return;
+        }
+
+        // Insert job roles in batches of 50
+        const batchSize = 50;
+        for (let i = 0; i < jobRoles.length; i += batchSize) {
+          const batch = jobRoles.slice(i, i + batchSize);
+          const { error } = await supabase.from('job_roles').insert(batch);
+          if (error) {
+            if (error.code === '23505') {
+              throw new Error('One or more job roles already exist in the database.');
+            }
+            throw error;
+          }
+        }
+
+        setUploadSuccessMessage(`${jobRoles.length} job roles uploaded successfully!`);
+        fetchJobRoles();
+      } catch (error: any) {
         console.error('Error processing the Excel file:', error);
-        setUploadSuccessMessage('An error occurred while processing the Excel file.');
+        setUploadError(error.message || 'An error occurred while processing the Excel file.');
+      } finally {
+        setIsUploading(false);
       }
     };
 
     reader.onerror = () => {
-      setUploadSuccessMessage('Failed to read the file. Please try again.');
+      setUploadError('Failed to read the file. Please try again.');
+      setIsUploading(false);
     };
 
     reader.readAsArrayBuffer(file);
@@ -306,8 +378,24 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles, 
     <div>
       {/* Display success or error message */}
       {uploadSuccessMessage && (
-        <div className="mt-4 rounded-lg bg-green-100 p-4 text-green-800">
-          {uploadSuccessMessage}
+        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800 dark:border-green-900 dark:bg-green-900/20 dark:text-green-400">
+          <div className="flex items-center">
+            <svg className="mr-2 size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+            {uploadSuccessMessage}
+          </div>
+        </div>
+      )}
+
+      {uploadError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-900 dark:bg-red-900/20 dark:text-red-400">
+          <div className="flex items-center">
+            <svg className="mr-2 size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {uploadError}
+          </div>
         </div>
       )}
 
@@ -341,12 +429,25 @@ export default function JobRolesTab({ jobRoles, loadingJobRoles, fetchJobRoles, 
               Add Job Role
             </button>
             <label className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 cursor-pointer ml-2">
-              Upload Excel
+              {isUploading ? (
+                <>
+                  <div className="mr-2 size-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <svg className="mr-2 size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Upload Excel
+                </>
+              )}
               <input
                 type="file"
                 accept=".xlsx, .xls"
                 onChange={handleExcelUpload}
                 className="hidden"
+                disabled={isUploading}
               />
             </label>
           </div>

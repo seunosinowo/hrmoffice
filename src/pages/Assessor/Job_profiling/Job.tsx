@@ -120,6 +120,20 @@ export default function Job() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Validate department_id if it's provided
+      if (formData.department_id) {
+        const { data: department, error: deptError } = await supabase
+          .from('departments')
+          .select('id')
+          .eq('id', formData.department_id)
+          .single();
+
+        if (deptError || !department) {
+          setError('Selected department does not exist. Please choose a valid department.');
+          return;
+        }
+      }
+
       if (selectedJob) {
         setIsUpdating(true);
         const { data, error } = await supabase
@@ -174,9 +188,13 @@ export default function Job() {
       }
       setSelectedJob(null);
       setFormData({ title: '', description: '', department_id: '' });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving job:', err);
-      setError('Failed to save job. Please try again later.');
+      if (err.code === '23503') {
+        setError('Selected department does not exist. Please choose a valid department.');
+      } else {
+        setError('Failed to save job. Please try again later.');
+      }
     } finally {
       setIsAdding(false);
       setIsUpdating(false);

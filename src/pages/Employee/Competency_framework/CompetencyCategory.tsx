@@ -59,7 +59,7 @@ export default function CompetencyCategory() {
       const { data, error } = await supabase
         .from('competency_categories')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       setData(data || []);
@@ -180,7 +180,7 @@ export default function CompetencyCategory() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                     {tempProficiencyLevels[item.id]
                       ? proficiencyLevelMap[tempProficiencyLevels[item.id]]
-                      : item.description}
+                      : proficiencyLevelMap[item.proficiency_level]}
                   </td>
                 </tr>
               ))

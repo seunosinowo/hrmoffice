@@ -59,21 +59,15 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
       if (roleError) throw roleError;
       if (!roleData) throw new Error('Role not found');
 
-      // Check if user already has this role
-      const { data: existingRole, error: existingError } = await supabase
+      // Delete all existing role assignments for this user
+      const { error: deleteError } = await supabase
         .from('user_role_assignments')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('role_id', roleData.id)
-        .single();
+        .delete()
+        .eq('user_id', userId);
 
-      if (existingError && existingError.code !== 'PGRST116') {
-        throw existingError;
-      }
-
-      if (existingRole) {
-        toast.error('User already has this role');
-        return;
+      if (deleteError) {
+        console.error('Error deleting existing roles:', deleteError);
+        throw new Error('Failed to remove existing role');
       }
 
       // Insert the new role assignment
@@ -87,24 +81,29 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
           }
         ]);
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Error inserting new role:', insertError);
+        throw new Error('Failed to assign new role');
+      }
 
       // Update the UI
       setUsers(prevUsers => 
         prevUsers.map(u => {
           if (u.id === userId) {
-            const updatedRoles = [...u.roles, newRole];
             return {
               ...u,
-              roles: updatedRoles,
-              displayRole: formatRoleName(newRole) // Show the newly added role
+              roles: [newRole],
+              displayRole: formatRoleName(newRole)
             };
           }
           return u;
         })
       );
 
-      toast.success(`Successfully added ${formatRoleName(newRole)} role to user`);
+      // Set success message
+      const successMsg = `User successfully upgraded to ${formatRoleName(newRole)} role`;
+      setSuccessMessage(successMsg);
+      toast.success(successMsg);
       setShowUpgradeRoleModal(false);
 
       // Refresh the user and assessor lists
@@ -114,7 +113,9 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
       ]);
     } catch (error) {
       console.error('Error upgrading role:', error);
-      toast.error('Failed to add role');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upgrade role';
+      toast.error(errorMessage);
+      setErrorMessage(errorMessage);
     } finally {
       setIsUpgradingRole(false);
     }
@@ -137,6 +138,18 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-green-800 dark:text-green-200">{successMessage}</p>
+            </div>
+            <div className="ml-auto pl-3">
+              <button
+                type="button"
+                onClick={() => setSuccessMessage(null)}
+                className="inline-flex rounded-md bg-green-50 p-1.5 text-green-500 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
+              >
+                <span className="sr-only">Dismiss</span>
+                <svg className="size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -203,7 +216,7 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
                           }}
                           className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
                         >
-                          Add Role
+                          Upgrade User
                           <ChevronDownIcon className="ml-1 size-4" />
                         </button>
                       </div>
@@ -222,77 +235,113 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
         </div>
       </div>
 
-      {/* Add Role Modal */}
+      {/* Upgrade User Modal */}
       {showUpgradeRoleModal && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-24 pb-8">
           <div className="w-full max-w-md rounded-xl bg-white p-5 dark:bg-gray-900">
-            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Add User Role</h2>
+            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white">Upgrade User Role</h2>
             <p className="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
               Select a new role for {selectedUser.email}
             </p>
             <p className="mt-2 text-center text-sm text-amber-500">
-              Note: This will add a new role to the user's existing roles.
+              Note: This will replace the user's current role.
             </p>
 
             <div className="mt-6 grid grid-cols-2 gap-4">
-              {!selectedUser.roles.includes('hr') && (
-                <button
-                  onClick={() => handleUpgradeRole(selectedUser.id, 'hr')}
-                  className={`flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:bg-white/[0.05] ${isUpgradingRole ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  disabled={isUpgradingRole}
-                >
-                  <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                    <UserIcon className="size-6 text-green-600 dark:text-green-400" />
-                  </div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-white">HR</h3>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Full system access</p>
-                </button>
+              {selectedUser.roles.includes('employee') && (
+                <>
+                  <button
+                    onClick={() => handleUpgradeRole(selectedUser.id, 'hr')}
+                    className={`flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:bg-white/[0.05] ${isUpgradingRole ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isUpgradingRole}
+                  >
+                    <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                      <UserIcon className="size-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">HR</h3>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Full system access</p>
+                  </button>
+
+                  <button
+                    onClick={() => handleUpgradeRole(selectedUser.id, 'assessor')}
+                    className={`flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:bg-white/[0.05] ${isUpgradingRole ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isUpgradingRole}
+                  >
+                    <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                      <GroupIcon className="size-6 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">Assessor</h3>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Assessment management</p>
+                  </button>
+                </>
               )}
 
-              {!selectedUser.roles.includes('assessor') && (
-                <button
-                  onClick={() => handleUpgradeRole(selectedUser.id, 'assessor')}
-                  className={`flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:bg-white/[0.05] ${isUpgradingRole ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  disabled={isUpgradingRole}
-                >
-                  <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-                    <GroupIcon className="size-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-white">Assessor</h3>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Assess employees</p>
-                </button>
+              {selectedUser.roles.includes('assessor') && (
+                <>
+                  <button
+                    onClick={() => handleUpgradeRole(selectedUser.id, 'hr')}
+                    className={`flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:bg-white/[0.05] ${isUpgradingRole ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isUpgradingRole}
+                  >
+                    <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                      <UserIcon className="size-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">HR</h3>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Full system access</p>
+                  </button>
+
+                  <button
+                    onClick={() => handleUpgradeRole(selectedUser.id, 'employee')}
+                    className={`flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:bg-white/[0.05] ${isUpgradingRole ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isUpgradingRole}
+                  >
+                    <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-900/30">
+                      <UserIcon className="size-6 text-gray-600 dark:text-gray-400" />
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">Employee</h3>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Basic access</p>
+                  </button>
+                </>
               )}
 
-              {!selectedUser.roles.includes('employee') && (
-                <button
-                  onClick={() => handleUpgradeRole(selectedUser.id, 'employee')}
-                  className={`flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:bg-white/[0.05] ${isUpgradingRole ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  disabled={isUpgradingRole}
-                >
-                  <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-900/30">
-                    <UserIcon className="size-6 text-gray-600 dark:text-gray-400" />
-                  </div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-white">Employee</h3>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Basic access</p>
-                </button>
+              {selectedUser.roles.includes('hr') && (
+                <>
+                  <button
+                    onClick={() => handleUpgradeRole(selectedUser.id, 'assessor')}
+                    className={`flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:bg-white/[0.05] ${isUpgradingRole ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isUpgradingRole}
+                  >
+                    <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                      <GroupIcon className="size-6 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">Assessor</h3>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Assessment management</p>
+                  </button>
+
+                  <button
+                    onClick={() => handleUpgradeRole(selectedUser.id, 'employee')}
+                    className={`flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:bg-white/[0.05] ${isUpgradingRole ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isUpgradingRole}
+                  >
+                    <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-900/30">
+                      <UserIcon className="size-6 text-gray-600 dark:text-gray-400" />
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">Employee</h3>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Basic access</p>
+                  </button>
+                </>
               )}
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-3">
-              {isUpgradingRole ? (
-                <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                  <div className="mr-2 size-4 animate-spin rounded-full border-2 border-gray-200 border-t-blue-600 dark:border-gray-700 dark:border-t-blue-500"></div>
-                  Adding role...
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowUpgradeRoleModal(false)}
-                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
-                >
-                  Cancel
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowUpgradeRoleModal(false)}
+                className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                disabled={isUpgradingRole}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -300,3 +349,4 @@ export default function UsersTab({ users, loadingUsers, fetchUsers, fetchAssesso
     </div>
   );
 }
+

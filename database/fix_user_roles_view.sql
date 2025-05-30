@@ -69,3 +69,67 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permission on the function
 GRANT EXECUTE ON FUNCTION public.update_user_role_status TO authenticated;
+
+-- Drop the user_roles view if it exists
+DROP VIEW IF EXISTS public.user_roles;
+
+-- Create the user_roles view
+CREATE OR REPLACE VIEW public.user_roles AS
+SELECT 
+  ura.user_id,
+  r.role_name
+FROM 
+  public.user_role_assignments ura
+JOIN 
+  public.roles r ON ura.role_id = r.id;
+
+-- Grant access to the view
+GRANT SELECT ON public.user_roles TO authenticated;
+
+-- Create a function to check if a user has a specific role
+CREATE OR REPLACE FUNCTION public.has_role(user_id UUID, role_name TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 
+    FROM public.user_roles 
+    WHERE user_id = $1 AND role_name = $2
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission on the function
+GRANT EXECUTE ON FUNCTION public.has_role TO authenticated;
+
+-- Create a function to assign a role to a user
+CREATE OR REPLACE FUNCTION public.assign_role(user_id UUID, role_name TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE
+  role_id UUID;
+BEGIN
+  -- Get the role ID
+  SELECT id INTO role_id
+  FROM public.roles
+  WHERE role_name = $2;
+
+  -- If role doesn't exist, create it
+  IF role_id IS NULL THEN
+    INSERT INTO public.roles (role_name)
+    VALUES ($2)
+    RETURNING id INTO role_id;
+  END IF;
+
+  -- Delete any existing role assignments for this user
+  DELETE FROM public.user_role_assignments
+  WHERE user_id = $1;
+
+  -- Insert the new role assignment
+  INSERT INTO public.user_role_assignments (user_id, role_id)
+  VALUES ($1, role_id);
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission on the function
+GRANT EXECUTE ON FUNCTION public.assign_role TO authenticated;

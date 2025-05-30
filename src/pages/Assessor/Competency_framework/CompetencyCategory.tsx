@@ -75,7 +75,7 @@ export default function CompetencyCategory() {
       const { data, error } = await supabase
         .from('competency_categories')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       setData(data || []);
@@ -222,7 +222,7 @@ export default function CompetencyCategory() {
 
       if (error) throw error;
       
-      setData([...data, newItem]);
+      setData(prevData => [...prevData, newItem]);
       setShowAddModal(false);
       setFormData({
         category: "",
@@ -365,7 +365,7 @@ export default function CompetencyCategory() {
                         onClick={() => toggleDropdown(item.id)}
                         className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
                       >
-                        Actions
+                        <span>Actions</span>
                         <ChevronDownIcon className="ml-1 size-4" />
                       </button>
                       {activeDropdown === item.id && (

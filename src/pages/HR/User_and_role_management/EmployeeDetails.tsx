@@ -54,6 +54,9 @@ const EmployeeDetails: React.FC = () => {
     phone_number: '',
     department_ids: []
   });
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [canEdit, setCanEdit] = useState(true);
+  const [timeUntilEditable, setTimeUntilEditable] = useState<string | null>(null);
 
   // Function to verify if an image URL is valid
   const verifyImageUrl = async (url: string | null): Promise<string | null> => {
@@ -96,7 +99,7 @@ const EmployeeDetails: React.FC = () => {
         .from('employees')
         .select(`
           *,
-          employee_departments!inner (
+          employee_departments (
             department:departments (
               id,
               name
@@ -142,6 +145,7 @@ const EmployeeDetails: React.FC = () => {
   // Fetch departments
   const fetchDepartments = async () => {
     try {
+      setDepartmentsLoading(true);
       const { data, error } = await supabase
         .from('departments')
         .select('*')
@@ -152,6 +156,8 @@ const EmployeeDetails: React.FC = () => {
     } catch (error) {
       console.error('Error fetching departments:', error);
       setError('Failed to load departments');
+    } finally {
+      setDepartmentsLoading(false);
     }
   };
 
@@ -275,16 +281,37 @@ const EmployeeDetails: React.FC = () => {
     }
   };
 
-  // Edit employee function
+  // Add edit lock check function
+  const checkEditLock = (employee: Employee) => {
+    if (employee.edit_locked_until) {
+      const lockTime = new Date(employee.edit_locked_until);
+      const now = new Date();
+      
+      if (lockTime > now) {
+        setCanEdit(false);
+        const timeDiff = lockTime.getTime() - now.getTime();
+        const minutes = Math.floor(timeDiff / (1000 * 60));
+        setTimeUntilEditable(`${minutes} minutes`);
+        return false;
+      }
+    }
+    setCanEdit(true);
+    setTimeUntilEditable(null);
+    return true;
+  };
+
+  // Update handleEditEmployee to check edit lock
   const handleEditEmployee = (employeeId: string) => {
     const employeeToEdit = employees.find(emp => emp.id === employeeId);
     if (employeeToEdit) {
-      setSelectedEmployee(employeeToEdit);
-      setShowEditModal(true);
+      if (checkEditLock(employeeToEdit)) {
+        setSelectedEmployee(employeeToEdit);
+        setShowEditModal(true);
+      }
     }
   };
 
-  // Update employee
+  // Update handleUpdateEmployee to be more efficient
   const handleUpdateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEmployee) return;
@@ -292,33 +319,21 @@ const EmployeeDetails: React.FC = () => {
     setError(null);
 
     try {
-      // Handle profile picture update first if a new file is selected
+      // Set edit lock for 30 minutes
+      const lockTime = new Date();
+      lockTime.setMinutes(lockTime.getMinutes() + 30);
+
+      // Handle profile picture update if a new file is selected
       let profilePictureUrl = selectedEmployee.profile_picture_url;
-
       if (avatarFile) {
-        // Check if the employee_pictures bucket exists
-        const bucketExists = await checkBucketExists('employee_pictures');
-        if (!bucketExists) {
-          setError('Storage bucket not available. Please contact the administrator.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        console.log('Uploading new profile picture...');
         const uploadedUrl = await uploadImage(avatarFile, 'employee_pictures');
-
-        if (!uploadedUrl) {
-          setError('Failed to upload profile picture. Please try again.');
-          setIsSubmitting(false);
-          return;
+        if (uploadedUrl) {
+          profilePictureUrl = uploadedUrl;
         }
-
-        console.log('Profile picture uploaded successfully:', uploadedUrl);
-        profilePictureUrl = uploadedUrl;
       }
 
-      // Update employee details including the profile picture URL
-      const { error: updateError } = await supabase
+      // Start a transaction to update everything at once
+      const { error: employeeUpdateError } = await supabase
         .from('employees')
         .update({
           username: selectedEmployee.username,
@@ -326,31 +341,34 @@ const EmployeeDetails: React.FC = () => {
           last_name: selectedEmployee.last_name,
           email: selectedEmployee.email,
           phone_number: selectedEmployee.phone_number,
-          profile_picture_url: profilePictureUrl // Always include the profile picture URL
+          profile_picture_url: profilePictureUrl,
+          edit_locked_until: lockTime.toISOString(),
+          last_edited_by: 'HR'
         })
         .eq('id', selectedEmployee.id);
 
-      if (updateError) throw updateError;
+      if (employeeUpdateError) throw employeeUpdateError;
 
-      // Update department associations
-      await supabase
-        .from('employee_departments')
-        .delete()
-        .eq('employee_id', selectedEmployee.id);
-
+      // Update departments in a single operation
       if (selectedEmployee.department_ids.length > 0) {
-        const departmentAssociations = selectedEmployee.department_ids.map(deptId => ({
-          employee_id: selectedEmployee.id,
-          department_id: deptId
-        }));
-
-        const { error: deptError } = await supabase
-          .from('employee_departments')
-          .insert(departmentAssociations);
+        // Delete existing departments and insert new ones in a single transaction
+        const { error: deptError } = await supabase.rpc('update_employee_departments', {
+          p_employee_id: selectedEmployee.id,
+          p_department_ids: selectedEmployee.department_ids
+        });
 
         if (deptError) throw deptError;
+      } else {
+        // If no departments selected, just delete all existing ones
+        const { error: deleteError } = await supabase
+          .from('employee_departments')
+          .delete()
+          .eq('employee_id', selectedEmployee.id);
+
+        if (deleteError) throw deleteError;
       }
 
+      // Refresh the employee list
       await fetchEmployees();
       setShowEditModal(false);
       setAvatarFile(null);
@@ -517,11 +535,11 @@ const EmployeeDetails: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-sm text-gray-500 dark:text-gray-400">Departments</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
+                        <div className="flex flex-wrap gap-1 mt-1 max-w-[300px]">
                           {employee.departments.map((dept) => (
                             <span
                               key={`employee-dept-${dept.id}-${employee.id}`}
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-normal break-words"
                             >
                               {dept.name}
                             </span>
@@ -857,46 +875,29 @@ const EmployeeDetails: React.FC = () => {
                       {selectedEmployee.phone_number}
                     </p>
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Departments
                     </label>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                      {selectedEmployee.departments.map(dept => dept.name).join(', ')}
-                    </p>
-                  </div>
-
-                  {/* Debug info for profile picture URL */}
-                  {selectedEmployee.profile_picture_url && (
-                    <div className="col-span-2 mt-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-md">
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Image URL Debug Info:</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 break-all">URL: {selectedEmployee.profile_picture_url}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Contains "employee_pictures": {selectedEmployee.profile_picture_url.includes('employee_pictures') ? 'Yes' : 'No'}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Contains "profile_pictures": {selectedEmployee.profile_picture_url.includes('profile_pictures') ? 'Yes' : 'No'}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Test image accessibility
-                          if (selectedEmployee.profile_picture_url) {
-                            fetch(selectedEmployee.profile_picture_url, { method: 'HEAD' })
-                              .then(response => {
-                                alert(`Image accessibility: ${response.ok ? 'OK' : 'Failed'} (${response.status} ${response.statusText})`);
-                              })
-                              .catch(error => {
-                                alert(`Image fetch error: ${error.message}`);
-                              });
-                          }
-                        }}
-                        className="mt-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
-                      >
-                        Test Image Accessibility
-                      </button>
+                    <div className="flex flex-wrap gap-2 max-w-[400px]">
+                      {departmentsLoading ? (
+                        <div className="flex justify-center items-center py-2">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                        </div>
+                      ) : selectedEmployee.departments && selectedEmployee.departments.length > 0 ? (
+                        selectedEmployee.departments.map(dept => (
+                          <span
+                            key={`view-dept-${dept.id}`}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 whitespace-normal break-words"
+                          >
+                            {dept.name}
+                          </span>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No departments assigned</p>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1086,6 +1087,26 @@ const EmployeeDetails: React.FC = () => {
                       />
                     </label>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Edit Status
+                  </label>
+                  <p className="mt-1 text-sm">
+                    {!canEdit ? (
+                      <span className="text-red-600 dark:text-red-400 font-semibold">Permanently locked</span>
+                    ) : timeUntilEditable ? (
+                      <span>
+                        <span className="text-green-600 dark:text-green-400">Editable</span> -
+                        <span className="text-orange-600 dark:text-orange-400 ml-1 font-semibold">
+                          Locks in {timeUntilEditable}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-green-600 dark:text-green-400 font-semibold">Can be edited</span>
+                    )}
+                  </p>
                 </div>
 
                 <div className="flex justify-end gap-3 mt-6">
