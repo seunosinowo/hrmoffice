@@ -6,6 +6,7 @@ import PublicLayout from "./layout/PublicLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import { RoleBasedRoute } from "./components/RoleBasedRoute";
 
+
 // Lazy load components
 const NotFound = lazy(() => import("./pages/OtherPage/NotFound"));
 const Unauthorized = lazy(() => import("./pages/OtherPage/Unauthorized"));

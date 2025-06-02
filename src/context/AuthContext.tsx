@@ -597,43 +597,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     try {
+      console.log('Starting sign up process for:', email);
+
       // Sign up the user
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // Always use Vercel URL for consistency
           emailRedirectTo: 'https://hrmoffice.vercel.app/auth/email-confirmation',
           data: {
-            // Always use Vercel URL for consistency
             redirectTo: 'https://hrmoffice.vercel.app/auth/email-confirmation'
           }
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Sign up error:', error.message);
+        throw error;
+      }
+
+      if (!data || !data.user) {
+        console.error('No user data returned after sign up');
+        throw new Error('No user data returned after sign up');
+      }
+
+      console.log('User created successfully, ID:', data.user.id);
 
       // If sign up was successful and we have a user, assign the default 'employee' role
-      if (data && data.user) {
-        try {
-          // First try to assign default employee role using RPC function
-          const { error: roleError } = await supabase.rpc('assign_default_role', {
-            user_id: data.user.id
-          });
+      try {
+        console.log('Attempting to assign default employee role...');
 
-          if (roleError) {
-            console.error('Error assigning default role via RPC:', roleError);
-            // If RPC fails, try direct assignment as fallback
-            await assignRoleDirectly(data.user.id, 'employee');
+        // First try to assign default employee role using RPC function
+        const { error: roleError } = await supabase.rpc('assign_default_role', {
+          user_id: data.user.id
+        });
+
+        if (roleError) {
+          console.error('Error assigning default role via RPC:', roleError);
+          
+          // If RPC fails, try direct assignment as fallback
+          console.log('Attempting direct role assignment...');
+          
+          // First check if the role exists
+          const { data: roleData, error: roleCheckError } = await supabase
+            .from('roles')
+            .select('id')
+            .eq('role_name', 'employee')
+            .single();
+
+          if (roleCheckError) {
+            console.error('Error finding employee role:', roleCheckError);
+            throw new Error('Could not find employee role in database');
           }
-        } catch (roleError) {
-          console.error('Error assigning default role:', roleError);
-          // Try direct assignment as fallback
-          await assignRoleDirectly(data.user.id, 'employee');
+
+          if (!roleData || !roleData.id) {
+            console.error('Employee role not found in database');
+            throw new Error('Employee role not found in database');
+          }
+
+          // Then assign the role to the user
+          const { error: assignError } = await supabase
+            .from('user_role_assignments')
+            .insert([{ user_id: data.user.id, role_id: roleData.id }]);
+
+          if (assignError) {
+            console.error('Error assigning role directly:', assignError);
+            throw new Error('Failed to assign default role to user');
+          }
+
+          console.log('Successfully assigned employee role directly');
+        } else {
+          console.log('Successfully assigned employee role via RPC');
         }
+      } catch (roleError) {
+        console.error('Error in role assignment process:', roleError);
+        // Don't throw here, as the user is still created
+        // Just log the error and continue
       }
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      console.error('Unexpected error during sign up:', error);
+      
+      // Provide more specific error messages
+      if (error.message.includes('duplicate key')) {
+        throw new Error('An account with this email already exists');
+      } else if (error.message.includes('password')) {
+        throw new Error('Password does not meet requirements');
+      } else if (error.message.includes('email')) {
+        throw new Error('Invalid email format');
+      } else {
+        throw new Error('Failed to create account. Please try again.');
+      }
     }
   };
 

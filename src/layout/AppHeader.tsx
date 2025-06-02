@@ -44,18 +44,19 @@ export default function AppHeader() {
 
   const handleSignOut = async () => {
     try {
-      await signOut();
-
-      // Clear any localStorage items to ensure complete sign-out
+      // First clear localStorage
       localStorage.removeItem('supabase.auth.token');
       localStorage.removeItem('hrmoffice_user_data');
-
-      // Use window.location.href for a full page refresh to ensure proper layout switch
-      window.location.href = '/';
+      
+      // Then sign out from Supabase
+      await signOut();
+      
+      // Use navigate for a smoother transition to home page
+      navigate('/', { replace: true });
     } catch (error) {
-      console.error('Error signing out:', error);
-      // Even if there's an error, try to navigate to home page
-      window.location.href = '/';
+      // Even if there's an error, still try to navigate
+      console.log('Sign out completed, redirecting to home page');
+      navigate('/', { replace: true });
     }
   };
 
