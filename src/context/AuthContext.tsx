@@ -623,54 +623,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('User created successfully, ID:', data.user.id);
 
-      // If sign up was successful and we have a user, assign the default 'employee' role
+      // Directly assign the employee role
       try {
-        console.log('Attempting to assign default employee role...');
-
-        // First try to assign default employee role using RPC function
-        const { error: roleError } = await supabase.rpc('assign_default_role', {
-          user_id: data.user.id
-        });
+        // First get the employee role ID
+        const { data: roleData, error: roleError } = await supabase
+          .from('roles')
+          .select('id')
+          .eq('role_name', 'employee')
+          .single();
 
         if (roleError) {
-          console.error('Error assigning default role via RPC:', roleError);
-          
-          // If RPC fails, try direct assignment as fallback
-          console.log('Attempting direct role assignment...');
-          
-          // First check if the role exists
-          const { data: roleData, error: roleCheckError } = await supabase
-            .from('roles')
-            .select('id')
-            .eq('role_name', 'employee')
-            .single();
-
-          if (roleCheckError) {
-            console.error('Error finding employee role:', roleCheckError);
-            throw new Error('Could not find employee role in database');
-          }
-
-          if (!roleData || !roleData.id) {
-            console.error('Employee role not found in database');
-            throw new Error('Employee role not found in database');
-          }
-
-          // Then assign the role to the user
-          const { error: assignError } = await supabase
-            .from('user_role_assignments')
-            .insert([{ user_id: data.user.id, role_id: roleData.id }]);
-
-          if (assignError) {
-            console.error('Error assigning role directly:', assignError);
-            throw new Error('Failed to assign default role to user');
-          }
-
-          console.log('Successfully assigned employee role directly');
-        } else {
-          console.log('Successfully assigned employee role via RPC');
+          console.error('Error finding employee role:', roleError);
+          throw new Error('Could not find employee role');
         }
+
+        if (!roleData || !roleData.id) {
+          console.error('Employee role not found');
+          throw new Error('Employee role not found');
+        }
+
+        // Then assign the role
+        const { error: assignError } = await supabase
+          .from('user_role_assignments')
+          .insert([{ 
+            user_id: data.user.id, 
+            role_id: roleData.id 
+          }]);
+
+        if (assignError) {
+          console.error('Error assigning role:', assignError);
+          throw new Error('Failed to assign employee role');
+        }
+
+        console.log('Successfully assigned employee role');
       } catch (roleError) {
-        console.error('Error in role assignment process:', roleError);
+        console.error('Error in role assignment:', roleError);
         // Don't throw here, as the user is still created
         // Just log the error and continue
       }
