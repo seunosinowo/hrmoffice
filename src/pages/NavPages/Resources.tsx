@@ -144,38 +144,13 @@ export default function ResourcesPage() {
         {/* Resource Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-16">
           {resources.map((resource) => (
-            <div 
-              key={resource.title} 
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-800"
-            >
-              <div className="p-6 h-full flex flex-col">
-                <div className="mb-4 p-3 bg-blue-50 dark:bg-gray-700 rounded-lg w-12 h-12 flex items-center justify-center">
-                  {resource.icon}
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                  {resource.title}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-5 flex-grow">
-                  {resource.desc}
-                </p>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-semibold px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-700 dark:text-gray-300">
-                    {resource.category}
-                  </span>
-                  <a 
-                    href={resource.link || "#"} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center"
-                  >
-                    {resource.action}
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </a>
-                </div>
-              </div>
-            </div>
+            <ResourceCard
+              key={resource.title}
+              icon={resource.icon}
+              title={resource.title}
+              description={resource.desc}
+              link={resource.link || "#"}
+            />
           ))}
         </div>
 
