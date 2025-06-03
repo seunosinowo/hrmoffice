@@ -17,6 +17,7 @@ export default function BookDemoPage() {
     role: "",
     date: "",
     time: "",
+    timePeriod: "AM",
     attendees: "1-5",
     message: ""
   });
@@ -37,8 +38,18 @@ export default function BookDemoPage() {
         throw new Error('Please fill in all required fields');
       }
 
+      // Convert time to 24-hour format for the email
+      const [hours] = formData.time.split(':');
+      let hour = parseInt(hours);
+      if (formData.timePeriod === 'PM' && hour !== 12) {
+        hour += 12;
+      } else if (formData.timePeriod === 'AM' && hour === 12) {
+        hour = 0;
+      }
+
       const templateParams = {
         ...formData,
+        time: `${formData.time} ${formData.timePeriod}`,
         to_email: 'hrmanager@hrmoffice.org',
         currentYear: new Date().getFullYear()
       };
@@ -196,13 +207,26 @@ export default function BookDemoPage() {
                 </div>
                 <div>
                   <Label>Preferred Time<span className="text-error-500">*</span></Label>
-                  <Input
-                    type="time"
-                    name="time"
-                    value={formData.time}
-                    onChange={handleChange}
-                    className="w-full dark:text-white"
-                  />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type="time"
+                        name="time"
+                        value={formData.time}
+                        onChange={handleChange}
+                        className="w-full dark:text-white"
+                      />
+                    </div>
+                    <Select
+                      name="timePeriod"
+                      value={formData.timePeriod}
+                      onChange={handleChange}
+                      options={[
+                        { value: "AM", label: "AM" },
+                        { value: "PM", label: "PM" }
+                      ]}
+                    />
+                  </div>
                 </div>
               </div>
 
