@@ -1,11 +1,15 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ChevronLeftIcon, CalenderIcon } from "../../icons";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import Select from "../../components/form/input/Select";
+import emailjs from '@emailjs/browser';
 
 export default function BookDemoPage() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -22,9 +26,37 @@ export default function BookDemoPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Demo booked:", formData);
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Validate required fields
+      if (!formData.name || !formData.email || !formData.company || !formData.role || !formData.date || !formData.time) {
+        throw new Error('Please fill in all required fields');
+      }
+
+      const templateParams = {
+        ...formData,
+        to_email: 'hrmanager@hrmoffice.org',
+        currentYear: new Date().getFullYear()
+      };
+
+      await emailjs.send(
+        'service_kqm5gnv',
+        'template_fdjyx5e',
+        templateParams,
+        'd_M8_7oyJ_d-WJMqQ'
+      );
+
+      navigate('/demo-success');
+    } catch (err) {
+      console.error('Error sending email:', err);
+      setError(err instanceof Error ? err.message : 'Failed to submit demo request. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -202,11 +234,20 @@ export default function BookDemoPage() {
 
               <button
                 type="submit"
-                className="w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600"
+                disabled={loading}
+                className={`w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg ${
+                  loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600'
+                } shadow-theme-xs`}
               >
-                Schedule Demo
+                {loading ? 'Submitting...' : 'Schedule Demo'}
               </button>
             </form>
+
+            {error && (
+              <div className="mt-4 p-4 text-sm text-red-600 bg-red-50 rounded-lg">
+                {error}
+              </div>
+            )}
           </div>
         </div>
       </div>
