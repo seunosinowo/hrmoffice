@@ -1,8 +1,24 @@
--- First, create the roles table if it doesn't exist
+-- Create the user_role enum type if it doesn't exist
+DO $$ BEGIN
+    CREATE TYPE public.user_role AS ENUM ('employee', 'assessor', 'hr');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Create roles table if it doesn't exist
 CREATE TABLE IF NOT EXISTS public.roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    role_name TEXT NOT NULL UNIQUE,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    role_name public.user_role NOT NULL UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create user_role_assignments table if it doesn't exist
+CREATE TABLE IF NOT EXISTS public.user_role_assignments (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    role_id UUID NOT NULL REFERENCES public.roles(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, role_id)
 );
 
 -- Insert default roles if they don't exist
@@ -13,14 +29,39 @@ VALUES
     ('hr')
 ON CONFLICT (role_name) DO NOTHING;
 
--- Create the user_role_assignments table if it doesn't exist
-CREATE TABLE IF NOT EXISTS public.user_role_assignments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    role_id UUID REFERENCES public.roles(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(user_id, role_id)
-);
+-- Create function to assign default role
+CREATE OR REPLACE FUNCTION public.assign_default_role()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Get the employee role ID
+    DECLARE
+        employee_role_id UUID;
+    BEGIN
+        SELECT id INTO employee_role_id
+        FROM public.roles
+        WHERE role_name = 'employee';
+
+        -- Assign the employee role to the new user
+        INSERT INTO public.user_role_assignments (user_id, role_id)
+        VALUES (NEW.id, employee_role_id);
+    END;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop the trigger if it exists
+DROP TRIGGER IF EXISTS assign_default_role_trigger ON auth.users;
+
+-- Create the trigger
+CREATE TRIGGER assign_default_role_trigger
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.assign_default_role();
+
+-- Grant necessary permissions
+GRANT USAGE ON TYPE public.user_role TO authenticated;
+GRANT ALL ON public.roles TO authenticated;
+GRANT ALL ON public.user_role_assignments TO authenticated;
 
 -- Enable RLS on both tables
 ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;

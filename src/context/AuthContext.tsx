@@ -597,83 +597,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     try {
-      console.log('Starting sign up process for:', email);
+      // Validate email and password
+      if (!email || !email.includes('@')) {
+        throw new Error('Invalid email address');
+      }
+      if (!password || password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
+      }
 
-      // Sign up the user
+      console.log('Starting sign-up process for:', email);
+
+      // Get the correct redirect URL based on environment
+      const redirectUrl = window.location.hostname === 'localhost'
+        ? `${window.location.origin}/auth/welcome-page`
+        : 'https://hrmoffice.vercel.app/auth/welcome-page';
+
+      // Sign up with email confirmation
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: 'https://hrmoffice.vercel.app/auth/email-confirmation',
+          emailRedirectTo: redirectUrl,
           data: {
-            redirectTo: 'https://hrmoffice.vercel.app/auth/email-confirmation'
+            redirectTo: redirectUrl
           }
         }
       });
 
       if (error) {
-        console.error('Sign up error:', error.message);
+        console.error('Auth sign-up error details:', {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
         throw error;
       }
 
-      if (!data || !data.user) {
-        console.error('No user data returned after sign up');
-        throw new Error('No user data returned after sign up');
+      if (!data.user) {
+        console.error('No user data returned after sign-up');
+        throw new Error('No user data returned after sign-up');
       }
 
-      console.log('User created successfully, ID:', data.user.id);
+      console.log('Sign-up successful:', {
+        userId: data.user.id,
+        email: data.user.email
+      });
 
-      // Directly assign the employee role
-      try {
-        // First get the employee role ID
-        const { data: roleData, error: roleError } = await supabase
-          .from('roles')
-          .select('id')
-          .eq('role_name', 'employee')
-          .single();
-
-        if (roleError) {
-          console.error('Error finding employee role:', roleError);
-          throw new Error('Could not find employee role');
-        }
-
-        if (!roleData || !roleData.id) {
-          console.error('Employee role not found');
-          throw new Error('Employee role not found');
-        }
-
-        // Then assign the role
-        const { error: assignError } = await supabase
-          .from('user_role_assignments')
-          .insert([{ 
-            user_id: data.user.id, 
-            role_id: roleData.id 
-          }]);
-
-        if (assignError) {
-          console.error('Error assigning role:', assignError);
-          throw new Error('Failed to assign employee role');
-        }
-
-        console.log('Successfully assigned employee role');
-      } catch (roleError) {
-        console.error('Error in role assignment:', roleError);
-        // Don't throw here, as the user is still created
-        // Just log the error and continue
-      }
-    } catch (error: any) {
-      console.error('Unexpected error during sign up:', error);
-      
-      // Provide more specific error messages
-      if (error.message.includes('duplicate key')) {
-        throw new Error('An account with this email already exists');
-      } else if (error.message.includes('password')) {
-        throw new Error('Password does not meet requirements');
-      } else if (error.message.includes('email')) {
-        throw new Error('Invalid email format');
-      } else {
-        throw new Error('Failed to create account. Please try again.');
-      }
+    } catch (error) {
+      console.error('Unexpected error during sign-up:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw error;
     }
   };
 
