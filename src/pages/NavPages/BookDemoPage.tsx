@@ -55,7 +55,7 @@ export default function BookDemoPage() {
       };
 
       await emailjs.send(
-        'service_kqm5gnv',
+        'service_z1rlyy8',
         'template_fdjyx5e',
         templateParams,
         'd_M8_7oyJ_d-WJMqQ'
