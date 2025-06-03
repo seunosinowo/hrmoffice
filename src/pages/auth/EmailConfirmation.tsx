@@ -43,7 +43,7 @@ export default function EmailConfirmation() {
           if (session) {
             console.log("Session already exists, redirecting to welcome page");
             // Always use Vercel URL for consistency
-            window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
+            window.location.href = 'https://hrmoffice.vercel.app/auth/welcome-page';
           }
         } catch (error) {
           console.error("Error checking session:", error);
@@ -80,7 +80,7 @@ export default function EmailConfirmation() {
       if (session) {
         console.log("Session found, redirecting to welcome page");
         // Always use Vercel URL for consistency
-        window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
+        window.location.href = 'https://hrmoffice.vercel.app/auth/welcome-page';
       } else {
         console.log("No session found, trying to refresh");
         // If no session, try to refresh it
@@ -94,7 +94,7 @@ export default function EmailConfirmation() {
         if (newSession) {
           console.log("New session created, redirecting to welcome page");
           // Always use Vercel URL for consistency
-          window.location.href = 'https://hrmoffice.vercel.app/auth/welcome';
+          window.location.href = 'https://hrmoffice.vercel.app/auth/welcome-page';
         } else {
           throw new Error("No session found after verification");
         }

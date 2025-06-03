@@ -104,7 +104,7 @@ export default function App() {
           <Route path="/auth/signup" element={<SignUp />} />
           <Route path="/auth/email-confirmation" element={<EmailConfirmation />} />
           <Route path="/auth/callback" element={<Callback />} />
-          <Route path="/auth/welcome" element={<WelcomePage />} />
+          <Route path="/auth/welcome-page" element={<WelcomePage />} />
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
           <Route path="/auth/reset-password" element={<ResetPassword />} />
 
