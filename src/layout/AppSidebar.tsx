@@ -183,6 +183,7 @@ const hrNavItems: NavItem[] = [
     subItems: [
       { name: "Assessor Assessment", path: "/hr/assessor-assessment" },
       { name: "Consensus Assessment", path: "/hr/consensus-assessment" },
+      { name: "HR Management Standard", path: "/hr/competency-set" },
     ],
   },
   {

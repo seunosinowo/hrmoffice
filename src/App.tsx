@@ -5,6 +5,7 @@ import AppLayout from "./layout/AppLayout";
 import PublicLayout from "./layout/PublicLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import { RoleBasedRoute } from "./components/RoleBasedRoute";
+import SetupOrganization from './pages/SetupOrganization';
 
 
 // Lazy load components
@@ -83,6 +84,7 @@ const HREmployeeAssessorAssign = lazy(() => import("./pages/HR/User_and_role_man
 const HREmployeeDetails = lazy(() => import("./pages/HR/User_and_role_management/EmployeeDetails"));
 const HREmployeeJobAssignment = lazy(() => import("./pages/HR/User_and_role_management/EmployeeJobAssignment"));
 // const HRUser = lazy(() => import("./pages/HR/User_and_role_management/User"));
+const HRManagementStandard = lazy(() => import("./pages/HR/Competency_framework/HRManagementStandard"));
 
 // Loading component
 const LoadingFallback = () => (
@@ -107,6 +109,9 @@ export default function App() {
           <Route path="/auth/welcome-page" element={<WelcomePage />} />
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
           <Route path="/auth/reset-password" element={<ResetPassword />} />
+
+          {/* Organization Setup Route - accessible after email confirmation */}
+          <Route path="/setup-organization" element={<SetupOrganization />} />
 
           {/* Public pages - accessible to all users */}
           {!user ? (
@@ -196,6 +201,7 @@ export default function App() {
                 <Route path="/hr/employee-job-assignment" element={<HREmployeeJobAssignment />} />
                 {/* <Route path="/hr/user" element={<HRUser />} /> */}
                 {/* <Route path="/hr/analytics" element={<HRAnalytics />} /> */}
+                <Route path="/hr/competency-set" element={<HRManagementStandard />} />
               </Route>
             </Route>
           )}
