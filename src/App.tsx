@@ -111,7 +111,9 @@ export default function App() {
           <Route path="/auth/reset-password" element={<ResetPassword />} />
 
           {/* Organization Setup Route - accessible after email confirmation */}
-          <Route path="/setup-organization" element={<SetupOrganization />} />
+          <Route element={<RoleBasedRoute allowedRoles={['hr']} />}>
+            <Route path="/setup-organization" element={<SetupOrganization />} />
+          </Route>
 
           {/* Public pages - accessible to all users */}
           {!user ? (
