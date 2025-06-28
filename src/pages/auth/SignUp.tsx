@@ -13,6 +13,15 @@ export default function SignUp() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [signUpType, setSignUpType] = useState<SignUpType | null>(null);
+  const [orgName, setOrgName] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [industry, setIndustry] = useState("");
+  const [companySize, setCompanySize] = useState("");
+  const [website, setWebsite] = useState("");
+  const [address, setAddress] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const navigate = useNavigate();
   const { signUp } = useAuth();
 
@@ -24,6 +33,72 @@ export default function SignUp() {
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       setLoading(false);
+      return;
+    }
+
+    if (signUpType === 'organization') {
+      if (!orgName) {
+        setError('Organization name is required');
+        setLoading(false);
+        return;
+      }
+      if (!logoFile) {
+        setError('Organization logo is required');
+        setLoading(false);
+        return;
+      }
+      try {
+        // 1. Sign up the user
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (signUpError || !signUpData.user) throw signUpError || new Error('User not created');
+        const user = signUpData.user;
+        // 2. Upload logo
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('organization-logos')
+          .upload(fileName, logoFile);
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage
+          .from('organization-logos')
+          .getPublicUrl(fileName);
+        const logoUrl = urlData.publicUrl;
+        // 3. Create organization
+        const { data: orgData, error: orgError } = await supabase
+          .from('organizations')
+          .insert([{
+            name: orgName,
+            logo_url: logoUrl,
+            industry,
+            company_size: companySize,
+            website,
+            address,
+            contact_name: contactName,
+            contact_email: contactEmail,
+            contact_phone: contactPhone
+          }])
+          .select()
+          .single();
+        if (orgError) throw orgError;
+        // 4. Update user with organization_id and role
+        await supabase
+          .from('users')
+          .update({ organization_id: orgData.id, role: 'hr' })
+          .eq('id', user.id);
+        // 5. Redirect to confirmation page
+        navigate("/auth/email-confirmation", {
+          state: {
+            message: "Please check your email for the confirmation link. If you don't see it, check your spam folder."
+          }
+        });
+      } catch (error: any) {
+        setError(error.message || 'Failed to sign up as organization');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -163,58 +238,164 @@ export default function SignUp() {
                 </div>
               )}
 
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="email-address" className="sr-only">
-                    Email address
-                  </label>
-                  <input
-                    id="email-address"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
-                    placeholder="Email&nbsp;address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
+              {signUpType === 'organization' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="col-span-1">
+                    <label className="block mb-1 font-medium text-gray-900 dark:text-white">Organization Name <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400"
+                      placeholder="Organization Name"
+                      value={orgName}
+                      onChange={e => setOrgName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block mb-1 font-medium text-gray-900 dark:text-white">Organization Size</label>
+                    <input
+                      type="text"
+                      className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400"
+                      placeholder="Organization Size"
+                      value={companySize}
+                      onChange={e => setCompanySize(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block mb-1 font-medium text-gray-900 dark:text-white">Organization Logo <span className="text-red-500">*</span></label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      required
+                      className="w-full text-gray-900 dark:text-white bg-white dark:bg-gray-800"
+                      onChange={e => setLogoFile(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block mb-1 font-medium text-gray-900 dark:text-white">Website</label>
+                    <input
+                      type="url"
+                      className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400"
+                      placeholder="Website"
+                      value={website}
+                      onChange={e => setWebsite(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block mb-1 font-medium text-gray-900 dark:text-white">Address</label>
+                    <input
+                      type="text"
+                      className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400"
+                      placeholder="Address"
+                      value={address}
+                      onChange={e => setAddress(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label htmlFor="email-address" className="block mb-1 font-medium text-gray-900 dark:text-white">Email address</label>
+                    <input
+                      id="email-address"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
+                      placeholder="Email address"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label htmlFor="password" className="block mb-1 font-medium text-gray-900 dark:text-white">Password</label>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label htmlFor="confirm-password" className="block mb-1 font-medium text-gray-900 dark:text-white">Confirm Password</label>
+                    <input
+                      id="confirm-password"
+                      name="confirmPassword"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
+                      placeholder="Confirm Password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block mb-1 font-medium text-gray-900 dark:text-white">Contact Phone</label>
+                    <input
+                      type="tel"
+                      className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400"
+                      placeholder="Contact Phone"
+                      value={contactPhone}
+                      onChange={e => setContactPhone(e.target.value)}
+                    />
+                  </div>
                 </div>
-
-                <div>
-                  <label htmlFor="password" className="sr-only">
-                    Password
-                  </label>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="email-address" className="sr-only">
+                      Email address
+                    </label>
+                    <input
+                      id="email-address"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
+                      placeholder="Email address"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="password" className="sr-only">
+                      Password
+                    </label>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="confirm-password" className="sr-only">
+                      Confirm Password
+                    </label>
+                    <input
+                      id="confirm-password"
+                      name="confirmPassword"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
+                      placeholder="Confirm Password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                  </div>
                 </div>
-
-                <div>
-                  <label htmlFor="confirm-password" className="sr-only">
-                    Confirm Password
-                  </label>
-                  <input
-                    id="confirm-password"
-                    name="confirm-password"
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
-                    placeholder="Confirm&nbsp;Password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
-                </div>
-              </div>
+              )}
 
               <div>
                 <button
