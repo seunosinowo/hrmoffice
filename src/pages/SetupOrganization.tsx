@@ -5,6 +5,13 @@ import { supabase } from '../lib/supabase';
 export default function SetupOrganization() {
   const [orgName, setOrgName] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [industry, setIndustry] = useState('');
+  const [companySize, setCompanySize] = useState('');
+  const [website, setWebsite] = useState('');
+  const [address, setAddress] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -50,7 +57,17 @@ export default function SetupOrganization() {
       // 2. Create organization
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
-        .insert([{ name: orgName, logo_url: logoUrl }])
+        .insert([{
+          name: orgName,
+          logo_url: logoUrl,
+          industry,
+          company_size: companySize,
+          website,
+          address,
+          contact_name: contactName,
+          contact_email: contactEmail,
+          contact_phone: contactPhone
+        }])
         .select()
         .single();
       if (orgError) throw orgError;
@@ -74,7 +91,7 @@ export default function SetupOrganization() {
     <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-10 p-6 bg-white rounded shadow">
       <h2 className="text-2xl font-bold mb-4">Set Up Your Organization</h2>
       <div className="mb-4">
-        <label className="block mb-1 font-medium">Organization Name</label>
+        <label className="block mb-1 font-medium">Organization Name <span className="text-red-500">*</span></label>
         <input
           type="text"
           className="w-full border px-3 py-2 rounded"
@@ -91,6 +108,76 @@ export default function SetupOrganization() {
           accept="image/*"
           required
           onChange={e => setLogoFile(e.target.files?.[0] || null)}
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-medium">Industry</label>
+        <input
+          type="text"
+          className="w-full border px-3 py-2 rounded"
+          placeholder="Industry"
+          value={industry}
+          onChange={e => setIndustry(e.target.value)}
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-medium">Company Size</label>
+        <input
+          type="text"
+          className="w-full border px-3 py-2 rounded"
+          placeholder="Company Size"
+          value={companySize}
+          onChange={e => setCompanySize(e.target.value)}
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-medium">Website</label>
+        <input
+          type="url"
+          className="w-full border px-3 py-2 rounded"
+          placeholder="Website"
+          value={website}
+          onChange={e => setWebsite(e.target.value)}
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-medium">Address</label>
+        <input
+          type="text"
+          className="w-full border px-3 py-2 rounded"
+          placeholder="Address"
+          value={address}
+          onChange={e => setAddress(e.target.value)}
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-medium">Contact Name</label>
+        <input
+          type="text"
+          className="w-full border px-3 py-2 rounded"
+          placeholder="Contact Name"
+          value={contactName}
+          onChange={e => setContactName(e.target.value)}
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-medium">Contact Email</label>
+        <input
+          type="email"
+          className="w-full border px-3 py-2 rounded"
+          placeholder="Contact Email"
+          value={contactEmail}
+          onChange={e => setContactEmail(e.target.value)}
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-medium">Contact Phone</label>
+        <input
+          type="tel"
+          className="w-full border px-3 py-2 rounded"
+          placeholder="Contact Phone"
+          value={contactPhone}
+          onChange={e => setContactPhone(e.target.value)}
         />
       </div>
       <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded" disabled={loading}>
