@@ -15,12 +15,9 @@ export default function SignUp() {
   const [signUpType, setSignUpType] = useState<SignUpType | null>(null);
   const [orgName, setOrgName] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [industry, setIndustry] = useState("");
   const [companySize, setCompanySize] = useState("");
   const [website, setWebsite] = useState("");
   const [address, setAddress] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const navigate = useNavigate();
   const { signUp } = useAuth();
@@ -72,22 +69,20 @@ export default function SignUp() {
           .insert([{
             name: orgName,
             logo_url: logoUrl,
-            industry,
             company_size: companySize,
             website,
             address,
-            contact_name: contactName,
-            contact_email: contactEmail,
             contact_phone: contactPhone
           }])
           .select()
           .single();
         if (orgError) throw orgError;
         // 4. Update user with organization_id and role
-        await supabase
+        const { error: userUpdateError } = await supabase
           .from('users')
           .update({ organization_id: orgData.id, role: 'hr' })
           .eq('id', user.id);
+        if (userUpdateError) throw userUpdateError;
         // 5. Redirect to confirmation page
         navigate("/auth/email-confirmation", {
           state: {
