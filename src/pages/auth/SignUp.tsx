@@ -45,13 +45,12 @@ export default function SignUp() {
         return;
       }
       try {
-        // 1. Sign up the user
+        // 1. Register with Supabase Auth
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
         });
         if (signUpError || !signUpData.user) throw signUpError || new Error('User not created');
-        const user = signUpData.user;
         // 2. Upload logo
         const fileExt = logoFile.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
@@ -63,31 +62,26 @@ export default function SignUp() {
           .from('organization-logos')
           .getPublicUrl(fileName);
         const logoUrl = urlData.publicUrl;
-        // 3. Create organization
+        // 3. Insert organization record (do NOT store password)
         let websiteToSubmit = website;
         if (websiteToSubmit && !/^https?:\/\//i.test(websiteToSubmit)) {
           websiteToSubmit = 'https://' + websiteToSubmit;
         }
-        const { data: orgData, error: orgError } = await supabase
+        const { error: orgError } = await supabase
           .from('organizations')
           .insert([{
             name: orgName,
-            logo_url: logoUrl,
             company_size: companySize,
+            logo_url: logoUrl,
             website: websiteToSubmit,
             address,
+            email,
             contact_phone: contactPhone
           }])
           .select()
           .single();
         if (orgError) throw orgError;
-        // 4. Update user with organization_id and role
-        const { error: userUpdateError } = await supabase
-          .from('users')
-          .update({ organization_id: orgData.id, role: 'hr' })
-          .eq('id', user.id);
-        if (userUpdateError) throw userUpdateError;
-        // 5. Redirect to confirmation page
+        // 4. Redirect to confirmation page
         navigate("/auth/email-confirmation", {
           state: {
             message: "Please check your email for the confirmation link. If you don't see it, check your spam folder."
