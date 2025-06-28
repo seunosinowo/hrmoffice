@@ -64,13 +64,17 @@ export default function SignUp() {
           .getPublicUrl(fileName);
         const logoUrl = urlData.publicUrl;
         // 3. Create organization
+        let websiteToSubmit = website;
+        if (websiteToSubmit && !/^https?:\/\//i.test(websiteToSubmit)) {
+          websiteToSubmit = 'https://' + websiteToSubmit;
+        }
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
           .insert([{
             name: orgName,
             logo_url: logoUrl,
             company_size: companySize,
-            website,
+            website: websiteToSubmit,
             address,
             contact_phone: contactPhone
           }])
@@ -271,7 +275,7 @@ export default function SignUp() {
                     <input
                       type="url"
                       className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400"
-                      placeholder="Website"
+                      placeholder="e.g. https://digital.com.ng"
                       value={website}
                       onChange={e => setWebsite(e.target.value)}
                     />
