@@ -12,7 +12,7 @@ export async function createOrganizationWithLogo(orgName: string, logoFile: File
   // 1. Upload logo to 'organization-logos' bucket
   const fileExt = logoFile.name.split('.').pop();
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-  const { data: uploadData, error: uploadError } = await supabase
+  const { error: uploadError } = await supabase
     .storage
     .from('organization-logos')
     .upload(fileName, logoFile);
