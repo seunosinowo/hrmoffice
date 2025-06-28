@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -8,6 +8,18 @@ export default function SetupOrganization() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // On mount, check if the user already has an organization_id
+    const checkOrgSetup = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && user.user_metadata && user.user_metadata.organization_id) {
+        // If organization_id exists, redirect to dashboard
+        navigate('/dashboard');
+      }
+    };
+    checkOrgSetup();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
