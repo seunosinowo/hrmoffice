@@ -6,7 +6,7 @@ import PublicLayout from "./layout/PublicLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import { RoleBasedRoute } from "./components/RoleBasedRoute";
 import SetupOrganization from './pages/SetupOrganization';
-import OrganizationDashboardWrapper from "./pages/OrganizationDashboardWrapper";
+// import OrganizationDashboardWrapper from "./pages/OrganizationDashboardWrapper";
 import OrganizationLogin from "./pages/auth/OrganizationLogin";
 import OrganizationDashboard from "./pages/OrganizationDashboard";
 
@@ -212,7 +212,7 @@ export default function App() {
               </Route>
 
               {/* Organization Dashboard Route */}
-              <Route path="/org/dashboard" element={<OrganizationDashboardWrapper />} />
+              {/* <Route path="/org/dashboard" element={<OrganizationDashboardWrapper />} /> */}
             </Route>
           )}
 
