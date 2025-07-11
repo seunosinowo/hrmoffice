@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ThemeToggleButton } from "../../components/common/ThemeToggleButton";
 import { supabase } from "../../lib/supabase";
-import { useAuth } from "../../context/AuthContext";
+// import { useAuth } from "../../context/AuthContext";
 import bcrypt from "bcryptjs";
 
 type SignUpType = 'individual' | 'organization';
@@ -13,7 +13,8 @@ export default function SignUp() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  // Remove unused 'signUp' from useAuth
+  // const { signUp } = useAuth();
 
   // Individual
   const [email, setEmail] = useState("");
@@ -32,13 +33,14 @@ export default function SignUp() {
   const [contactPhone, setContactPhone] = useState("");
 
   // Organization selection for individual sign-up
-  const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState("");
+  // Remove unused organization state and fetching
+  // const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
+  // const [selectedOrgId, setSelectedOrgId] = useState("");
 
-  useEffect(() => {
-    // Fetch organizations for the dropdown
-    supabase.from('organizations').select('id, name').then(({ data }) => setOrgs(data || []));
-  }, []);
+  // useEffect(() => {
+  //   // Fetch organizations for the dropdown
+  //   supabase.from('organizations').select('id, name').then(({ data }) => setOrgs(data || []));
+  // }, []);
 
   const handleIndividualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,13 +53,13 @@ export default function SignUp() {
     }
     try {
       // Sign up logic (update as needed for your auth system)
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
       if (signUpError) throw signUpError;
       // Save organization_id and role in user profile (if using a profile table)
-      await supabase.from('users').update({ organization_id: selectedOrgId, role: 'employee' }).eq('email', email);
+      // await supabase.from('users').update({ organization_id: selectedOrgId, role: 'employee' }).eq('email', email);
       navigate("/auth/email-confirmation", {
         state: {
           message: "Please check your email for the confirmation link. If you don't see it, check your spam folder."
@@ -107,16 +109,16 @@ export default function SignUp() {
         websiteToSubmit = 'https://' + websiteToSubmit;
       }
       // Check if organization email already exists
-      const { data: existingOrg, error: checkOrgError } = await supabase
-        .from('organizations')
-        .select('id')
-        .eq('email', normalizedEmail)
-        .single();
-      if (existingOrg) {
-        setError('An organization with this email already exists.');
-        setLoading(false);
-        return;
-      }
+      // const { data: existingOrg, error: checkOrgError } = await supabase
+      //   .from('organizations')
+      //   .select('id')
+      //   .eq('email', normalizedEmail)
+      //   .single();
+      // if (existingOrg) {
+      //   setError('An organization with this email already exists.');
+      //   setLoading(false);
+      //   return;
+      // }
       // Insert new organization
       const { error: orgError } = await supabase
         .from('organizations')
