@@ -41,5 +41,5 @@ export default function OrganizationDashboardWrapper() {
 
   if (loading) return <div>Loading...</div>;
   // Always render dashboard, even if org is null
-  return <OrganizationDashboard org={org} />;
+  return <OrganizationDashboard />;
 } 
