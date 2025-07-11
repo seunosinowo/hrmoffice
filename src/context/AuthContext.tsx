@@ -10,6 +10,7 @@ type User = {
   id: string;
   email: string;
   roles: string[];
+  organization_id?: string;
 };
 
 type AuthContextType = {
@@ -398,7 +399,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser({
             id: session.user.id,
             email: session.user.email!,
-            roles: initialRoles
+            roles: initialRoles,
+            organization_id: session.user.user_metadata?.organization_id
           });
 
           // Then fetch actual roles in the background
@@ -409,12 +411,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem('hrmoffice_user_data', JSON.stringify({
               id: session.user.id,
               email: session.user.email,
-              roles: roles
+              roles: roles,
+              organization_id: session.user.user_metadata?.organization_id
             }));
 
             setUser(prevUser => {
               if (prevUser) {
-                return { ...prevUser, roles };
+                return { ...prevUser, roles, organization_id: session.user.user_metadata?.organization_id };
               }
               return null;
             });
@@ -483,7 +486,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser({
           id: session.user.id,
           email: session.user.email!,
-          roles: initialRoles
+          roles: initialRoles,
+          organization_id: session.user.user_metadata?.organization_id
         });
 
         // Then fetch actual roles in the background
@@ -494,12 +498,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem('hrmoffice_user_data', JSON.stringify({
             id: session.user.id,
             email: session.user.email,
-            roles: roles
+            roles: roles,
+            organization_id: session.user.user_metadata?.organization_id
           }));
 
           setUser(prevUser => {
             if (prevUser) {
-              return { ...prevUser, roles };
+              return { ...prevUser, roles, organization_id: session.user.user_metadata?.organization_id };
             }
             return null;
           });
@@ -577,7 +582,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem('hrmoffice_user_data', JSON.stringify({
             id: data.user.id,
             email: data.user.email,
-            roles: roles
+            roles: roles,
+            organization_id: data.user.user_metadata?.organization_id
           }));
 
           // The auth state change handler will set the user with these roles

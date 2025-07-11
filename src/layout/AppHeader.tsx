@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { HorizontaLDots, CloseLineIcon } from "../icons";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 
 export default function AppHeader() {
   const [isOpen, setIsOpen] = useState(false);
@@ -11,6 +12,38 @@ export default function AppHeader() {
   const location = useLocation();
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Org logo state
+  const [orgLogo, setOrgLogo] = useState<string | null>(null);
+
+  // Fetch org logo if user is authenticated
+  useEffect(() => {
+    async function fetchOrgLogo() {
+      if (user) {
+        // Fetch the user's organization_id from users table
+        const { data: userData } = await supabase
+          .from('users')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single();
+        const orgId = userData?.organization_id;
+        if (orgId) {
+          // Fetch the org's logo_url
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('logo_url')
+            .eq('id', orgId)
+            .single();
+          setOrgLogo(orgData?.logo_url || null);
+        } else {
+          setOrgLogo(null);
+        }
+      } else {
+        setOrgLogo(null);
+      }
+    }
+    fetchOrgLogo();
+  }, [user]);
 
   // Close the mobile menu when clicking outside of it
   useEffect(() => {
@@ -67,12 +100,14 @@ export default function AppHeader() {
           <div className="flex">
             <div className="flex flex-shrink-0 items-center">
               {user ? (
-                // When user is authenticated, show as plain text (not clickable)
-                <span className="text-xl font-bold text-gray-900 dark:text-white cursor-default">
-                  HRM&nbsp;Office
-                </span>
+                orgLogo ? (
+                  <img src={orgLogo} alt="Organization Logo" className="h-10 w-auto" />
+                ) : (
+                  <span className="text-xl font-bold text-gray-900 dark:text-white cursor-default">
+                    HRM&nbsp;Office
+                  </span>
+                )
               ) : (
-                // When user is not authenticated, show as a link to home page
                 <Link to="/" className="text-xl font-bold text-gray-900 dark:text-white">
                   HRM&nbsp;Office
                 </Link>
