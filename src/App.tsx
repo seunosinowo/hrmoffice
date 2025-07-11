@@ -6,6 +6,9 @@ import PublicLayout from "./layout/PublicLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import { RoleBasedRoute } from "./components/RoleBasedRoute";
 import SetupOrganization from './pages/SetupOrganization';
+import OrganizationDashboardWrapper from "./pages/OrganizationDashboardWrapper";
+import OrganizationLogin from "./pages/auth/OrganizationLogin";
+import OrganizationDashboard from "./pages/OrganizationDashboard";
 
 
 // Lazy load components
@@ -101,6 +104,7 @@ export default function App() {
       <ScrollToTop />
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
+          <Route path="/organization/dashboard" element={<OrganizationDashboard />} />
           {/* Auth Routes */}
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<SignUp />} />
@@ -109,6 +113,7 @@ export default function App() {
           <Route path="/auth/welcome-page" element={<WelcomePage />} />
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
           <Route path="/auth/reset-password" element={<ResetPassword />} />
+          <Route path="/auth/org-login" element={<OrganizationLogin />} />
 
           {/* Organization Setup Route - accessible after email confirmation */}
           <Route element={<RoleBasedRoute allowedRoles={['hr']} />}>
@@ -205,6 +210,9 @@ export default function App() {
                 {/* <Route path="/hr/analytics" element={<HRAnalytics />} /> */}
                 <Route path="/hr/competency-set" element={<HRManagementStandard />} />
               </Route>
+
+              {/* Organization Dashboard Route */}
+              <Route path="/org/dashboard" element={<OrganizationDashboardWrapper />} />
             </Route>
           )}
 
