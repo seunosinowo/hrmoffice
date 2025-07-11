@@ -15,7 +15,6 @@ interface Organization {
 }
 
 export default function OrganizationDashboardWrapper() {
-  const [org, setOrg] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,9 +29,6 @@ export default function OrganizationDashboardWrapper() {
           .select("id, name, logo_url, industry, company_size, website, address, email, contact_phone")
           .eq("email", orgEmail)
           .single();
-        setOrg(data || null);
-      } else {
-        setOrg(null);
       }
       setLoading(false);
     }
