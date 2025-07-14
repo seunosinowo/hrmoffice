@@ -38,7 +38,7 @@ export default function BookDemoPage() {
         throw new Error('Please fill in all required fields');
       }
 
-      // Convert time to 24-hour format for the email --
+      // Convert time to 24-hour format for the email ----
       const [hours] = formData.time.split(':');
       let hour = parseInt(hours);
       if (formData.timePeriod === 'PM' && hour !== 12) {
