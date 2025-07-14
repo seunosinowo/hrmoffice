@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ChevronLeftIcon, CalenderIcon } from "../../icons";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
@@ -7,7 +7,6 @@ import Select from "../../components/form/input/Select";
 // Removed emailjs import
 
 export default function BookDemoPage() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
