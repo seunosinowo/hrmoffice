@@ -2,66 +2,141 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ThemeToggleButton } from "../../components/common/ThemeToggleButton";
 import { supabase } from "../../lib/supabase";
-import { useAuth } from "../../context/AuthContext";
+// import { useAuth } from "../../context/AuthContext";
+import bcrypt from "bcryptjs";
 
 type SignUpType = 'individual' | 'organization';
 
 export default function SignUp() {
+  const [signUpType, setSignUpType] = useState<SignUpType>('individual');
+  // Shared
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  // Remove unused 'signUp' from useAuth
+  // const { signUp } = useAuth();
+
+  // Individual
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [signUpType, setSignUpType] = useState<SignUpType | null>(null);
-  const navigate = useNavigate();
-  const { signUp } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Organization
+  const [orgName, setOrgName] = useState("");
+  const [companySize, setCompanySize] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [website, setWebsite] = useState("");
+  const [address, setAddress] = useState("");
+  const [orgEmail, setOrgEmail] = useState("");
+  const [orgPassword, setOrgPassword] = useState("");
+  const [orgConfirmPassword, setOrgConfirmPassword] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+
+  // Organization selection for individual sign-up
+  // Remove unused organization state and fetching
+  // const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
+  // const [selectedOrgId, setSelectedOrgId] = useState("");
+
+  // useEffect(() => {
+  //   // Fetch organizations for the dropdown
+  //   supabase.from('organizations').select('id, name').then(({ data }) => setOrgs(data || []));
+  // }, []);
+
+  const handleIndividualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       setLoading(false);
       return;
     }
-
     try {
-      await signUp(email, password);
+      // Sign up logic (update as needed for your auth system)
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (signUpError) throw signUpError;
+      // Save organization_id and role in user profile (if using a profile table)
+      // await supabase.from('users').update({ organization_id: selectedOrgId, role: 'employee' }).eq('email', email);
       navigate("/auth/email-confirmation", {
         state: {
           message: "Please check your email for the confirmation link. If you don't see it, check your spam folder."
         }
       });
     } catch (error: any) {
-      if (error.message.includes('already registered')) {
-        setError("This email is already registered. Please try logging in instead.");
-      } else if (error.message.includes('email')) {
-        setError("There was an issue sending the verification email. Please try again or use a different email provider.");
-      } else {
         setError(error.message);
-      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleOrganizationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    if (orgPassword !== orgConfirmPassword) {
+      setError("Passwords do not match");
+      setLoading(false);
+      return;
+    }
+    if (!orgName || !logoFile || !orgEmail || !orgPassword) {
+      setError("Please fill all required fields");
+      setLoading(false);
+      return;
+    }
     try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.hostname === 'localhost'
-            ? 'http://localhost:5173/auth/callback'
-            : 'https://hrmoffice.vercel.app/auth/callback'
-        }
-      });
-
-      if (error) throw error;
-    } catch (error: any) {
-      setError(error.message);
+      // Normalize organization email for consistency
+      const normalizedEmail = orgEmail.trim().toLowerCase();
+      // 1. Hash password
+      const salt = bcrypt.genSaltSync(10);
+      const passwordHash = bcrypt.hashSync(orgPassword, salt);
+      // 2. Upload logo
+      const fileExt = logoFile.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('organization-logos')
+        .upload(fileName, logoFile);
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage
+        .from('organization-logos')
+        .getPublicUrl(fileName);
+      const logoUrl = urlData.publicUrl;
+      // 3. Insert organization record
+      let websiteToSubmit = website;
+      if (websiteToSubmit && !/^https?:\/\//i.test(websiteToSubmit)) {
+        websiteToSubmit = 'https://' + websiteToSubmit;
+      }
+      // Check if organization email already exists
+      // const { data: existingOrg, error: checkOrgError } = await supabase
+      //   .from('organizations')
+      //   .select('id')
+      //   .eq('email', normalizedEmail)
+      //   .single();
+      // if (existingOrg) {
+      //   setError('An organization with this email already exists.');
+      //   setLoading(false);
+      //   return;
+      // }
+      // Insert new organization
+      const { error: orgError } = await supabase
+        .from('organizations')
+        .insert([{
+          name: orgName,
+          company_size: companySize,
+          logo_url: logoUrl,
+          website: websiteToSubmit,
+          address,
+          email: normalizedEmail,
+          password_hash: passwordHash,
+          contact_phone: contactPhone
+        }]);
+      if (orgError) throw orgError;
+      // Navigate to dashboard after successful sign up
+      navigate("/organization/dashboard");
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign up organization');
     } finally {
       setLoading(false);
     }
@@ -76,25 +151,7 @@ export default function SignUp() {
           </Link>
           <ThemeToggleButton />
         </div>
-
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900 dark:text-white">
-            Create your account
-          </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Or{" "}
-            <Link
-              to="/auth/login"
-              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              sign in to your account
-            </Link>
-          </p>
-        </div>
-
-        <div className="mt-8 space-y-6">
-          <div className="flex flex-col space-y-4">
-            <div className="flex justify-between space-x-4">
+        <div className="flex space-x-2 mb-6">
               <button
                 type="button"
                 onClick={() => setSignUpType('individual')}
@@ -117,8 +174,8 @@ export default function SignUp() {
                   <span className="text-sm font-medium text-gray-900 dark:text-white">Individual</span>
                 </div>
               </button>
-
-              <button
+              {/* Organization sign up card/button */}
+              {/* <button
                 type="button"
                 onClick={() => setSignUpType('organization')}
                 className={`flex-1 p-4 border-2 rounded-lg text-center transition-all duration-200 ${
@@ -140,29 +197,23 @@ export default function SignUp() {
                   <span className="text-sm font-medium text-gray-900 dark:text-white">Organization</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Sign up as organization</span>
                 </div>
-              </button>
+              </button> */}
             </div>
-
-            {signUpType && (
-              <div className="mt-6 text-center">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                  Sign up as {signUpType.charAt(0).toUpperCase() + signUpType.slice(1)}
-                </h3>
+        <div className="text-center">
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900 dark:text-white">
+            {signUpType === 'individual' ? 'Sign up as Individual' : 'Sign up as Organization'}
+          </h2>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                   Please fill in your details below to create your account
                 </p>
               </div>
-            )}
-          </div>
-
-          {signUpType && (
-            <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
               {error && (
                 <div className="bg-red-50 dark:bg-red-900/50 text-red-600 dark:text-red-400 p-3 rounded-md text-sm">
                   {error}
                 </div>
               )}
-
+        {signUpType === 'individual' ? (
+          <form className="mt-8 space-y-6" onSubmit={handleIndividualSubmit}>
               <div className="space-y-4">
                 <div>
                   <label htmlFor="email-address" className="sr-only">
@@ -175,12 +226,11 @@ export default function SignUp() {
                     autoComplete="email"
                     required
                     className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
-                    placeholder="Email&nbsp;address"
+                  placeholder="Email address"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
-
                 <div>
                   <label htmlFor="password" className="sr-only">
                     Password
@@ -197,25 +247,37 @@ export default function SignUp() {
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
-
                 <div>
                   <label htmlFor="confirm-password" className="sr-only">
                     Confirm Password
                   </label>
                   <input
                     id="confirm-password"
-                    name="confirm-password"
+                  name="confirmPassword"
                     type="password"
                     autoComplete="new-password"
                     required
                     className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm dark:bg-gray-800 mb-4"
-                    placeholder="Confirm&nbsp;Password"
+                  placeholder="Confirm Password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                   />
                 </div>
-              </div>
-
+              {/* <div>
+                <label className="block mb-1 font-medium text-gray-900 dark:text-white">Organization *</label>
+                <select
+                  className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white bg-white dark:bg-gray-800"
+                  value={selectedOrgId}
+                  onChange={e => setSelectedOrgId(e.target.value)}
+                  required
+                >
+                  <option value="">Select Organization</option>
+                  {orgs.map(org => (
+                    <option key={org.id} value={org.id}>{org.name}</option>
+                  ))}
+                </select>
+              </div> */}
+            </div>
               <div>
                 <button
                   type="submit"
@@ -234,7 +296,6 @@ export default function SignUp() {
                     "Create account"
                   )}
                 </button>
-
                 <div className="mt-4 text-center">
                   <Link
                     to="/auth/forgot-password"
@@ -244,38 +305,68 @@ export default function SignUp() {
                   </Link>
                 </div>
               </div>
-
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300 dark:border-gray-700"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400">
-                      Or continue with
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignIn}
-                    disabled={loading}
-                    className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="currentColor"
-                        d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"
-                      />
-                    </svg>
-                    Sign up with Google
-                  </button>
-                </div>
+          </form>
+        ) : (
+          <form className="mt-8 space-y-6" onSubmit={handleOrganizationSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="col-span-1">
+                <label className="block mb-1 font-medium text-gray-900 dark:text-white">Organization Name *</label>
+                <input type="text" className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800" value={orgName} onChange={e => setOrgName(e.target.value)} required />
               </div>
+              <div className="col-span-1">
+                <label className="block mb-1 font-medium text-gray-900 dark:text-white">Organization Size</label>
+                <input type="text" className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800" value={companySize} onChange={e => setCompanySize(e.target.value)} />
+              </div>
+              <div className="col-span-1">
+                <label className="block mb-1 font-medium text-gray-900 dark:text-white">Organization Logo *</label>
+                <input type="file" accept="image/*" required className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white bg-white dark:bg-gray-800" onChange={e => setLogoFile(e.target.files?.[0] || null)} />
+              </div>
+              <div className="col-span-1">
+                <label className="block mb-1 font-medium text-gray-900 dark:text-white">Website</label>
+                <input type="url" className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800" placeholder="e.g. https://digital.com.ng" value={website} onChange={e => setWebsite(e.target.value)} />
+              </div>
+              <div className="col-span-1">
+                <label className="block mb-1 font-medium text-gray-900 dark:text-white">Address</label>
+                <input type="text" className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800" value={address} onChange={e => setAddress(e.target.value)} />
+                  </div>
+              <div className="col-span-1">
+                <label className="block mb-1 font-medium text-gray-900 dark:text-white">Email *</label>
+                <input type="email" className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800" value={orgEmail} onChange={e => setOrgEmail(e.target.value)} required />
+                  </div>
+              <div className="col-span-1">
+                <label className="block mb-1 font-medium text-gray-900 dark:text-white">Password *</label>
+                <input type="password" className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800" value={orgPassword} onChange={e => setOrgPassword(e.target.value)} required />
+                </div>
+              <div className="col-span-1">
+                <label className="block mb-1 font-medium text-gray-900 dark:text-white">Confirm Password *</label>
+                <input type="password" className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800" value={orgConfirmPassword} onChange={e => setOrgConfirmPassword(e.target.value)} required />
+                </div>
+              <div className="col-span-1">
+                <label className="block mb-1 font-medium text-gray-900 dark:text-white">Contact Phone</label>
+                <input type="tel" className="w-full border px-3 py-2 rounded mb-4 border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-800" value={contactPhone} onChange={e => setContactPhone(e.target.value)} />
+              </div>
+            </div>
+            <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded mt-2" disabled={loading}>
+              {loading ? 'Signing up...' : 'Sign Up'}
+            </button>
             </form>
           )}
+        <div className="mt-4 text-center">
+          {/* Organization links at the bottom */}
+          {/* <Link
+            to="/auth/org-signup"
+            className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            Sign up as an Organization (no email confirmation)
+          </Link>
+          <div className="mt-2">
+            <Link
+              to="/auth/org-login"
+              className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Organization Login
+            </Link>
+          </div> */}
         </div>
       </div>
     </div>

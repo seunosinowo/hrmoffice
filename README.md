@@ -116,4 +116,22 @@ The HR Management System offers a range of features and tools to support HR prof
 - API: RESTful with Supabase
 - Testing: Jest & React Testing Library
 
-### 
+## Enabling Organization Sign Up and Login
+
+By default, the organization sign up card/button and the organization-related links at the bottom of the sign up page are commented out in `src/pages/auth/SignUp.tsx` for individual user testing.
+
+### How to Re-enable Organization Sign Up and Login
+
+1. Open `src/pages/auth/SignUp.tsx` in your code editor.
+2. Locate the commented sections marked as:
+   - `/* Organization sign up card/button */`
+   - `/* Organization links at the bottom */`
+3. Uncomment the relevant code blocks to restore the organization sign up and login options.
+4. Save the file and restart your development server if necessary.
+
+### When to Uncomment
+- Uncomment these sections when you want to allow users to sign up as an organization or access the organization login page.
+- Keep them commented if you only want to test or allow individual user sign up.
+
+---
+If you have any questions, please refer to the code comments or contact the project maintainer. 
