@@ -14,7 +14,7 @@ function PageDescription() {
               HR Management System (HR ROLE)
             </h1>
             <p className="max-w-2xl text-gray-600 dark:text-gray-400">
-              Our Human Resources team is the heart of Soto Nigeria | Digital Energy, dedicated to fostering a vibrant and high-performing workforce. We empower our people, cultivate talent, and champion a culture of growth and innovation, ensuring every member of our team can contribute to shaping Nigeria's digital energy future
+              Our Human Resources team is the heart of HRM office, dedicated to fostering a vibrant and high-performing workforce. We empower our people, cultivate talent, and champion a culture of growth and innovation, ensuring every member of our team can contribute to shaping Nigeria's digital energy future
               
             </p>
           </div>

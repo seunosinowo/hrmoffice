@@ -1,15 +1,14 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ChevronLeftIcon, CalenderIcon } from "../../icons";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import Select from "../../components/form/input/Select";
-import emailjs from '@emailjs/browser';
 
 export default function BookDemoPage() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -38,32 +37,30 @@ export default function BookDemoPage() {
         throw new Error('Please fill in all required fields');
       }
 
-      // Convert time to 24-hour format for the email ----
-      const [hours] = formData.time.split(':');
-      let hour = parseInt(hours);
-      if (formData.timePeriod === 'PM' && hour !== 12) {
-        hour += 12;
-      } else if (formData.timePeriod === 'AM' && hour === 12) {
-        hour = 0;
+      // Prepare data for w3forms
+      const w3formData = new FormData();
+      Object.entries(formData).forEach(([key, value]) => {
+        w3formData.append(key, value);
+      });
+
+      // Use your w3forms public access key
+      const w3formsUrl = 'https://w3forms.com/api/forms/public/submit/53162de4-b933-422e-85d8-284be6830a0f';
+
+      // Add a title/subject for the email
+      w3formData.append('title', 'New Demo Booking Request');
+
+      const response = await fetch(w3formsUrl, {
+        method: 'POST',
+        body: w3formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit demo request. Please try again.');
       }
 
-      const templateParams = {
-        ...formData,
-        time: `${formData.time} ${formData.timePeriod}`,
-        to_email: 'hrmanager@hrmoffice.org',
-        currentYear: new Date().getFullYear()
-      };
-
-      await emailjs.send(
-        'service_kqm5gnv',
-        'template_fdjyx5e',
-        templateParams,
-        'd_M8_7oyJ_d-WJMqQ'
-      );
-
-      navigate('/demo-success');
+      setSuccess(true);
     } catch (err) {
-      console.error('Error sending email:', err);
+      console.error('Error submitting form:', err);
       setError(err instanceof Error ? err.message : 'Failed to submit demo request. Please try again.');
     } finally {
       setLoading(false);
@@ -139,138 +136,144 @@ export default function BookDemoPage() {
               <p className="text-gray-500 dark:text-gray-400">Schedule a personalized demo with our experts</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <Label>Full Name<span className="text-error-500">*</span></Label>
-                  <Input
-                    type="text"
-                    name="name"
-                    placeholder="Your name"
-                    value={formData.name}
-                    onChange={handleChange}
-                  />
-                </div>
-                <div>
-                  <Label>Email<span className="text-error-500">*</span></Label>
-                  <Input
-                    type="email"
-                    name="email"
-                    placeholder="your@email.com"
-                    value={formData.email}
-                    onChange={handleChange}
-                  />
+            {success ? (
+              <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 p-6 rounded-lg flex flex-col items-center justify-center text-center shadow-md">
+                <svg className="w-12 h-12 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <h2 className="text-2xl font-bold mb-2">Thank you for booking a demo!</h2>
+                <p className="mb-4">Your request has been received. Our team will contact you soon to confirm your demo session.</p>
+                <div className="flex gap-4">
+                  <Link to="/" className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">Back to Home</Link>
+                  <button onClick={() => { setSuccess(false); setFormData({ name: "", email: "", company: "", role: "", date: "", time: "", timePeriod: "AM", attendees: "1-5", message: "" }); }} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition">Book Another Demo</button>
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <Label>Company Name<span className="text-error-500">*</span></Label>
-                  <Input
-                    type="text"
-                    name="company"
-                    placeholder="Your company"
-                    value={formData.company}
-                    onChange={handleChange}
-                  />
-                </div>
-                <div>
-                  <Label>Your Role<span className="text-error-500">*</span></Label>
-                  <Select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    options={[
-                      { value: "", label: "Select your role" },
-                      { value: "executive", label: "Executive/C-Level" },
-                      { value: "manager", label: "Manager" },
-                      { value: "director", label: "Director" },
-                      { value: "other", label: "Other" }
-                    ]}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <Label>Preferred Date<span className="text-error-500">*</span></Label>
-                  <div className="relative">
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <Label>Full Name<span className="text-error-500">*</span></Label>
                     <Input
-                      type="date"
-                      name="date"
-                      value={formData.date}
+                      type="text"
+                      name="name"
+                      placeholder="Your name"
+                      value={formData.name}
                       onChange={handleChange}
-                      className="pl-3 pr-10 dark:text-white"
                     />
-                    <CalenderIcon className="absolute right-3 top-1/2 -translate-y-1/2 size-5 text-gray-400 dark:text-gray-300 pointer-events-none" />
+                  </div>
+                  <div>
+                    <Label>Email<span className="text-error-500">*</span></Label>
+                    <Input
+                      type="email"
+                      name="email"
+                      placeholder="your@email.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                    />
                   </div>
                 </div>
-                <div>
-                  <Label>Preferred Time<span className="text-error-500">*</span></Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        type="time"
-                        name="time"
-                        value={formData.time}
-                        onChange={handleChange}
-                        className="w-full dark:text-white"
-                      />
-                    </div>
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <Label>Company Name<span className="text-error-500">*</span></Label>
+                    <Input
+                      type="text"
+                      name="company"
+                      placeholder="Your company"
+                      value={formData.company}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div>
+                    <Label>Your Role<span className="text-error-500">*</span></Label>
                     <Select
-                      name="timePeriod"
-                      value={formData.timePeriod}
+                      name="role"
+                      value={formData.role}
                       onChange={handleChange}
                       options={[
-                        { value: "AM", label: "AM" },
-                        { value: "PM", label: "PM" }
+                        { value: "", label: "Select your role" },
+                        { value: "executive", label: "Executive/C-Level" },
+                        { value: "manager", label: "Manager" },
+                        { value: "director", label: "Director" },
+                        { value: "other", label: "Other" }
                       ]}
                     />
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <Label>Number of Attendees</Label>
-                <Select
-                  name="attendees"
-                  value={formData.attendees}
-                  onChange={handleChange}
-                  options={[
-                    { value: "1-5", label: "1-5 people" },
-                    { value: "6-10", label: "6-10 people" },
-                    { value: "10+", label: "10+ people" }
-                  ]}
-                />
-              </div>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <Label>Preferred Date<span className="text-error-500">*</span></Label>
+                    <div className="relative">
+                      <Input
+                        type="date"
+                        name="date"
+                        value={formData.date}
+                        onChange={handleChange}
+                        className="pl-3 pr-10 dark:text-white"
+                      />
+                      <CalenderIcon className="absolute right-3 top-1/2 -translate-y-1/2 size-5 text-gray-400 dark:text-gray-300 pointer-events-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Preferred Time<span className="text-error-500">*</span></Label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input
+                          type="time"
+                          name="time"
+                          value={formData.time}
+                          onChange={handleChange}
+                          className="w-full dark:text-white"
+                        />
+                      </div>
+                      <Select
+                        name="timePeriod"
+                        value={formData.timePeriod}
+                        onChange={handleChange}
+                        options={[
+                          { value: "AM", label: "AM" },
+                          { value: "PM", label: "PM" }
+                        ]}
+                      />
+                    </div>
+                  </div>
+                </div>
 
-              <div>
-                <Label>Anything specific you'd like to see?</Label>
-                <textarea
-                  name="message"
-                  rows={3}
-                  className="w-full px-3 py-2 text-sm border rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:border-brand-500 focus:ring-brand-500"
-                  placeholder="Tell us about your needs or questions..."
-                  value={formData.message}
-                  onChange={handleChange}
-                ></textarea>
-              </div>
+                <div>
+                  <Label>Number of Attendees</Label>
+                  <Select
+                    name="attendees"
+                    value={formData.attendees}
+                    onChange={handleChange}
+                    options={[
+                      { value: "1-5", label: "1-5 people" },
+                      { value: "6-10", label: "6-10 people" },
+                      { value: "10+", label: "10+ people" }
+                    ]}
+                  />
+                </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className={`w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg ${
-                  loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600'
-                } shadow-theme-xs`}
-              >
-                {loading ? 'Submitting...' : 'Schedule Demo'}
-              </button>
-            </form>
+                <div>
+                  <Label>Anything specific you'd like to see?</Label>
+                  <textarea
+                    name="message"
+                    value={formData.message}
+                    onChange={handleChange}
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={3}
+                  />
+                </div>
 
-            {error && (
-              <div className="mt-4 p-4 text-sm text-red-600 bg-red-50 rounded-lg">
-                {error}
-              </div>
+                <button
+                  type="submit"
+                  className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-lg shadow hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
+                  {loading ? 'Booking...' : 'Book Demo'}
+                </button>
+                {error && <div className="text-red-600 dark:text-red-400 text-center mt-2">{error}</div>}
+              </form>
             )}
           </div>
         </div>
