@@ -72,13 +72,7 @@ function PageDescription() {
 
       {/* Call to Action */}
       <div className="relative z-10 mt-12 flex flex-col items-center">
-        <a
-          href="/employee-details"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow hover:bg-blue-700 transition-colors text-lg"
-        >
-          Get Started
-          <ArrowRightIcon className="h-5 w-5" />
-        </a>
+        
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">You can always revisit this page for guidance.</p>
       </div>
     </div>
